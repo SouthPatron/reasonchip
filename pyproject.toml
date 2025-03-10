@@ -4,25 +4,31 @@ build-backend = "setuptools.build_meta"
 
 
 [project]
+requires-python = ">=3.12"
 name = "reasonchip"
 version = "0.0.1"
 authors = [
-  { name="ReasonChip", email="support@reasonchip.io" },
+  { name="ReasonChip" },
 ]
 description = "Agentic workflow tools"
 readme = "README.md"
-requires-python = ">=3.12"
 classifiers = [
 	'Development Status :: 4 - Beta',
+    'Environment :: Console',
 	'Intended Audience :: Developers',
 	'Programming Language :: Python :: 3',
-	'License :: OSI Approved :: GNU General Public License (GPLv3)',
-	'Operating System :: OS Independent',
+    'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+	'Operating System :: POSIX',
 	'Topic :: Software Development :: Libraries',
 	'Topic :: System :: Distributed Computing',
 ]
+dynamic = ["dependencies"]
 
 [project.urls]
-Homepage = "https://www.reasonchip.io/"
-GitHub = "https://github.com/SouthPatron/reasonchip"
-Documentation = "https://www.reasonchip.io/docs/"
+"Homepage" = "https://www.reasonchip.io/"
+"Source Code" = "https://github.com/SouthPatron/reasonchip"
+"Bug Tracker" = "https://github.com/SouthPatron/reasonchip/issues/"
+"Documentation" = "https://www.reasonchip.io/docs/"
+
+[tool.setuptools.dynamic]
+dependencies = {file = "requirements.txt"}
