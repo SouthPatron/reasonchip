@@ -1,3 +1,6 @@
+# Process management
+setproctitle>=1.3.4
+
 # openapi-generator-cli requirements
 urllib3>=1.25.3,<3.0.0
 python-dateutil>=2.8.2
@@ -6,22 +9,21 @@ aiohttp-retry>=2.8.3
 pydantic>=2
 typing-extensions>=4.7.1
 
-
 # reasonchip library
-ruamel.yaml==0.18.6
-dotty_dict==1.3.1
-munch==4.0.0
+ruamel.yaml>=0.18.6
+dotty_dict>=1.3.1
+munch>=4.0.0
 
-# Server
-fastapi==0.115.6
+# Servers
+fastapi>=0.115.6
+hypercorn[h3]>=0.17.3
+grpcio>=1.68.1
+grpcio-reflection>=1.68.1
+grpcio-tools>=1.68.1
 
 # Chip specific
-
-httpx==0.28.1
-
-openai==1.61.1
-
-redis[hiredis]==5.2.1
-
-python-telegram-bot==21.10
+httpx>=0.28.1
+openai>=1.61.1
+redis[hiredis]>=5.2.1
+python-telegram-bot>=21.10
 
