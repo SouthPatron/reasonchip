@@ -6,6 +6,29 @@ class ReasonChipException(Exception):
     pass
 
 
+# --------- Client-side Exceptions ------------------------------------------
+
+class ClientSideException(ReasonChipException):
+    pass
+
+
+# --------- Server-side Exceptions ------------------------------------------
+
+
+class ServerSideException(ReasonChipException):
+    pass
+
+
+# --------- General Exceptions ----------------------------------------------
+
+class ConfigurationException(ReasonChipException):
+    pass
+
+
+
+class TooBusyException(ReasonChipException):
+    pass
+
 
 # --------- Parsing Exceptions ----------------------------------------------
 
@@ -69,7 +92,7 @@ class PipelineFormatException(ParsingException):
         return resp
 
 
-# --------- Registry Exceptions -----------------------------------------------
+# --------- Registry Exceptions ----------------------------------------------
 
 
 class RegistryException(ReasonChipException):
@@ -116,7 +139,7 @@ class MalformedChipException(RegistryException):
         return resp
 
 
-# --------- Validation Exceptions ---------------------------------------------
+# --------- Validation Exceptions --------------------------------------------
 
 
 class ValidationException(ReasonChipException):
@@ -180,7 +203,7 @@ class NestedValidationException(ValidationException):
         return resp
 
 
-# --------- Processor Exceptions ----------------------------------------------
+# --------- Processor Exceptions ---------------------------------------------
 
 
 class ProcessorException(ReasonChipException):
@@ -305,7 +328,7 @@ class LoopVariableNotIterable(ProcessorException):
     pass
 
 
-# --------- Flow Exceptions ---------------------------------------------------
+# --------- Flow Exceptions --------------------------------------------------
 
 
 class FlowException(ProcessorException):

@@ -1,0 +1,27 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+root = true
+
+# Everything
+[*]
+end_of_line = lf
+
+# Makefiles
+[*.sh]
+indent_style = tab
+indent_size = 4
+trim_trailing_whitespace = true
+
+# Makefiles
+[*.am]
+indent_style = tab
+indent_size = 4
+trim_trailing_whitespace = true
+
+# Python files
+[*.py]
+charset = utf-8
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
