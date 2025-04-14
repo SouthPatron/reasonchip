@@ -1,4 +1,4 @@
-# ReasonChip website
+# ReasonChip.io website
 
 ## Overview
 
@@ -15,13 +15,13 @@ Make sure you have `hugo` installed.
 
 To run the server locally:
 
-```
-cd src/
-hugo server -D
+```bash
+$ ./serve.sh
 ```
 
 To rebuild the documentation:
 
+```bash
+$ ./rebuild.sh
 ```
-./rebuild.sh
-```
+

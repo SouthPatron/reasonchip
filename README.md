@@ -18,8 +18,8 @@ Open source agentic workflow automation software
 | Location | Description |
 | ------------------------- | ----------------------------------------------- |
 | [examples](./examples/) | Example workflows |
-| [src](./src/reasonchip/) | ReasonChip package code |
-| [website](./website/reasonchip/) | ReasonChip.io website code |
+| [src](./src/reasonchip/) | Package |
+| [website](./website/reasonchip/) | Website |
 
 ## Installation
 
