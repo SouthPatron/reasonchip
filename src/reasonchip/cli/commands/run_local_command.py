@@ -34,6 +34,12 @@ class RunLocalCommand(AsyncCommand):
     @classmethod
     def build_parser(cls, parser: argparse.ArgumentParser):
         parser.add_argument(
+            'pipeline',
+            metavar='<name>',
+            type=str,
+            help="Name of the pipeline to run",
+        )
+        parser.add_argument(
             '--collection',
             dest='collections',
             action='append',
@@ -57,14 +63,6 @@ class RunLocalCommand(AsyncCommand):
             metavar='<variable file>',
             type=str,
             help="Variable file to load into context"
-        )
-        parser.add_argument(
-            '-e', '--entry',
-            action='store',
-            metavar='<entry>',
-            type=str,
-            required=True,
-            help="Entry pipeline at which to start"
         )
 
         cls.add_default_options(parser)
@@ -103,7 +101,7 @@ class RunLocalCommand(AsyncCommand):
             variables.set("job_id", uuid.uuid4())
 
             # Run the engine
-            rc = await engine.run(args.entry, variables)
+            rc = await engine.run(args.pipeline, variables)
 
             if rc:
                 print(json.dumps(rc))
@@ -123,6 +121,4 @@ class RunLocalCommand(AsyncCommand):
             print(f"\n\n{type(ex)}\n\n")
             print(ex)
             return ExitCode.ERROR
-
-
 

@@ -9,7 +9,7 @@ while true; do
 
 
 	reasonchip run-local		\
-		-e entry				\
+		entry					\
 		--vars ./_params.yml	\
 		--vars ./_secrets.yml	\
 		--set secrets.openai.api_key=$OPENAI_API_KEY						\
