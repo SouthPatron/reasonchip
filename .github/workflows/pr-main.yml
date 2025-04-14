@@ -52,6 +52,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r ./requirements.txt
 
+      - name: Install reasonchip
+        run: |
+          cd ${{ github.workspace }}/
+          pip install -e .          
+
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v3
         with:
