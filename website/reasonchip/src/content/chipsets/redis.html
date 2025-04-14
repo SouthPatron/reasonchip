@@ -1,0 +1,125 @@
+---
+title: redis
+date: 2025-04-07
+---
+
+<h1>Redis Command Chipset</h1>
+<p>This module provides a flexible wrapper for executing Redis commands using
+redis-py. It defines a dynamic chip that can execute any Redis method
+asynchronously, with configurable client settings and error handling.</p>
+<h2>Features:</h2>
+<ul>
+<li>Configurable Redis client settings (host, port, database, etc.).</li>
+<li>Dynamic method execution based on provided method name and parameters.</li>
+<li>Supports asynchronous Redis operations.</li>
+<li>Handles connection errors and invalid method names gracefully.</li>
+</ul>
+
+
+<div>
+	<p>
+		View source code here:
+		<a
+			href="https://github.com/SouthPatron/reasonchip/blob/main/src/reasonchip/chipsets/redis.py"
+		>GitHub</a>
+	</p>
+</div>
+
+
+
+<div class="chip-section my-5 p-2 bg-light">
+
+	<h3
+		class="px-4 py-2 bg-success-subtle border shadow"
+	><i class="text-success me-3 bi bi-cpu-fill"></i> redis.redis_execute</h3>
+
+	<div class="p-3">
+
+		
+		<p class="lead">
+			<p>Executes a Redis command dynamically using redis-py’s async client.</p>
+<p>This chip allows you to execute any Redis command by specifying the method name
+and its parameters. It validates the method exists on the Redis client before
+execution and handles errors appropriately.</p>
+<p>Refer to redis-py documentation for available commands:
+<a href="https://redis-py.readthedocs.io/en/stable/">redis-py Reference</a></p>
+		</p>
+		
+
+		
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Request Parameters</h4>
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				
+				<tr>
+					<td><strong>client_settings</strong></td>
+					<td><class 'reasonchip.chipsets.redis.RedisClientSettings'></td>
+					<td>Configuration for the Redis async client.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>method</strong></td>
+					<td><class 'str'></td>
+					<td>The Redis method to execute (e.g., 'set', 'get', 'hset').</td>
+				</tr>
+				
+				<tr>
+					<td><strong>args</strong></td>
+					<td>typing.List[typing.Any]</td>
+					<td>Positional arguments for the method.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>kwargs</strong></td>
+					<td>typing.Dict[str, typing.Any]</td>
+					<td>Keyword arguments for the method.</td>
+				</tr>
+				
+			</table>
+		</div>
+		
+
+		
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Response</h4>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				
+				<tr>
+					<td><strong>status</strong></td>
+					<td>typing.Literal['OK', 'CONNECTION_ERROR', 'TIMEOUT', 'METHOD_NOT_FOUND', 'REDIS_ERROR', 'ERROR']</td>
+					<td>Status of the request.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>result</strong></td>
+					<td>typing.Optional[typing.Any]</td>
+					<td>The result of the Redis command (if successful).</td>
+				</tr>
+				
+				<tr>
+					<td><strong>error_message</strong></td>
+					<td>typing.Optional[str]</td>
+					<td>Error message if the command failed.</td>
+				</tr>
+				
+			</table>
+		</div>
+		
+
+	</div>
+
+</div>

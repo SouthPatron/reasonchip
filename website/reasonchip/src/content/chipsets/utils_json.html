@@ -1,0 +1,166 @@
+---
+title: utils.json
+date: 2025-04-07
+---
+
+<h1>JSON Command Chipset</h1>
+
+
+<div>
+	<p>
+		View source code here:
+		<a
+			href="https://github.com/SouthPatron/reasonchip/blob/main/src/reasonchip/chipsets/utils/json.py"
+		>GitHub</a>
+	</p>
+</div>
+
+
+
+<div class="chip-section my-5 p-2 bg-light">
+
+	<h3
+		class="px-4 py-2 bg-success-subtle border shadow"
+	><i class="text-success me-3 bi bi-cpu-fill"></i> utils.json.dumps</h3>
+
+	<div class="p-3">
+
+		
+		<p class="lead">
+			<p>Dumps an object to a JSON string.</p>
+		</p>
+		
+
+		
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Request Parameters</h4>
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				
+				<tr>
+					<td><strong>obj</strong></td>
+					<td>typing.Any</td>
+					<td>No description</td>
+				</tr>
+				
+			</table>
+		</div>
+		
+
+		
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Response</h4>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				
+				<tr>
+					<td><strong>status</strong></td>
+					<td>typing.Literal['OK', 'ERROR']</td>
+					<td>Status of the request.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>result</strong></td>
+					<td>typing.Optional[str]</td>
+					<td>The result of the json dumps (if successful).</td>
+				</tr>
+				
+				<tr>
+					<td><strong>error_message</strong></td>
+					<td>typing.Optional[str]</td>
+					<td>Error message if the command failed.</td>
+				</tr>
+				
+			</table>
+		</div>
+		
+
+	</div>
+
+</div>
+
+<div class="chip-section my-5 p-2 bg-light">
+
+	<h3
+		class="px-4 py-2 bg-success-subtle border shadow"
+	><i class="text-success me-3 bi bi-cpu-fill"></i> utils.json.loads</h3>
+
+	<div class="p-3">
+
+		
+		<p class="lead">
+			<p>Loads a JSON string to an object.</p>
+		</p>
+		
+
+		
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Request Parameters</h4>
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				
+				<tr>
+					<td><strong>string</strong></td>
+					<td><class 'str'></td>
+					<td>No description</td>
+				</tr>
+				
+			</table>
+		</div>
+		
+
+		
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Response</h4>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				
+				<tr>
+					<td><strong>status</strong></td>
+					<td>typing.Literal['OK', 'ERROR']</td>
+					<td>Status of the request.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>result</strong></td>
+					<td>typing.Optional[typing.Any]</td>
+					<td>The result of the json loads (if successful).</td>
+				</tr>
+				
+				<tr>
+					<td><strong>error_message</strong></td>
+					<td>typing.Optional[str]</td>
+					<td>Error message if the command failed.</td>
+				</tr>
+				
+			</table>
+		</div>
+		
+
+	</div>
+
+</div>

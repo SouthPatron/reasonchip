@@ -1,0 +1,163 @@
+---
+title: 'DevOps Overview'
+date: 2025-02-24
+---
+
+<h3 class="px-4 py-2 bg-primary-subtle border shadow">
+<i class="text-primary me-3 bi bi-arrow-right-square-fill"></i> DevOps Overview
+</h3>
+
+<div class="p-3">
+	<p>
+	ReasonChip is a distributed, pipeline-driven reasoning system designed to
+	handle complex, asynchronous job execution across multiple components. A
+	the heart of the system are three major roles: <strong>clients</strong>,
+	<strong>brokers</strong>, and <strong>workers</strong>. This document
+	outlines the responsibilities of each component, how they interact,
+	and the overall flow of job execution within the infrastructure.
+	</p>
+</div>
+
+<h3
+	class="px-4 py-2 bg-success-subtle border shadow"
+><i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Clients</h3>
+
+<div class="p-3">
+	<p><strong>Purpose:</strong><br>
+	Clients are external systems, user interfaces, or automated scripts that initiate a job or pipeline. They act as the entry point for work into the ReasonChip system.
+	</p>
+	<p><strong>Responsibilities:</strong></p>
+	<ul>
+	<li>Create and submit jobs to the system.</li>
+	<li>Establish long-lived bidirectional connections to receive progress, logs, or output (e.g., via gRPC streaming).</li>
+	<li>Authenticate and optionally specify job configuration or input data.</li>
+	</ul>
+</div>
+
+<h3
+	class="px-4 py-2 bg-success-subtle border shadow"
+><i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Broker</h3>
+
+<div class="p-3">
+	<p><strong>Purpose:</strong><br>
+	The broker serves as the central coordination point of the ReasonChip system. It accepts incoming client connections and routes work to available workers.
+	</p>
+	<p><strong>Responsibilities:</strong></p>
+	<ul>
+	<li>Accept and manage incoming client sessions.</li>
+	<li>Queue or throttle job submissions to control load.</li>
+	<li>Dispatch jobs to available workers based on criteria like capacity, type, or affinity.</li>
+	<li>Maintain job state and metadata.</li>
+	<li>Optionally log or audit job lifecycle events.</li>
+	<li>Communicate between client and worker for status updates or results.</li>
+	</ul>
+	<p><strong>Optional Capabilities:</strong></p>
+	<ul>
+	<li>Load balancing across multiple workers.</li>
+	<li>Secure communication enforcement (e.g., Unix sockets, SSL, gRPC TLS).</li>
+	<li>Worker registration and health monitoring.</li>
+	</ul>
+</div>
+
+<h3
+	class="px-4 py-2 bg-success-subtle border shadow"
+><i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Worker</h3>
+
+<div class="p-3">
+	<p><strong>Purpose:</strong><br>
+	Workers are the executors of ReasonChip pipelines. Each worker processes tasks routed to it by a broker, potentially handling multiple tasks concurrently or sequentially depending on configuration.
+	</p>
+	<p><strong>Responsibilities:</strong></p>
+	<ul>
+	<li>Register with a broker to accept work.</li>
+	<li>Receive and execute jobs (often structured as YAML-defined ReasonChip pipelines).</li>
+	<li>Isolate and manage job execution (e.g., fork, thread, process pool).</li>
+	<li>Report progress, logs, and results back to the broker.</li>
+	<li>Optionally support plugin-based task execution or custom pipeline extensions.</li>
+	</ul>
+	<p><strong>Execution Contexts:</strong></p>
+	<ul>
+	<li>May run locally, on a container, or within sandboxed environments.</li>
+	<li>Typically handle I/O, compute, or API-bound tasks as defined in the ReasonChip library.</li>
+	</ul>
+</div>
+
+<h3
+	class="px-4 py-2 bg-primary-subtle border shadow"
+><i class="text-primary me-3 bi bi-arrow-right-square-fill"></i> Communication</h3>
+
+<div class="p-3">
+	<h3>Data flow</h3>
+	<pre class="bg-secondary-subtle m-5 p-3 rounded"><code>
+	Client -&gt; Broker : Establish Connection
+	Client -&gt; Broker : Submit Job Request
+	Broker -&gt; Worker : Dispatch Job
+	Worker -&gt; Broker : Stream Logs/Updates
+	Broker -&gt; Client : Stream Logs/Status
+	Worker --&gt; Broker : Job Complete + Result
+	Broker --&gt; Client : Final Result
+	</code></pre>
+</div>
+
+<div class="p-3">
+	<h3>Transports</h3>
+
+	<p>
+	<strong>Client to Broker:</strong>
+	<ul>
+		<li>Sockets (Unix, TCP) <i>recommended</i></li>
+		<li>gRPC</li>
+		<li>HTTP/1 and HTTP/2 (slower because "connection"-per-request)</li>
+	</ul>
+	</p>
+
+	<p>
+	<strong>Worker to Broker:</strong>
+	<ul>
+		<li>Sockets (Unix, TCP) <i>recommended</i></li>
+		<li>gRPC</li>
+	</ul>
+	</p>
+
+</div>
+
+<div class="p-3">
+	<h3>Security</h3>
+
+	<p>
+	All transports provide for SSL/TLS encryption and authentication.
+	</p>
+
+	<p>
+	Secrets (e.g., API keys, tokens) should be stored in a secure vault or
+	kept within isolated areas.  The broker may be provided with secrets
+	on startup and these will be combined to all requests received from the
+	clients and sent to the workers. The workflows should not contain
+	any secrets, and instead, the broker should be responsible for providing
+	these to the workers.
+	</p>
+
+	<p>
+	Secrets are kept in memory during runtime.
+	<strong class="text-danger">Depending on your log-levels, secrets MAY
+	 BE logged.</strong>
+	</p>
+
+</div>
+
+<div class="p-3">
+	<h3>Logging</h3>
+
+	<p>
+	By default, all logging goes to syslog and different log-levels are
+	provided.
+	</p>
+
+	<p>
+	Individual loggers (modules) within the system may be targetted for
+	different log levels.
+	</p>
+
+</div>
+
+

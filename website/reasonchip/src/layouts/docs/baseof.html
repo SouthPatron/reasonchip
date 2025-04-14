@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html
+	lang="{{ site.Language.LanguageCode }}"
+	dir="{{ or site.Language.LanguageDirection `ltr` }}">
+<head>
+  {{ partial "head.html" . }}
+  {{ partial "style.html" . }}
+</head>
+<body class="bg-body-tertiary">
+
+<div class="
+	min-vh-100 w-100
+
+	d-flex flex-column
+	align-items-stretch justify-content-start">
+
+	<div class="bg-white p-4 border-bottom">
+	{{ partial "header.html" . }}
+	</div>
+
+	<div class="
+		flex-fill
+
+		d-flex
+		flex-column-reverse flex-md-row
+
+		align-items-stretch
+		justify-content-end justify-content-md-start
+	">
+		<div class="
+			p-4
+			border-md-end
+			sidemenu
+		">
+			<h5>Overviews</h5>
+			<ul>
+				<li><a href="/docs/quickstart/">Quickstart</a></li>
+				<li><a href="/docs/concepts/">Concepts</a></li>
+				<li><a href="/docs/workflows/">Workflows</a></li>
+				<li><a href="/docs/devops/">DevOps</a></li>
+				<li><a href="/docs/developers/">Developers</a></li>
+			</ul>
+
+			<h5>Details</h5>
+
+			<ul>
+				<li><a href="/docs/task_types/">Task types</a></li>
+				<li><a href="/docs/variables/">Variables</a></li>
+				<li><a href="/docs/conditionals/">Conditionals</a></li>
+				<li><a href="/docs/async/">Async</a></li>
+			</ul>
+
+			<h5>Examples</h5>
+			<ul>
+				<li><a
+					target="_blank"
+					href="https://github.com/SouthPatron/reasonchip/tree/main/examples/"
+				>GitHub</a></li>
+			</ul>
+		</div>
+
+		<div class="flex-md-fill p-4">
+			{{ block "main" . }}{{ end }}
+		</div>
+	</div>
+
+	<div class="bg-white pt-5 pb-3 px-5 border-top">
+	{{ partial "footer.html" . }}
+	</div>
+
+</div>
+
+{{ partial "post_scripts.html" . }}
+
+</body>
+</html>

@@ -1,0 +1,234 @@
+---
+title: http
+date: 2025-04-07
+---
+
+<h1>HTTP Requests Chipset</h1>
+<p>This module provides an HTTP request chipset for ReasonChip. It enables
+asynchronous HTTP requests using <code>httpx.AsyncClient</code> and returns
+structured responses.</p>
+<p>This chipset is a wrapper around httpx. You can find httpx documentation
+here: <a href="https://www.python-httpx.org/">HTTPX Documentation</a></p>
+<h2>Features</h2>
+<ul>
+<li>Supports standard HTTP methods (<code>GET</code>, <code>POST</code>, <code>PUT</code>, <code>DELETE</code>, etc.).</li>
+<li>Handles request timeouts, network errors, and various HTTP errors gracefully.</li>
+<li>Returns structured response data with status, headers, and content.</li>
+<li>Limits response content size to prevent excessive memory usage.</li>
+</ul>
+
+
+<div>
+	<p>
+		View source code here:
+		<a
+			href="https://github.com/SouthPatron/reasonchip/blob/main/src/reasonchip/chipsets/http.py"
+		>GitHub</a>
+	</p>
+</div>
+
+
+
+<div class="chip-section my-5 p-2 bg-light">
+
+	<h3
+		class="px-4 py-2 bg-success-subtle border shadow"
+	><i class="text-success me-3 bi bi-cpu-fill"></i> http.http_request</h3>
+
+	<div class="p-3">
+
+		
+		<p class="lead">
+			<p>Executes an HTTP request asynchronously using <code>httpx.AsyncClient</code> and
+returns the response.</p>
+		</p>
+		
+
+		
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Request Parameters</h4>
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				
+				<tr>
+					<td><strong>method</strong></td>
+					<td>typing.Literal['GET', 'OPTIONS', 'HEAD', 'POST', 'PUT', 'DELETE', 'PATCH']</td>
+					<td>HTTP method to use for the request (e.g., GET, POST, DELETE).</td>
+				</tr>
+				
+				<tr>
+					<td><strong>url</strong></td>
+					<td><class 'pydantic.networks.HttpUrl'></td>
+					<td>Target URL for the request.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>timeout</strong></td>
+					<td><class 'float'></td>
+					<td>Request timeout in seconds.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>headers</strong></td>
+					<td>typing.Dict[str, str]</td>
+					<td>Optional HTTP headers to include in the request.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>content</strong></td>
+					<td>typing.Optional[bytes]</td>
+					<td>Optional request body content as bytes.</td>
+				</tr>
+				
+			</table>
+		</div>
+		
+
+		
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Response</h4>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				
+				<tr>
+					<td><strong>status</strong></td>
+					<td>typing.Literal['OK', 'TIMEOUT_ERROR', 'NETWORK_ERROR', 'PROTOCOL_ERROR', 'PROXY_ERROR', 'UNSUPPORTED_PROTOCOL_ERROR', 'DECODING_ERROR', 'TOO_MANY_REDIRECTS', 'HTTP_STATUS_ERROR', 'INVALID_URL', 'COOKIE_CONFLICT', 'STREAM_ERROR', 'ERROR']</td>
+					<td>Status of the HTTP request execution.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>status_code</strong></td>
+					<td>typing.Optional[int]</td>
+					<td>HTTP response status code (e.g., 200, 404).</td>
+				</tr>
+				
+				<tr>
+					<td><strong>headers</strong></td>
+					<td>typing.Dict[str, str]</td>
+					<td>Response headers received from the server.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>content</strong></td>
+					<td>typing.Optional[bytes]</td>
+					<td>Response body content as bytes.</td>
+				</tr>
+				
+			</table>
+		</div>
+		
+
+	</div>
+
+</div>
+
+<div class="chip-section my-5 p-2 bg-light">
+
+	<h3
+		class="px-4 py-2 bg-success-subtle border shadow"
+	><i class="text-success me-3 bi bi-cpu-fill"></i> http.post_json_object</h3>
+
+	<div class="p-3">
+
+		
+		<p class="lead">
+			<p>Executes an HTTP request asynchronously using <code>httpx.AsyncClient</code> and
+returns the response. The request body is a JSON object.</p>
+		</p>
+		
+
+		
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Request Parameters</h4>
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				
+				<tr>
+					<td><strong>url</strong></td>
+					<td><class 'pydantic.networks.HttpUrl'></td>
+					<td>Target URL for the request.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>timeout</strong></td>
+					<td><class 'float'></td>
+					<td>Request timeout in seconds.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>headers</strong></td>
+					<td>typing.Dict[str, str]</td>
+					<td>Optional HTTP headers to include in the request.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>content</strong></td>
+					<td>typing.Optional[typing.Dict[str, typing.Any]]</td>
+					<td>Optional request body content as bytes.</td>
+				</tr>
+				
+			</table>
+		</div>
+		
+
+		
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Response</h4>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				
+				<tr>
+					<td><strong>status</strong></td>
+					<td>typing.Literal['OK', 'TIMEOUT_ERROR', 'NETWORK_ERROR', 'PROTOCOL_ERROR', 'PROXY_ERROR', 'UNSUPPORTED_PROTOCOL_ERROR', 'DECODING_ERROR', 'TOO_MANY_REDIRECTS', 'HTTP_STATUS_ERROR', 'INVALID_URL', 'COOKIE_CONFLICT', 'STREAM_ERROR', 'ERROR']</td>
+					<td>Status of the HTTP request execution.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>status_code</strong></td>
+					<td>typing.Optional[int]</td>
+					<td>HTTP response status code (e.g., 200, 404).</td>
+				</tr>
+				
+				<tr>
+					<td><strong>headers</strong></td>
+					<td>typing.Dict[str, str]</td>
+					<td>Response headers received from the server.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>content</strong></td>
+					<td>typing.Optional[bytes]</td>
+					<td>Response body content as bytes.</td>
+				</tr>
+				
+			</table>
+		</div>
+		
+
+	</div>
+
+</div>
