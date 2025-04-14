@@ -5,14 +5,9 @@ ReasonChip is open source software developed and maintained by
 **South Patron LLC**, and we welcome ALL contributions from the
 community.
 
----
-
 ## Code of Conduct
 
-We strive to foster a respectful and inclusive environment.
-Please read and follow our [Code of Conduct](https://www.contributor-covenant.org/version/2/0/code_of_conduct/) in all interactions.
-
----
+Just focus on the work. Be cool.
 
 ## Development Setup
 
@@ -52,11 +47,9 @@ Please read and follow our [Code of Conduct](https://www.contributor-covenant.or
 
     By contributing, you agree that:
 
-    Your code is licensed under GPLv3+
-
-    You have the right to submit it under these terms
-
-    Ownership of the ReasonChip project and brand remains with South Patron LLC
+    - Your code is licensed under GPLv3+
+    - You have the right to submit it under these terms
+    - Ownership of the ReasonChip project and brand remains with South Patron LLC
 
 5. What You Can Contribute
 
