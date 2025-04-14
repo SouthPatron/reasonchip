@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 import typing
 import uuid
 import asyncio
@@ -17,11 +22,11 @@ class SocketClient(ClientTransport):
         self,
         path: str,
         limit: int = 2**16,
-        sock = None,
-        ssl = None,
-        server_hostname = None,
-        ssl_handshake_timeout = None,
-        ssl_shutdown_timeout = None,
+        sock=None,
+        ssl=None,
+        server_hostname=None,
+        ssl_handshake_timeout=None,
+        ssl_shutdown_timeout=None,
     ):
         """
         Constructor.
@@ -49,7 +54,6 @@ class SocketClient(ClientTransport):
         self._handler: typing.Optional[asyncio.Task] = None
         self._sent_none: bool = False
 
-
     async def connect(
         self,
         callback: ReadCallbackType,
@@ -70,13 +74,13 @@ class SocketClient(ClientTransport):
             self._callback = callback
 
             self._reader, self._writer = await asyncio.open_unix_connection(
-                path = self._path,
-                limit = self._limit,
-                sock = self._sock,
-                ssl = self._ssl,
-                server_hostname = self._server_hostname,
-                ssl_handshake_timeout = self._ssl_handshake_timeout,
-                ssl_shutdown_timeout = self._ssl_shutdown_timeout,
+                path=self._path,
+                limit=self._limit,
+                sock=self._sock,
+                ssl=self._ssl,
+                server_hostname=self._server_hostname,
+                ssl_handshake_timeout=self._ssl_handshake_timeout,
+                ssl_shutdown_timeout=self._ssl_shutdown_timeout,
             )
 
             self._handler = asyncio.create_task(self._loop())
@@ -91,7 +95,6 @@ class SocketClient(ClientTransport):
 
             logging.exception("Connect failed")
             return False
-
 
     async def disconnect(self):
         if not self._handler:
@@ -113,11 +116,9 @@ class SocketClient(ClientTransport):
         self._writer = None
         self._handler = None
 
-
     async def send_packet(self, packet: SocketPacket) -> bool:
         assert self._writer
         return await send_packet(self._writer, packet)
-
 
     async def _loop(self):
         assert self._reader
@@ -133,4 +134,3 @@ class SocketClient(ClientTransport):
             if pkt is None:
                 self._sent_none = True
                 break
-

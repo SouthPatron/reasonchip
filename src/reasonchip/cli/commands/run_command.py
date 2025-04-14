@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 import typing
 import argparse
 import re
@@ -15,16 +20,13 @@ from .command import AsyncCommand
 
 class RunCommand(AsyncCommand):
 
-
     @classmethod
     def command(cls) -> str:
         return "run"
 
-
     @classmethod
     def help(cls) -> str:
         return "Run a pipeline"
-
 
     @classmethod
     def description(cls) -> str:
@@ -33,18 +35,17 @@ This command connects to a remote ReasonChip broker and runs a single
 pipeline. You may specify variables on the command line.
 """
 
-
     @classmethod
     def build_parser(cls, parser: argparse.ArgumentParser):
         parser.add_argument(
-            'pipeline',
-            metavar='<name>',
+            "pipeline",
+            metavar="<name>",
             type=str,
             help="Name of the pipeline to run",
         )
         parser.add_argument(
-            '--broker',
-            metavar='<address>',
+            "--broker",
+            metavar="<address>",
             type=str,
             default=DEFAULT_SERVERS[0],
             help="Address of the broker. Socket or IP4/6",
@@ -55,20 +56,19 @@ pipeline. You may specify variables on the command line.
             default=[],
             metavar="key=value",
             type=str,
-            help="Set or override a configuration key-value pair."
+            help="Set or override a configuration key-value pair.",
         )
         parser.add_argument(
-            '--vars',
-            action='append',
+            "--vars",
+            action="append",
             default=[],
-            metavar='<variable file>',
+            metavar="<variable file>",
             type=str,
-            help="Variable file to load into context"
+            help="Variable file to load into context",
         )
 
         cls.add_default_options(parser)
         cls.add_ssl_client_options(parser)
-
 
     async def main(
         self,
@@ -93,15 +93,14 @@ pipeline. You may specify variables on the command line.
             key, value = m[1], m[2]
             variables.set(key, value)
 
-
         # Create the connection
         ssl_options = SSLClientOptions.from_args(args)
         ssl_context = ssl_options.create_ssl_context() if ssl_options else None
 
         transport = client_to_broker(
             args.broker,
-            ssl_client_options = ssl_options,
-            ssl_context = ssl_context,
+            ssl_client_options=ssl_options,
+            ssl_context=ssl_context,
         )
 
         # Create the Multiplexor
@@ -115,8 +114,8 @@ pipeline. You may specify variables on the command line.
         api = Api(multiplexor)
 
         resp = await api.run_pipeline(
-            pipeline = args.pipeline,
-            variables = variables.vdict,
+            pipeline=args.pipeline,
+            variables=variables.vdict,
         )
 
         if resp:
@@ -125,4 +124,3 @@ pipeline. You may specify variables on the command line.
         await multiplexor.stop()
 
         return ExitCode.OK
-

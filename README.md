@@ -1,6 +1,12 @@
 # ReasonChip
 
+![License: GPL v3+](https://img.shields.io/badge/license-GPLv3%2B-blue.svg)
+![Python](https://img.shields.io/badge/python-3.12+-blue)
+[![PyPI version](https://img.shields.io/pypi/v/reasonchip.svg)](https://pypi.org/project/reasonchip/)
+![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)
+
 Open source agentic workflow automation software
+
 
 ## Quick links
 
@@ -12,8 +18,8 @@ Open source agentic workflow automation software
 
 Easy peasy, lemon squeezy
 
-```
-# pip install reasonchip
+```bash
+pip install reasonchip
 ```
 
 ## Example workflows
@@ -21,8 +27,12 @@ Easy peasy, lemon squeezy
 They're right here in the source tree: [Examples](./examples/README.md)
 
 
-## Additional Links
+## License
 
-- [PyPI package](https://pypi.org/project/reasonchip/)
+ReasonChip
 
+Copyright &copy; 2025 South Patron LLC.
+
+This project is licensed under the GPLv3+.
+See <https://www.gnu.org/licenses/> for details.
 

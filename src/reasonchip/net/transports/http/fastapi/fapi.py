@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 import time
 
 from fastapi import FastAPI, Request
@@ -40,7 +45,6 @@ def setup_fapi(callbacks: CallbackHooks) -> FastAPI:
         response.headers["X-Process-Time"] = str(int(process_time))
         return response
 
-
     # ****************************** ENDPOINTS ********************************
 
     @app.get("/")
@@ -50,9 +54,7 @@ def setup_fapi(callbacks: CallbackHooks) -> FastAPI:
             status_code=302,
         )
 
-
     from . import v1
+
     v1.populate(app)
     return app
-
-

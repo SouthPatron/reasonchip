@@ -1,9 +1,15 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 """
 # ReasonChip Streams
 
 This module provides ReasonChips for handling standard input (stdin),
 standard output (stdout), and standard error (stderr) using bytes.
 """
+
 import sys
 
 from pydantic import BaseModel, Field
@@ -16,6 +22,7 @@ class StdinRequest(BaseModel):
         default=1024,
         description="Maximum number of bytes to read from stdin.",
     )
+
 
 class StdinResponse(BaseModel):
     data: bytes = Field(
@@ -148,6 +155,3 @@ async def read_line(request: ReadlineRequest) -> ReadlineResponse:
     """
     data = sys.stdin.buffer.readline(request.max_bytes)
     return ReadlineResponse(data=data)
-
-
-

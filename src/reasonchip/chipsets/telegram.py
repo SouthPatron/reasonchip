@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 """
 # Telegram Sending Chipset
 
@@ -111,7 +116,8 @@ async def telegram_send(request: TelegramSendRequest) -> TelegramSendResponse:
         method_name = request.method.lower()
         available_methods = {
             name.lower(): name
-            for name in dir(bot) if callable(getattr(bot, name))
+            for name in dir(bot)
+            if callable(getattr(bot, name))
         }
         if method_name not in available_methods:
             return TelegramSendResponse(
@@ -167,4 +173,3 @@ async def telegram_send(request: TelegramSendRequest) -> TelegramSendResponse:
             status="ERROR",
             error_message=f"Unexpected error: {str(e)}",
         )
-

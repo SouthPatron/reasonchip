@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 import typing
 import uuid
 import argparse
@@ -18,11 +23,9 @@ class GrpcRunCommand(AsyncCommand):
     def command(cls) -> str:
         return "grpc-run"
 
-
     @classmethod
     def help(cls) -> str:
         return "Run a remote pipeline over gRPC"
-
 
     @classmethod
     def description(cls) -> str:
@@ -38,7 +41,6 @@ single line. Remember that the pipeline defines the output format, so
 the result may be any JSON object depending on which pipeline is run and
 what it is supposed to return.
 """
-
 
     @classmethod
     def build_parser(cls, parser: argparse.ArgumentParser):
@@ -61,25 +63,24 @@ what it is supposed to return.
             default=[],
             metavar="key=value",
             type=str,
-            help="Set or override a configuration key-value pair"
+            help="Set or override a configuration key-value pair",
         )
         parser.add_argument(
-            '--vars',
-            action='append',
+            "--vars",
+            action="append",
             default=[],
-            metavar='<variable file>',
+            metavar="<variable file>",
             type=str,
-            help="Variable file to load into context"
+            help="Variable file to load into context",
         )
         parser.add_argument(
-            '--server',
-            action='store',
-            default='localhost:50051',
-            metavar='<host[:port]>',
+            "--server",
+            action="store",
+            default="localhost:50051",
+            metavar="<host[:port]>",
             type=str,
-            help="gRPC server address"
+            help="gRPC server address",
         )
-
 
     async def main(
         self,
@@ -107,29 +108,28 @@ what it is supposed to return.
             key, value = m[1], m[2]
             variables.set(key, value)
 
-
         # Create the connection
         conn = GrpcConnectionImpl()
         rc = await conn.connect(
-            target = args.server,
-            max_message_length = 1 * (1024 * 1024),
+            target=args.server,
+            max_message_length=1 * (1024 * 1024),
         )
         if rc is False:
             raise ConnectionError(f"Failed to connect to {args.server}")
 
         # Create the multiplexor
-        multiplexor = Multiplexor(impl = conn)
+        multiplexor = Multiplexor(impl=conn)
         await multiplexor.start()
 
         # Get a client
-        api = Api(multiplexor = multiplexor)
+        api = Api(multiplexor=multiplexor)
         result = await api.run_pipeline(
-            pipeline = args.pipeline,
-            variables = variables.vdict,
-            cookie = ck,
+            pipeline=args.pipeline,
+            variables=variables.vdict,
+            cookie=ck,
         )
 
-        resp = { "cookie": ck, "result": result }
+        resp = {"cookie": ck, "result": result}
         resp_str = json.dumps(resp)
         print(resp_str)
 
@@ -142,5 +142,3 @@ what it is supposed to return.
         conn = None
 
         return ExitCode.OK
-
-

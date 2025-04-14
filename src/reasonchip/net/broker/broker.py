@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 import typing
 import uuid
 import asyncio
@@ -11,7 +16,6 @@ from .switchboard import Switchboard
 
 class Broker:
 
-
     def __init__(
         self,
         client_transports: typing.List[ServerTransport],
@@ -21,8 +25,12 @@ class Broker:
         assert worker_transports
 
         # Transports
-        self._client_transports: typing.List[ServerTransport] = client_transports
-        self._worker_transports: typing.List[ServerTransport] = worker_transports
+        self._client_transports: typing.List[ServerTransport] = (
+            client_transports
+        )
+        self._worker_transports: typing.List[ServerTransport] = (
+            worker_transports
+        )
 
         # Connections
         self._lock: asyncio.Lock = asyncio.Lock()
@@ -30,12 +38,10 @@ class Broker:
 
         # Switchboard
         self._switchboard: Switchboard = Switchboard(
-            writer_callback = self.send_packet,
+            writer_callback=self.send_packet,
         )
 
-
     # --------------------- LIFECYCLE -----------------------------------------
-
 
     async def start(self):
         logging.info("Starting broker...")
@@ -46,9 +52,9 @@ class Broker:
         logging.info("Starting worker manager...")
         for t in self._worker_transports:
             rc = await t.start_server(
-                new_connection_callback = self._connected,
-                read_callback = self._worker_read,
-                closed_connection_callback = self._worker_closed,
+                new_connection_callback=self._connected,
+                read_callback=self._worker_read,
+                closed_connection_callback=self._worker_closed,
             )
             if not rc:
                 raise ConnectionError("Failed to start worker transport")
@@ -57,15 +63,14 @@ class Broker:
         logging.info("Starting client manager...")
         for t in self._client_transports:
             rc = await t.start_server(
-                new_connection_callback = self._connected,
-                read_callback = self._client_read,
-                closed_connection_callback = self._client_closed,
+                new_connection_callback=self._connected,
+                read_callback=self._client_read,
+                closed_connection_callback=self._client_closed,
             )
             if not rc:
                 raise ConnectionError("Failed to start client transport")
 
         logging.info("Broker started.")
-
 
     async def stop(self) -> bool:
         logging.info("Stopping broker...")
@@ -83,8 +88,6 @@ class Broker:
         logging.info("Broker stopped.")
         return True
 
-
-
     # --------------------- CONTROL -------------------------------------------
 
     async def _connected(
@@ -97,15 +100,14 @@ class Broker:
             assert connection_id not in self._connections
             self._connections[connection_id] = transport
 
-
     # --------------------- CLIENT CONTROL ------------------------------------
 
-    async def _client_read(self, connection_id: uuid.UUID, packet: SocketPacket):
+    async def _client_read(
+        self, connection_id: uuid.UUID, packet: SocketPacket
+    ):
         await self._switchboard.client_payload(
-            connection_id = connection_id,
-            packet = packet
+            connection_id=connection_id, packet=packet
         )
-
 
     async def _client_closed(self, connection_id: uuid.UUID):
         async with self._lock:
@@ -117,15 +119,14 @@ class Broker:
             # Notify the switchboard that the client is gone
             await self._switchboard.eliminate_client(connection_id)
 
-
     # --------------------- WORKER CONTROL ------------------------------------
 
-    async def _worker_read(self, connection_id: uuid.UUID, packet: SocketPacket):
+    async def _worker_read(
+        self, connection_id: uuid.UUID, packet: SocketPacket
+    ):
         await self._switchboard.worker_payload(
-            connection_id = connection_id,
-            packet = packet
+            connection_id=connection_id, packet=packet
         )
-
 
     async def _worker_closed(self, connection_id: uuid.UUID):
         async with self._lock:
@@ -136,7 +137,6 @@ class Broker:
 
             # Notify the switchboard that the worker is gone
             await self._switchboard.eliminate_worker(connection_id)
-
 
     # --------------------- SUPPORT METHODS -----------------------------------
 
@@ -152,4 +152,3 @@ class Broker:
                 return False
 
             return await conn.send_packet(connection_id, packet)
-

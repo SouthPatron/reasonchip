@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 import typing
 import argparse
 import uuid
@@ -15,32 +20,34 @@ from .command import AsyncCommand
 
 class RunLocalCommand(AsyncCommand):
 
-
     @classmethod
     def command(cls) -> str:
         return "run-local"
-
 
     @classmethod
     def help(cls) -> str:
         return "Run a pipeline locally"
 
-
     @classmethod
     def description(cls) -> str:
         return "Run a pipeline locally"
 
-
     @classmethod
     def build_parser(cls, parser: argparse.ArgumentParser):
         parser.add_argument(
-            '--collection',
-            dest='collections',
-            action='append',
-            default=[],
-            metavar='<collection root>',
+            "pipeline",
+            metavar="<name>",
             type=str,
-            help="Root of a pipeline collection"
+            help="Name of the pipeline to run",
+        )
+        parser.add_argument(
+            "--collection",
+            dest="collections",
+            action="append",
+            default=[],
+            metavar="<collection root>",
+            type=str,
+            help="Root of a pipeline collection",
         )
         parser.add_argument(
             "--set",
@@ -48,27 +55,18 @@ class RunLocalCommand(AsyncCommand):
             default=[],
             metavar="key=value",
             type=str,
-            help="Set or override a configuration key-value pair."
+            help="Set or override a configuration key-value pair.",
         )
         parser.add_argument(
-            '--vars',
-            action='append',
+            "--vars",
+            action="append",
             default=[],
-            metavar='<variable file>',
+            metavar="<variable file>",
             type=str,
-            help="Variable file to load into context"
-        )
-        parser.add_argument(
-            '-e', '--entry',
-            action='store',
-            metavar='<entry>',
-            type=str,
-            required=True,
-            help="Entry pipeline at which to start"
+            help="Variable file to load into context",
         )
 
         cls.add_default_options(parser)
-
 
     async def main(
         self,
@@ -84,7 +82,7 @@ class RunLocalCommand(AsyncCommand):
 
         try:
             engine: Engine = Engine()
-            engine.initialize(pipelines = args.collections)
+            engine.initialize(pipelines=args.collections)
 
             # Load variables
             variables = Variables()
@@ -103,7 +101,7 @@ class RunLocalCommand(AsyncCommand):
             variables.set("job_id", uuid.uuid4())
 
             # Run the engine
-            rc = await engine.run(args.entry, variables)
+            rc = await engine.run(args.pipeline, variables)
 
             if rc:
                 print(json.dumps(rc))
@@ -123,6 +121,3 @@ class RunLocalCommand(AsyncCommand):
             print(f"\n\n{type(ex)}\n\n")
             print(ex)
             return ExitCode.ERROR
-
-
-

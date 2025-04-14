@@ -11,8 +11,8 @@ Then just run, making sure to set your OpenAI credentials.
 
 <pre><code>
 
-bash$ export OPENAI\_API\_KEY='<your openapi key>'
-bash$ export OPENAI\_ORG\_ID='<your openapi organisational id>'
+bash$ export OPENAI_API_KEY='your openapi key'
+bash$ export OPENAI_ORG_ID='your openapi organisational id'
 
 bash$ ./chat.sh
 

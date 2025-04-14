@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 """
 # JSON Command Chipset
 
@@ -15,14 +20,15 @@ class JsonDumpsRequest(BaseModel):
     """
     Request structure.
     """
-    obj: typing.Any
 
+    obj: typing.Any
 
 
 class JsonDumpsResponse(BaseModel):
     """
     Response structure.
     """
+
     status: typing.Literal[
         "OK",
         "ERROR",
@@ -30,11 +36,10 @@ class JsonDumpsResponse(BaseModel):
 
     result: typing.Optional[str] = Field(
         default=None,
-        description="The result of the json dumps (if successful)."
+        description="The result of the json dumps (if successful).",
     )
     error_message: typing.Optional[str] = Field(
-        default=None,
-        description="Error message if the command failed."
+        default=None, description="Error message if the command failed."
     )
 
 
@@ -58,11 +63,11 @@ async def dumps(request: JsonDumpsRequest) -> JsonDumpsResponse:
         )
 
 
-
 class JsonLoadsRequest(BaseModel):
     """
     Request structure.
     """
+
     string: str
 
 
@@ -70,6 +75,7 @@ class JsonLoadsResponse(BaseModel):
     """
     Response structure.
     """
+
     status: typing.Literal[
         "OK",
         "ERROR",
@@ -77,11 +83,10 @@ class JsonLoadsResponse(BaseModel):
 
     result: typing.Optional[typing.Any] = Field(
         default=None,
-        description="The result of the json loads (if successful)."
+        description="The result of the json loads (if successful).",
     )
     error_message: typing.Optional[str] = Field(
-        default=None,
-        description="Error message if the command failed."
+        default=None, description="Error message if the command failed."
     )
 
 
@@ -103,5 +108,3 @@ async def loads(request: JsonLoadsRequest) -> JsonLoadsResponse:
             status="ERROR",
             error_message=str(e),
         )
-
-

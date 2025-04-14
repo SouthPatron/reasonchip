@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 from __future__ import annotations
 
 import typing
@@ -28,16 +33,16 @@ class Config:
 
     def getBool(self, key: str) -> bool:
         return self.getStr(key).lower() in [
-            'true',
-            'yes',
-            '1',
-            'on',
-            'enabled',
-            'ja',
-            'yebo',
-            'yup',
-            'yep',
-            'y',
+            "true",
+            "yes",
+            "1",
+            "on",
+            "enabled",
+            "ja",
+            "yebo",
+            "yup",
+            "yep",
+            "y",
         ]
 
     def getFloat(self, key: str) -> float:
@@ -59,4 +64,3 @@ class Config:
         ns = self._kvp[namespace]
         rc = dict(ns)
         return Config(rc)
-

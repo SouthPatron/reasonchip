@@ -1,11 +1,15 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 from .api import Api
 from .client import Client
 from .multiplexor import Multiplexor
 
 
 __all__ = [
-    'Api',
-    'Client',
-    'Multiplexor',
+    "Api",
+    "Client",
+    "Multiplexor",
 ]
-

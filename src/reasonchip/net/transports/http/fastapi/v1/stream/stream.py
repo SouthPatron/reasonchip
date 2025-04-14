@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 import typing
 import asyncio
 import logging
@@ -18,7 +23,6 @@ from ... import di
 # ************* Models *******************************************************
 
 
-
 # ************* Routes *******************************************************
 
 
@@ -26,7 +30,7 @@ from ... import di
 async def stream(
     request: Request,
     req: SocketPacket,
-    callbacks: di.CallbackHooks = Depends(di.get_callbacks)
+    callbacks: di.CallbackHooks = Depends(di.get_callbacks),
 ) -> StreamingResponse:
 
     session = ClientSession()
@@ -37,14 +41,13 @@ async def stream(
     # Send through the initial packet
     await callbacks.read_callback(session, req)
 
-
     async def log_stream() -> typing.AsyncGenerator[bytes, None]:
 
         try:
             t_die = asyncio.create_task(session.death_signal.wait())
             t_reader = asyncio.create_task(session.outgoing_queue.get())
 
-            wl = [ t_die, t_reader ]
+            wl = [t_die, t_reader]
 
             while wl:
 
@@ -73,7 +76,9 @@ async def stream(
 
                         if pkt.packet_type != PacketType.RESULT:
                             # We keep doing this until we get a result
-                            t_reader = asyncio.create_task(session.outgoing_queue.get())
+                            t_reader = asyncio.create_task(
+                                session.outgoing_queue.get()
+                            )
                             wl.append(t_reader)
 
                         else:
@@ -91,10 +96,6 @@ async def stream(
             # This one is gone
             await callbacks.disconnect_callback(session)
 
-
     return StreamingResponse(
-        log_stream(),
-        media_type="application/octet-stream"
+        log_stream(), media_type="application/octet-stream"
     )
-
-

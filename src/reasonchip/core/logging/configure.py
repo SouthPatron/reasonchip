@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 import logging
 import logging.config
 import typing
@@ -32,7 +37,7 @@ def configure_logging(
     # Default levels
     default_level = logging.getLogger().level
 
-    levels = { "root": default_level }
+    levels = {"root": default_level}
 
     for level in lv:
         if match := re.match(
@@ -58,7 +63,6 @@ def configure_logging(
                 f"Invalid log level format: {level}. Expected format: LOGGER=LEVEL or LEVEL. Options are [DEBUG, INFO, WARNING, ERROR, CRITICAL]"
             )
 
-
     # Get the handler
     syslog_handler = logging.getHandlerByName("syslog")
     assert syslog_handler, "syslog handler not found in logging configuration"
@@ -78,11 +82,10 @@ def configure_logging(
                 logger.removeHandler(h)
             logger.addHandler(syslog_handler)
 
-
     # Hooking into the call
     original_get_logger = logging.getLogger
 
-    def crafty_get_logger(name = None):
+    def crafty_get_logger(name=None):
         logger = original_get_logger(name)
 
         if name and name in levels and not getattr(logger, "_crafty", False):
@@ -96,5 +99,3 @@ def configure_logging(
         return logger
 
     logging.getLogger = crafty_get_logger
-
-

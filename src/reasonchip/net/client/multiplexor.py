@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 import asyncio
 import typing
 import uuid
@@ -38,13 +43,12 @@ class Multiplexor:
         self._dead.clear()
 
         # Start the connection
-        rc = await self._transport.connect(callback = self._incoming_callback)
+        rc = await self._transport.connect(callback=self._incoming_callback)
         if rc is False:
             raise ConnectionError("Failed to connect to server")
 
         logging.debug("Multiplexor started")
         return True
-
 
     async def wait(self, timeout: typing.Optional[float] = None) -> bool:
         logging.debug("Waiting for multiplexor to stop")
@@ -64,7 +68,6 @@ class Multiplexor:
         logging.debug("Multiplexor stopped")
         return True
 
-
     async def stop(self, timeout: typing.Optional[float] = None) -> bool:
         logging.debug("Stopping multiplexor")
 
@@ -72,9 +75,7 @@ class Multiplexor:
 
         return await self.wait(timeout=timeout)
 
-
     # -------------------------- REGISTRATION --------------------------------
-
 
     async def register(self, connection_id: uuid.UUID) -> ConnectionInfo:
         logging.debug(f"Registering connection: {connection_id}")
@@ -84,12 +85,11 @@ class Multiplexor:
                 logging.error(f"Connection already registered: {connection_id}")
                 raise ValueError("Client already registered")
 
-            cl = ConnectionInfo(connection_id = connection_id)
+            cl = ConnectionInfo(connection_id=connection_id)
             self._connections[connection_id] = cl
 
             logging.debug(f"Registered connection: {connection_id}")
             return cl
-
 
     async def release(self, connection_id: uuid.UUID) -> bool:
         logging.debug(f"Releasing connection: {connection_id}")
@@ -101,7 +101,6 @@ class Multiplexor:
 
             logging.debug(f"Released connection: {connection_id}")
             return True
-
 
     # -------------------------- SEND & RECV PACKET --------------------------
 
@@ -126,11 +125,8 @@ class Multiplexor:
 
             return await self._transport.send_packet(packet)
 
-
     async def _incoming_callback(
-        self,
-        transport_cookie: uuid.UUID,
-        packet: typing.Optional[SocketPacket]
+        self, transport_cookie: uuid.UUID, packet: typing.Optional[SocketPacket]
     ):
         # Transport is disconnected. Kill everything.
         if packet is None:
@@ -154,22 +150,21 @@ class Multiplexor:
                 conn.cookies.remove(cookie)
                 del self._cookies[cookie]
 
-
     # -------------------------- THE DEATH PROCESS ---------------------------
-
 
     async def _death_process(self):
 
         async with self._lock:
             for conn in self._connections.values():
                 for cookie in conn.cookies:
-                    await conn.incoming_queue.put(SocketPacket(
-                        packet_type = PacketType.RESULT,
-                        cookie = cookie,
-                        rc = ResultCode.BROKER_WENT_AWAY,
-                        error = "The connection to the broker went away",
-                    ))
+                    await conn.incoming_queue.put(
+                        SocketPacket(
+                            packet_type=PacketType.RESULT,
+                            cookie=cookie,
+                            rc=ResultCode.BROKER_WENT_AWAY,
+                            error="The connection to the broker went away",
+                        )
+                    )
 
             self._connections.clear()
             self._cookies.clear()
-

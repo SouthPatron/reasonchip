@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 import uuid
 import typing
 import logging
@@ -10,9 +15,7 @@ from ..protocol import SocketPacket
 from .client_transport import ClientTransport, ReadCallbackType
 
 
-
 class HttpClient(ClientTransport):
-
 
     def __init__(
         self,
@@ -41,7 +44,6 @@ class HttpClient(ClientTransport):
         self._shutdown_event = asyncio.Event()
         self._num_workers = num_workers
 
-
     async def connect(
         self,
         callback: ReadCallbackType,
@@ -62,7 +64,6 @@ class HttpClient(ClientTransport):
 
         return True
 
-
     async def disconnect(self):
         if not self._worker_tasks:
             return
@@ -80,7 +81,7 @@ class HttpClient(ClientTransport):
         # Let them all die cleanly
         await asyncio.wait(
             self._worker_tasks,
-            return_when = asyncio.ALL_COMPLETED,
+            return_when=asyncio.ALL_COMPLETED,
         )
 
         self._worker_tasks.clear()
@@ -94,14 +95,12 @@ class HttpClient(ClientTransport):
         self._callback = None
         self._cookie = None
 
-
     async def send_packet(self, packet: SocketPacket) -> bool:
         if not self._worker_tasks:
             return False
 
         await self._queue.put(packet)
         return True
-
 
     async def _worker(self, worker_id: int):
         assert self._callback
@@ -120,12 +119,14 @@ class HttpClient(ClientTransport):
                     json_data = packet.model_dump_json()
                     response = await self._client.post(
                         self._target,
-                        content = json_data,
-                        timeout = None,
+                        content=json_data,
+                        timeout=None,
                     )
 
                     if response.status_code != 200:
-                        logging.error(f"[Worker {worker_id}] HTTP error: {response.status_code}")
+                        logging.error(
+                            f"[Worker {worker_id}] HTTP error: {response.status_code}"
+                        )
                         continue
 
                     async for line in response.aiter_lines():
@@ -136,15 +137,17 @@ class HttpClient(ClientTransport):
                             pkt = SocketPacket.model_validate_json(line)
                             await self._callback(self._cookie, pkt)
                         except Exception:
-                            logging.exception(f"[Worker {worker_id}] Failed to parse line: {line}")
+                            logging.exception(
+                                f"[Worker {worker_id}] Failed to parse line: {line}"
+                            )
 
                 except Exception:
-                    logging.exception(f"[Worker {worker_id}] failed to process packet")
+                    logging.exception(
+                        f"[Worker {worker_id}] failed to process packet"
+                    )
 
         except asyncio.CancelledError:
             logging.info(f"[Worker {worker_id}] cancelled")
 
         except Exception:
             logging.exception(f"[Worker {worker_id}] unexpected error")
-
-

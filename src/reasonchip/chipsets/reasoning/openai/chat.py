@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 """
 # OpenAI Chat Completion Chipset
 
@@ -49,7 +54,8 @@ class ClientSettings(BaseModel):
         default=60, description="The timeout for the request."
     )
     max_retries: typing.Optional[int] = Field(
-        default=openai.DEFAULT_MAX_RETRIES, description="The maximum number of retries."
+        default=openai.DEFAULT_MAX_RETRIES,
+        description="The maximum number of retries.",
     )
     default_headers: typing.Optional[typing.Dict[str, str]] = Field(
         default=None, description="The default headers for the request."
@@ -78,11 +84,11 @@ class ChatCompletionResponse(BaseModel):
     """
 
     status: typing.Literal[
-        'OK',
-        'CONNECTION_ERROR',
-        'RATE_LIMIT',
-        'API_ERROR',
-        'ERROR',
+        "OK",
+        "CONNECTION_ERROR",
+        "RATE_LIMIT",
+        "API_ERROR",
+        "ERROR",
     ] = Field(description="Status of the request.")
     status_code: typing.Optional[int] = Field(
         default=None, description="The HTTP status code of the response."
@@ -93,7 +99,9 @@ class ChatCompletionResponse(BaseModel):
 
 
 @Registry.register
-async def chat_completion(request: ChatCompletionRequest) -> ChatCompletionResponse:
+async def chat_completion(
+    request: ChatCompletionRequest,
+) -> ChatCompletionResponse:
     """
     Generates a chat completion using OpenAI's API.
 
@@ -144,6 +152,3 @@ async def chat_completion(request: ChatCompletionRequest) -> ChatCompletionRespo
         return ChatCompletionResponse(
             status="ERROR",
         )
-
-
-

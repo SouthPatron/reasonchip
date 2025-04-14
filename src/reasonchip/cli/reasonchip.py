@@ -1,15 +1,12 @@
-#!/usr/bin/env python
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
 
 import sys
 import argparse
 import asyncio
-import logging
-import logging.config
-import os
-
 import setproctitle
-
-from importlib.resources import files
 
 from ..core.logging.configure import configure_logging
 
@@ -73,4 +70,3 @@ def main() -> ExitCode:
 if __name__ == "__main__":
     rc = main()
     sys.exit(rc)
-

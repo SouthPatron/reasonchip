@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
 import uuid
 import typing
 import enum
@@ -17,7 +22,7 @@ DEFAULT_SERVERS = [
     "socket:///tmp/reasonchip-broker-client.sock",
     "tcp://[::1]/",
     "grpc://[::1]/",
-    "http://[::1]/"
+    "http://[::1]/",
 ]
 
 DEFAULT_CLIENT_PORT_TCP = 51500
@@ -28,11 +33,11 @@ DEFAULT_WORKER_PORT_TCP = 51510
 DEFAULT_WORKER_PORT_GRPC = 51511
 
 
-
 class PacketType(enum.StrEnum):
     """
     The type of packet.
     """
+
     # Server side operations
     REGISTER = "REGISTER"
     SHUTDOWN = "SHUTDOWN"
@@ -66,6 +71,7 @@ class SocketPacket(BaseModel):
     This is the base class for all packets that are sent between the client
     and the server.
     """
+
     packet_type: PacketType
 
     # Common variables
@@ -111,7 +117,7 @@ async def receive_packet(
 
         logging.debug(f"Read {length} octets")
 
-        req = SocketPacket.model_validate_json(msg_str.decode('utf-8'))
+        req = SocketPacket.model_validate_json(msg_str.decode("utf-8"))
 
         logging.debug("Packet received and parsed from stream")
 
@@ -139,7 +145,7 @@ async def send_packet(
     try:
         logging.debug("Sending packet to stream")
 
-        msg_str = request.model_dump_json().encode('utf-8')
+        msg_str = request.model_dump_json().encode("utf-8")
         length = len(msg_str)
 
         msg_bytes = struct.pack(f"!{length}s", msg_str)
@@ -155,4 +161,3 @@ async def send_packet(
     except:
         logging.debug("Failed to write packet to stream", exc_info=True)
         return False
-
