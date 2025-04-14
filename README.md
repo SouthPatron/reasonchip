@@ -7,7 +7,6 @@
 
 Open source agentic workflow automation software
 
-Copyright &copy; 2025 South Patron LLC
 
 ## Quick links
 
@@ -27,4 +26,10 @@ pip install reasonchip
 
 They're right here in the source tree: [Examples](./examples/README.md)
 
+
+## License
+
+ReasonChip - Copyright &copy; 2025 South Patron LLC
+This project is licensed under the GPLv3+.
+See <https://www.gnu.org/licenses/> for details.
 
