@@ -61,6 +61,7 @@ def get_port(scheme: str, client_type: ClientType) -> int:
 
 # ------------------- SUPPORT CLASSES ----------------------------------------
 
+
 @dataclass
 class ConnectionTarget:
     raw_target: str
@@ -71,23 +72,31 @@ class ConnectionTarget:
 
     def __post_init__(self):
         # IPv6 address with optional port: [::1]:5000
-        ipv6_match = re.match(r'^\[(?P<ip>[0-9a-fA-F:]+)\](?::(?P<port>\d+))?$', self.raw_target)
+        ipv6_match = re.match(
+            r"^\[(?P<ip>[0-9a-fA-F:]+)\](?::(?P<port>\d+))?$", self.raw_target
+        )
         if ipv6_match:
-            self.host = ipv6_match.group('ip')
-            self.port = int(ipv6_match.group('port')) if ipv6_match.group('port') else None
+            self.host = ipv6_match.group("ip")
+            self.port = (
+                int(ipv6_match.group("port"))
+                if ipv6_match.group("port")
+                else None
+            )
             self.is_ipv6 = True
             self.family = socket.AF_INET6
             return
 
         # IPv4 or hostname with optional port
-        if ':' in self.raw_target:
-            host_part, port_part = self.raw_target.rsplit(':', 1)
+        if ":" in self.raw_target:
+            host_part, port_part = self.raw_target.rsplit(":", 1)
             self.host = host_part
             self.family = socket.AF_INET
             try:
                 self.port = int(port_part)
             except ValueError:
-                raise ValueError(f"Invalid port number in target: {self.raw_target}")
+                raise ValueError(
+                    f"Invalid port number in target: {self.raw_target}"
+                )
         else:
             self.host = self.raw_target
             self.port = None
@@ -99,11 +108,12 @@ class TransportOptions:
     target: str
 
     @classmethod
-    def from_args(cls, url: str) -> 'TransportOptions':
+    def from_args(cls, url: str) -> "TransportOptions":
         """
         Create a TransportOptions instance from command line arguments.
         """
-        pattern = re.compile(r'''
+        pattern = re.compile(
+            r"""
             ^
             (?P<scheme>grpc|tcp|http|socket)://           # Scheme
             (?P<target>
@@ -118,15 +128,17 @@ class TransportOptions:
                 )
             )
             /?$                                           # Trailing slash
-        ''', re.VERBOSE)
+        """,
+            re.VERBOSE,
+        )
 
         match = pattern.match(url)
         if not match:
             raise ValueError(f"Invalid URL format: {url}")
 
         return TransportOptions(
-            scheme = match.group('scheme'),
-            target = match.group('target'),
+            scheme=match.group("scheme"),
+            target=match.group("target"),
         )
 
 
@@ -138,7 +150,6 @@ def client_connection(
     client_type: ClientType,
     ssl_client_options: typing.Optional[SSLClientOptions] = None,
     ssl_context: typing.Optional[ssl.SSLContext] = None,
-
 ) -> ClientTransport:
 
     parsed = TransportOptions.from_args(addr)
@@ -147,19 +158,19 @@ def client_connection(
     if parsed.scheme == "tcp":
         ct = ConnectionTarget(parsed.target)
         return TcpClient(
-            host = ct.host,
-            port = ct.port or default_port,
-            ssl = ssl_context,
-            family = socket.AF_INET6 if ct.is_ipv6 else socket.AF_INET,
+            host=ct.host,
+            port=ct.port or default_port,
+            ssl=ssl_context,
+            family=socket.AF_INET6 if ct.is_ipv6 else socket.AF_INET,
         )
 
     elif parsed.scheme == "socket":
         return SocketClient(
-            path = parsed.target,
-            ssl = ssl_context,
+            path=parsed.target,
+            ssl=ssl_context,
         )
 
-    elif parsed.scheme == 'grpc':
+    elif parsed.scheme == "grpc":
         ct = ConnectionTarget(parsed.target)
         new_port = ct.port or default_port
 
@@ -169,11 +180,11 @@ def client_connection(
             new_target = f"{ct.host}:{new_port}"
 
         return GrpcClient(
-            target = new_target,
-            ssl_options = ssl_client_options,
+            target=new_target,
+            ssl_options=ssl_client_options,
         )
 
-    elif parsed.scheme == 'http':
+    elif parsed.scheme == "http":
         ct = ConnectionTarget(parsed.target)
         new_port = ct.port or default_port
 
@@ -183,8 +194,8 @@ def client_connection(
             new_target = f"{ct.host}:{new_port}"
 
         return HttpClient(
-            target = new_target,
-            ssl_context = ssl_context,
+            target=new_target,
+            ssl_context=ssl_context,
         )
 
     raise ValueError(f"Unknown scheme: {parsed.scheme}")
@@ -197,9 +208,9 @@ def client_to_broker(
 ) -> ClientTransport:
     return client_connection(
         addr,
-        client_type = ClientType.CLIENT,
-        ssl_client_options = ssl_client_options,
-        ssl_context = ssl_context,
+        client_type=ClientType.CLIENT,
+        ssl_client_options=ssl_client_options,
+        ssl_context=ssl_context,
     )
 
 
@@ -210,9 +221,9 @@ def worker_to_broker(
 ) -> ClientTransport:
     return client_connection(
         addr,
-        client_type = ClientType.WORKER,
-        ssl_client_options = ssl_client_options,
-        ssl_context = ssl_context,
+        client_type=ClientType.WORKER,
+        ssl_client_options=ssl_client_options,
+        ssl_context=ssl_context,
     )
 
 
@@ -224,7 +235,6 @@ def server_connection(
     client_type: ClientType,
     ssl_server_options: typing.Optional[SSLServerOptions] = None,
     ssl_context: typing.Optional[ssl.SSLContext] = None,
-
 ) -> ServerTransport:
 
     parsed = TransportOptions.from_args(addr)
@@ -234,19 +244,19 @@ def server_connection(
         ct = ConnectionTarget(parsed.target)
 
         return TcpServer(
-            hosts = ct.host,
-            port = ct.port or default_port,
-            ssl = ssl_context,
-            family = socket.AF_INET6 if ct.is_ipv6 else socket.AF_INET,
+            hosts=ct.host,
+            port=ct.port or default_port,
+            ssl=ssl_context,
+            family=socket.AF_INET6 if ct.is_ipv6 else socket.AF_INET,
         )
 
     elif parsed.scheme == "socket":
         return SocketServer(
-            path = parsed.target,
-            ssl = ssl_context,
+            path=parsed.target,
+            ssl=ssl_context,
         )
 
-    elif parsed.scheme == 'grpc':
+    elif parsed.scheme == "grpc":
         ct = ConnectionTarget(parsed.target)
         new_port = ct.port or default_port
 
@@ -256,8 +266,8 @@ def server_connection(
             new_target = f"{ct.host}:{new_port}"
 
         return GrpcServer(
-            host = new_target,
-            ssl_options = ssl_server_options,
+            host=new_target,
+            ssl_options=ssl_server_options,
         )
 
     elif parsed.scheme == "http":
@@ -270,10 +280,9 @@ def server_connection(
             new_target = f"{ct.host}:{new_port}"
 
         return HttpServer(
-            host = new_target,
-            ssl_options = ssl_server_options,
+            host=new_target,
+            ssl_options=ssl_server_options,
         )
-
 
     raise ValueError(f"Unknown scheme: {parsed.scheme}")
 
@@ -285,12 +294,14 @@ def broker_for_workers(
 ) -> typing.List[ServerTransport]:
     rc = []
     for addr in addresses:
-        rc.append(server_connection(
-            addr,
-            ClientType.WORKER,
-            ssl_server_options,
-            ssl_context,
-        ))
+        rc.append(
+            server_connection(
+                addr,
+                ClientType.WORKER,
+                ssl_server_options,
+                ssl_context,
+            )
+        )
     return rc
 
 
@@ -301,11 +312,12 @@ def broker_for_clients(
 ) -> typing.List[ServerTransport]:
     rc = []
     for addr in addresses:
-        rc.append(server_connection(
-            addr,
-            ClientType.CLIENT,
-            ssl_server_options,
-            ssl_context,
-        ))
+        rc.append(
+            server_connection(
+                addr,
+                ClientType.CLIENT,
+                ssl_server_options,
+                ssl_context,
+            )
+        )
     return rc
-

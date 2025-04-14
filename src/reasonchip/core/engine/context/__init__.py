@@ -3,7 +3,6 @@ from .variables import Variables, VariableMapType
 
 
 __all__ = [
-    'FlowControl',
-    'Variables',
+    "FlowControl",
+    "Variables",
 ]
-

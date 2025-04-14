@@ -28,7 +28,9 @@ class ClientPayload:
     packet: SocketPacket
 
 
-WriterCallbackType = typing.Callable[[uuid.UUID, SocketPacket], typing.Awaitable[bool]]
+WriterCallbackType = typing.Callable[
+    [uuid.UUID, SocketPacket], typing.Awaitable[bool]
+]
 
 
 class Switchboard:
@@ -45,9 +47,12 @@ class Switchboard:
         self._available: typing.List[uuid.UUID] = []
 
         self._routes: typing.Dict[uuid.UUID, Route] = {}
-        self._routes_by_client: typing.Dict[uuid.UUID, typing.List[Route]] = defaultdict(list)
-        self._routes_by_worker: typing.Dict[uuid.UUID, typing.List[Route]] = defaultdict(list)
-
+        self._routes_by_client: typing.Dict[uuid.UUID, typing.List[Route]] = (
+            defaultdict(list)
+        )
+        self._routes_by_worker: typing.Dict[uuid.UUID, typing.List[Route]] = (
+            defaultdict(list)
+        )
 
     # --------------------- PAYLOAD HANDLING ----------------------------------
 
@@ -63,7 +68,6 @@ class Switchboard:
                     r.client_gone = True
 
             await self.print_status()
-
 
     async def eliminate_worker(self, connection_id: uuid.UUID):
         """
@@ -82,12 +86,15 @@ class Switchboard:
                     # Remove from the route from the global routes
                     self._routes.pop(r.route_id)
 
-                    await self._writer_callback(r.client_id, SocketPacket(
-                        packet_type = PacketType.RESULT,
-                        cookie = r.route_id,
-                        rc = ResultCode.WORKER_WENT_AWAY,
-                        error = "The worker connection went away",
-                    ))
+                    await self._writer_callback(
+                        r.client_id,
+                        SocketPacket(
+                            packet_type=PacketType.RESULT,
+                            cookie=r.route_id,
+                            rc=ResultCode.WORKER_WENT_AWAY,
+                            error="The worker connection went away",
+                        ),
+                    )
 
                     # Remove the route for the client
                     self._routes_by_client[r.client_id].remove(r)
@@ -99,17 +106,11 @@ class Switchboard:
                 # Finally remove the worker route entry
                 self._routes_by_worker.pop(connection_id)
 
-
             # Now we purge the available connections of the worker
-            self._available = [
-                c
-                for c in self._available
-                if c != connection_id
-            ]
+            self._available = [c for c in self._available if c != connection_id]
 
             # Tell the world
             await self.print_status()
-
 
     # --------------------- PAYLOAD HANDLING ----------------------------------
 
@@ -122,10 +123,9 @@ class Switchboard:
             PacketType.RUN: self._cl_run,
             PacketType.CANCEL: self._cl_passthru,
         }
-        payload = ClientPayload(connection_id = connection_id, packet = packet)
+        payload = ClientPayload(connection_id=connection_id, packet=packet)
         handler = handlers.get(packet.packet_type, self._unsupported_packet)
         await handler(payload)
-
 
     async def worker_payload(
         self,
@@ -136,10 +136,11 @@ class Switchboard:
             PacketType.REGISTER: self._wk_register,
             PacketType.RESULT: self._wk_result,
         }
-        payload = ClientPayload(connection_id = connection_id, packet = packet)
-        handler = handlers.get(payload.packet.packet_type, self._unsupported_packet)
+        payload = ClientPayload(connection_id=connection_id, packet=packet)
+        handler = handlers.get(
+            payload.packet.packet_type, self._unsupported_packet
+        )
         await handler(payload)
-
 
     # --------------------- COMMON --------------------------------------------
 
@@ -159,34 +160,30 @@ class Switchboard:
 
         # Create the packet
         resp = SocketPacket(
-            packet_type = PacketType.RESULT,
-            cookie = pkt.cookie,
-            rc = rc,
-            error = error,
+            packet_type=PacketType.RESULT,
+            cookie=pkt.cookie,
+            rc=rc,
+            error=error,
         )
 
         # And send it back
         await self._writer_callback(payload.connection_id, resp)
 
-
     async def _unsupported_packet(self, payload: ClientPayload):
         return await self._respond(
-            payload = payload,
-            rc = ResultCode.UNSUPPORTED_PACKET_TYPE,
-            error = "Packet type not supported on this client",
+            payload=payload,
+            rc=ResultCode.UNSUPPORTED_PACKET_TYPE,
+            error="Packet type not supported on this client",
         )
-
 
     async def _bad_packet(self, payload: ClientPayload, reason: str):
         return await self._respond(
-            payload = payload,
-            rc = ResultCode.BAD_PACKET,
-            error = reason,
+            payload=payload,
+            rc=ResultCode.BAD_PACKET,
+            error=reason,
         )
 
-
     # --------------------- CLIENTS -------------------------------------------
-
 
     async def _cl_run(self, payload: ClientPayload):
 
@@ -208,36 +205,37 @@ class Switchboard:
             # Make sure the cookie doesn't already exist in the routes
             if cookie in self._routes:
                 return await self._respond(
-                    payload = payload,
-                    rc = ResultCode.COOKIE_COLLISION,
-                    error = "Already in use",
+                    payload=payload,
+                    rc=ResultCode.COOKIE_COLLISION,
+                    error="Already in use",
                 )
 
             # Make sure there are available connections
             if not self._available:
                 return await self._respond(
-                    payload = payload,
-                    rc = ResultCode.NO_CAPACITY,
-                    error = "No capacity available",
+                    payload=payload,
+                    rc=ResultCode.NO_CAPACITY,
+                    error="No capacity available",
                 )
 
             # Create the Route and keep track of it
             conn = self._available.pop()
             route = Route(
-                route_id = cookie,
-                client_id = payload.connection_id,
-                connection_id = conn,
+                route_id=cookie,
+                client_id=payload.connection_id,
+                connection_id=conn,
             )
             self._routes[cookie] = route
             self._routes_by_client[payload.connection_id].append(route)
             self._routes_by_worker[conn].append(route)
 
             # Log what happened
-            logging.info(f"CLIENT RUN: cookie=[{cookie}] pipeline=[{pkt.pipeline}] client=[{payload.connection_id}] connection=[{conn}]")
+            logging.info(
+                f"CLIENT RUN: cookie=[{cookie}] pipeline=[{pkt.pipeline}] client=[{payload.connection_id}] connection=[{conn}]"
+            )
 
             # Send through to the worker
             await self._writer_callback(conn, pkt)
-
 
     async def _cl_passthru(self, payload: ClientPayload):
 
@@ -256,9 +254,9 @@ class Switchboard:
             # Make sure the cookie exists in the routes
             if cookie not in self._routes:
                 return await self._respond(
-                    payload = payload,
-                    rc = ResultCode.COOKIE_NOT_FOUND,
-                    error = "No such cookie",
+                    payload=payload,
+                    rc=ResultCode.COOKIE_NOT_FOUND,
+                    error="No such cookie",
                 )
 
             # Get the route
@@ -267,10 +265,7 @@ class Switchboard:
             # Send through to the worker
             await self._writer_callback(route.connection_id, pkt)
 
-
     # --------------------- WORKERS -------------------------------------------
-
-
 
     async def _wk_register(self, payload: ClientPayload):
 
@@ -285,7 +280,6 @@ class Switchboard:
 
             # Tell the world
             await self.print_status()
-
 
     async def _wk_result(self, payload: ClientPayload):
 
@@ -324,11 +318,12 @@ class Switchboard:
                 await self._writer_callback(route.client_id, pkt)
 
             # Log what happened
-            logging.info(f"WORKER RESULT: cookie=[{cookie}] rc=[{pkt.rc}] error=[{pkt.error}] client=[{route.client_id}] connection=[{route.connection_id}]")
+            logging.info(
+                f"WORKER RESULT: cookie=[{cookie}] rc=[{pkt.rc}] error=[{pkt.error}] client=[{route.client_id}] connection=[{route.connection_id}]"
+            )
 
             # Return the connection to the available pool
             self._available.append(route.connection_id)
-
 
     # --------------------- CLEANUP -------------------------------------------
 
@@ -340,4 +335,3 @@ class Switchboard:
 
         msg = f"STATS: available [{avail}] | routes [{routes}] rbw [{rbw}] rbc [{rbc}]"
         logging.info(msg)
-

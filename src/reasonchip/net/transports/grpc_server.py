@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from ..protocol import SocketPacket
 
-from .grpc_stubs.reasonchip_pb2 import ReasonChipPacket # type: ignore
+from .grpc_stubs.reasonchip_pb2 import ReasonChipPacket  # type: ignore
 from .grpc_stubs.reasonchip_pb2_grpc import (
     ReasonChipServiceServicer,
     add_ReasonChipServiceServicer_to_server,
@@ -36,9 +36,8 @@ class ReasonChipServiceImpl(ReasonChipServiceServicer):
     NOTE: This class is friendly with GrpcServer (It touches privates)
     """
 
-    def __init__(self, server: 'GrpcServer'):
+    def __init__(self, server: "GrpcServer"):
         self.server = server
-
 
     async def EstablishConnection(self, request_iterator, context):
         session = ClientSession()
@@ -48,7 +47,9 @@ class ReasonChipServiceImpl(ReasonChipServiceServicer):
         async with self.server._lock:
             self.server._connections[connection_id] = session
             if self.server._new_connection_callback:
-                await self.server._new_connection_callback(self.server, connection_id)
+                await self.server._new_connection_callback(
+                    self.server, connection_id
+                )
 
         # Stream reading and writing
         async def reader():
@@ -57,15 +58,15 @@ class ReasonChipServiceImpl(ReasonChipServiceServicer):
                     if self.server._read_callback:
 
                         pkt = SocketPacket(
-                            packet_type = packet.packet_type,
-                            cookie = packet.cookie,
-                            capacity = packet.capacity,
-                            pipeline = packet.pipeline,
-                            variables = packet.variables,
-                            rc = packet.rc,
-                            error = packet.error,
-                            stacktrace = packet.stacktrace,
-                            result = packet.result,
+                            packet_type=packet.packet_type,
+                            cookie=packet.cookie,
+                            capacity=packet.capacity,
+                            pipeline=packet.pipeline,
+                            variables=packet.variables,
+                            rc=packet.rc,
+                            error=packet.error,
+                            stacktrace=packet.stacktrace,
+                            result=packet.result,
                         )
 
                         await self.server._read_callback(connection_id, pkt)
@@ -75,13 +76,12 @@ class ReasonChipServiceImpl(ReasonChipServiceServicer):
             finally:
                 session.death_signal.set()
 
-
         try:
             t_read = asyncio.create_task(reader())
             t_write = asyncio.create_task(session.outgoing_queue.get())
             t_die = asyncio.create_task(session.death_signal.wait())
 
-            wl = [ t_read, t_write, t_die ]
+            wl = [t_read, t_write, t_die]
 
             while wl:
                 done, _ = await asyncio.wait(
@@ -102,19 +102,21 @@ class ReasonChipServiceImpl(ReasonChipServiceServicer):
                         assert isinstance(packet, SocketPacket)
 
                         grpc_packet = ReasonChipPacket(
-                            packet_type = packet.packet_type,
-                            cookie = packet.cookie,
-                            capacity = packet.capacity,
-                            pipeline = packet.pipeline,
-                            variables = packet.variables,
-                            rc = packet.rc,
-                            error = packet.error,
-                            stacktrace = packet.stacktrace,
-                            result = packet.result,
+                            packet_type=packet.packet_type,
+                            cookie=packet.cookie,
+                            capacity=packet.capacity,
+                            pipeline=packet.pipeline,
+                            variables=packet.variables,
+                            rc=packet.rc,
+                            error=packet.error,
+                            stacktrace=packet.stacktrace,
+                            result=packet.result,
                         )
                         yield grpc_packet
 
-                        t_write = asyncio.create_task(session.outgoing_queue.get())
+                        t_write = asyncio.create_task(
+                            session.outgoing_queue.get()
+                        )
                         wl.append(t_write)
 
                     else:
@@ -145,16 +147,20 @@ class GrpcServer(ServerTransport):
     ):
         super().__init__()
 
-        self._host = host or '[::]'
+        self._host = host or "[::]"
 
         # Connection management
         self._lock: asyncio.Lock = asyncio.Lock()
         self._connections: typing.Dict[uuid.UUID, ClientSession] = {}
 
         # Callbacks
-        self._new_connection_callback: typing.Optional[NewConnectionCallbackType] = None
+        self._new_connection_callback: typing.Optional[
+            NewConnectionCallbackType
+        ] = None
         self._read_callback: typing.Optional[ReadCallbackType] = None
-        self._closed_connection_callback: typing.Optional[ClosedConnectionCallbackType] = None
+        self._closed_connection_callback: typing.Optional[
+            ClosedConnectionCallbackType
+        ] = None
 
         # gRPC code
         self._server = grpc.aio.server()
@@ -168,7 +174,6 @@ class GrpcServer(ServerTransport):
 
         else:
             self._server.add_insecure_port(self._host)
-
 
     async def start_server(
         self,
@@ -186,12 +191,10 @@ class GrpcServer(ServerTransport):
         logging.info(f"gRPC server listening on {self._host}")
         return True
 
-
     async def stop_server(self) -> bool:
         await self._server.stop(0)
         logging.info("gRPC server stopped")
         return True
-
 
     async def send_packet(
         self,
@@ -205,7 +208,6 @@ class GrpcServer(ServerTransport):
 
             return False
 
-
     async def close_connection(self, connection_id: uuid.UUID) -> bool:
         async with self._lock:
             if session := self._connections.get(connection_id):
@@ -214,7 +216,6 @@ class GrpcServer(ServerTransport):
 
             return False
 
-
     def create_grpc_server_credentials(
         self,
         options: SSLServerOptions,
@@ -222,12 +223,15 @@ class GrpcServer(ServerTransport):
 
         assert options.cert and options.key and options.ca
 
-        with open(options.cert, 'rb') as cert_file, open(options.key, 'rb') as key_file:
+        with (
+            open(options.cert, "rb") as cert_file,
+            open(options.key, "rb") as key_file,
+        ):
             server_cert_chain = cert_file.read()
             private_key = key_file.read()
 
         if options.require_client_cert and options.ca:
-            with open(options.ca, 'rb') as ca_file:
+            with open(options.ca, "rb") as ca_file:
                 root_certificates = ca_file.read()
 
             return grpc.ssl_server_credentials(
@@ -239,5 +243,3 @@ class GrpcServer(ServerTransport):
         return grpc.ssl_server_credentials(
             [(private_key, server_cert_chain)],
         )
-
-

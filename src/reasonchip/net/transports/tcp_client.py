@@ -15,20 +15,20 @@ class TcpClient(ClientTransport):
 
     def __init__(
         self,
-        host = None,
-        port = None,
-        limit = 2**16,
-        ssl = None,
-        family = 0,
-        proto = 0,
-        flags = 0,
-        sock = None,
-        local_addr = None,
-        server_hostname = None,
-        ssl_handshake_timeout = None,
-        ssl_shutdown_timeout = None,
-        happy_eyeballs_delay = None,
-        interleave = None,
+        host=None,
+        port=None,
+        limit=2**16,
+        ssl=None,
+        family=0,
+        proto=0,
+        flags=0,
+        sock=None,
+        local_addr=None,
+        server_hostname=None,
+        ssl_handshake_timeout=None,
+        ssl_shutdown_timeout=None,
+        happy_eyeballs_delay=None,
+        interleave=None,
     ):
         """
         Constructor.
@@ -61,7 +61,6 @@ class TcpClient(ClientTransport):
         self._handler: typing.Optional[asyncio.Task] = None
         self._sent_none: bool = False
 
-
     async def connect(
         self,
         callback: ReadCallbackType,
@@ -82,20 +81,20 @@ class TcpClient(ClientTransport):
             self._callback = callback
 
             self._reader, self._writer = await asyncio.open_connection(
-                host = self._host,
-                port = self._port,
-                limit = self._limit,
-                ssl = self._ssl,
-                family = self._family,
-                proto = self._proto,
-                flags = self._flags,
-                sock = self._sock,
-                local_addr = self._local_addr,
-                server_hostname = self._server_hostname,
-                ssl_handshake_timeout = self._ssl_handshake_timeout,
-                ssl_shutdown_timeout = self._ssl_shutdown_timeout,
-                happy_eyeballs_delay = self._happy_eyeballs_delay,
-                interleave = self._interleave,
+                host=self._host,
+                port=self._port,
+                limit=self._limit,
+                ssl=self._ssl,
+                family=self._family,
+                proto=self._proto,
+                flags=self._flags,
+                sock=self._sock,
+                local_addr=self._local_addr,
+                server_hostname=self._server_hostname,
+                ssl_handshake_timeout=self._ssl_handshake_timeout,
+                ssl_shutdown_timeout=self._ssl_shutdown_timeout,
+                happy_eyeballs_delay=self._happy_eyeballs_delay,
+                interleave=self._interleave,
             )
 
             self._handler = asyncio.create_task(self._loop())
@@ -110,7 +109,6 @@ class TcpClient(ClientTransport):
 
             logging.exception("Connect failed")
             return False
-
 
     async def disconnect(self):
         if not self._handler:
@@ -132,11 +130,9 @@ class TcpClient(ClientTransport):
         self._writer = None
         self._handler = None
 
-
     async def send_packet(self, packet: SocketPacket) -> bool:
         assert self._writer
         return await send_packet(self._writer, packet)
-
 
     async def _loop(self):
         assert self._reader
@@ -152,4 +148,3 @@ class TcpClient(ClientTransport):
             if pkt is None:
                 self._sent_none = True
                 break
-

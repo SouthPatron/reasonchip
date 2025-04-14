@@ -11,7 +11,6 @@ def evaluate(expr: str, variables: Variables):
         # Evaluate the expression in a restricted environment.
         result = eval(expr, {"__builtins__": {}}, variables.vobj)
     except Exception as e:
-        raise rex.EvaluationException(expr = expr) from e
+        raise rex.EvaluationException(expr=expr) from e
 
     return result
-

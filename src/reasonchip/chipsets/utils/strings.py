@@ -15,6 +15,7 @@ class RemoveCodeBlockRequest(BaseModel):
     """
     Request structure.
     """
+
     string: str
 
 
@@ -22,28 +23,29 @@ class RemoveCodeBlockResponse(BaseModel):
     """
     Response structure.
     """
+
     status: typing.Literal[
         "OK",
         "ERROR",
     ] = Field(description="Status of the request.")
 
     language: typing.Optional[str] = Field(
-        default=None,
-        description="The language of the code block, if specified"
+        default=None, description="The language of the code block, if specified"
     )
 
     result: typing.Optional[str] = Field(
         default=None,
-        description="The contents of the string without a code block."
+        description="The contents of the string without a code block.",
     )
     error_message: typing.Optional[str] = Field(
-        default=None,
-        description="Error message if the command failed."
+        default=None, description="Error message if the command failed."
     )
 
 
 @Registry.register
-async def remove_code_block(request: RemoveCodeBlockRequest) -> RemoveCodeBlockResponse:
+async def remove_code_block(
+    request: RemoveCodeBlockRequest,
+) -> RemoveCodeBlockResponse:
     """
     Removes a fenced code block (triple backticks) and its language specifier
     if present.
@@ -61,7 +63,7 @@ async def remove_code_block(request: RemoveCodeBlockRequest) -> RemoveCodeBlockR
 
         if match:
             language = match.group(1)
-            cleaned_text = text[:match.start()] + text[match.end():]
+            cleaned_text = text[: match.start()] + text[match.end() :]
         else:
             language = None
             cleaned_text = text
@@ -77,4 +79,3 @@ async def remove_code_block(request: RemoveCodeBlockRequest) -> RemoveCodeBlockR
             status="ERROR",
             error_message=str(e),
         )
-

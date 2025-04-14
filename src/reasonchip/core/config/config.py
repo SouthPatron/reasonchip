@@ -28,16 +28,16 @@ class Config:
 
     def getBool(self, key: str) -> bool:
         return self.getStr(key).lower() in [
-            'true',
-            'yes',
-            '1',
-            'on',
-            'enabled',
-            'ja',
-            'yebo',
-            'yup',
-            'yep',
-            'y',
+            "true",
+            "yes",
+            "1",
+            "on",
+            "enabled",
+            "ja",
+            "yebo",
+            "yup",
+            "yep",
+            "y",
         ]
 
     def getFloat(self, key: str) -> float:
@@ -59,4 +59,3 @@ class Config:
         ns = self._kvp[namespace]
         rc = dict(ns)
         return Config(rc)
-

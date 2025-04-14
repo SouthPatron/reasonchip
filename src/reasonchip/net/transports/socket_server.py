@@ -29,13 +29,13 @@ class SocketServer(ServerTransport):
 
     def __init__(
         self,
-        path = None,
-        limit = 2**16,
-        sock = None,
-        backlog = 100,
-        ssl = None,
-        ssl_handshake_timeout = None,
-        ssl_shutdown_timeout = None,
+        path=None,
+        limit=2**16,
+        sock=None,
+        backlog=100,
+        ssl=None,
+        ssl_handshake_timeout=None,
+        ssl_shutdown_timeout=None,
     ):
         super().__init__()
 
@@ -49,15 +49,18 @@ class SocketServer(ServerTransport):
         self._ssl_shutdown_timeout = ssl_shutdown_timeout
 
         # Callbacks
-        self._new_connection_callback: typing.Optional[NewConnectionCallbackType] = None
+        self._new_connection_callback: typing.Optional[
+            NewConnectionCallbackType
+        ] = None
         self._read_callback: typing.Optional[ReadCallbackType] = None
-        self._closed_connection_callback: typing.Optional[ClosedConnectionCallbackType] = None
+        self._closed_connection_callback: typing.Optional[
+            ClosedConnectionCallbackType
+        ] = None
 
         # Server state
         self._lock: asyncio.Lock = asyncio.Lock()
         self._server: typing.Optional[asyncio.Server] = None
         self._connections: typing.Dict[uuid.UUID, ClientConnection] = {}
-
 
     async def start_server(
         self,
@@ -76,17 +79,16 @@ class SocketServer(ServerTransport):
 
         self._server = await asyncio.start_unix_server(
             self._connection,
-            path = self._path,
-            limit = self._limit,
-            sock = self._sock,
-            backlog = self._backlog,
-            ssl = self._ssl,
-            ssl_handshake_timeout = self._ssl_handshake_timeout,
-            ssl_shutdown_timeout = self._ssl_shutdown_timeout,
+            path=self._path,
+            limit=self._limit,
+            sock=self._sock,
+            backlog=self._backlog,
+            ssl=self._ssl,
+            ssl_handshake_timeout=self._ssl_handshake_timeout,
+            ssl_shutdown_timeout=self._ssl_shutdown_timeout,
         )
 
         return True
-
 
     async def stop_server(self) -> bool:
         async with self._lock:
@@ -94,7 +96,6 @@ class SocketServer(ServerTransport):
                 conn.death_signal.set()
 
         return True
-
 
     async def send_packet(
         self,
@@ -111,7 +112,6 @@ class SocketServer(ServerTransport):
             await conn.outgoing_queue.put(packet)
             return True
 
-
     async def close_connection(
         self,
         connection_id: uuid.UUID,
@@ -125,9 +125,7 @@ class SocketServer(ServerTransport):
             conn.death_signal.set()
             return True
 
-
     # ------------------------------------------------------------------------
-
 
     async def _connection(
         self,
@@ -138,8 +136,8 @@ class SocketServer(ServerTransport):
         assert self._closed_connection_callback is not None
 
         conn = ClientConnection(
-            reader = reader,
-            writer = writer,
+            reader=reader,
+            writer=writer,
         )
 
         # Register the connection
@@ -159,7 +157,6 @@ class SocketServer(ServerTransport):
         writer.close()
         await writer.wait_closed()
 
-
     async def _client_loop(self, conn: ClientConnection) -> None:
         assert self._read_callback is not None
 
@@ -167,12 +164,12 @@ class SocketServer(ServerTransport):
         t_read = asyncio.create_task(receive_packet(conn.reader))
         t_write = asyncio.create_task(conn.outgoing_queue.get())
 
-        wl = [ t_die, t_read, t_write ]
+        wl = [t_die, t_read, t_write]
 
         while wl:
             done, _ = await asyncio.wait(
                 wl,
-                return_when = asyncio.FIRST_COMPLETED,
+                return_when=asyncio.FIRST_COMPLETED,
             )
 
             # Read a packet
@@ -193,12 +190,13 @@ class SocketServer(ServerTransport):
                     else:
                         await self._read_callback(conn.connection_id, packet)
 
-                        t_read = asyncio.create_task(receive_packet(conn.reader))
+                        t_read = asyncio.create_task(
+                            receive_packet(conn.reader)
+                        )
                         wl.append(t_read)
 
                 else:
                     t_read = None
-
 
             # Write a packet
             if t_write in done:
@@ -217,7 +215,6 @@ class SocketServer(ServerTransport):
                 else:
                     t_write = None
 
-
             # Die
             if t_die in done:
                 assert t_die and t_die.done()
@@ -229,5 +226,3 @@ class SocketServer(ServerTransport):
 
                 if t_write:
                     t_write.cancel()
-
-

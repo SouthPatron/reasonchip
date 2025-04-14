@@ -111,7 +111,8 @@ async def telegram_send(request: TelegramSendRequest) -> TelegramSendResponse:
         method_name = request.method.lower()
         available_methods = {
             name.lower(): name
-            for name in dir(bot) if callable(getattr(bot, name))
+            for name in dir(bot)
+            if callable(getattr(bot, name))
         }
         if method_name not in available_methods:
             return TelegramSendResponse(
@@ -167,4 +168,3 @@ async def telegram_send(request: TelegramSendRequest) -> TelegramSendResponse:
             status="ERROR",
             error_message=f"Unexpected error: {str(e)}",
         )
-

@@ -1,6 +1,9 @@
 # Process management
 setproctitle>=1.3.4
 
+# Code formating
+black>=25.1.0
+
 # openapi-generator-cli requirements
 urllib3>=1.25.3,<3.0.0
 python-dateutil>=2.8.2

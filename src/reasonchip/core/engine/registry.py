@@ -16,7 +16,10 @@ RequestType = typing.TypeVar("RequestType", bound=BaseModel)
 ResponseType = typing.TypeVar("ResponseType", bound=BaseModel)
 
 # Define the chip type
-ChipType = typing.Callable[[RequestType], typing.Coroutine[None, None, ResponseType]]
+ChipType = typing.Callable[
+    [RequestType], typing.Coroutine[None, None, ResponseType]
+]
+
 
 # Define the registry types
 class RegistryEntry(BaseModel):
@@ -36,12 +39,10 @@ class Registry:
     def __new__(cls, *args, **kwargs):
         raise RuntimeError("Cannot instantiate Registry.")
 
-
     _registry: RegistryType = {}
     _search_path: typing.List[str] = [
-        'reasonchip.chipsets',  # This is the default search path
+        "reasonchip.chipsets",  # This is the default search path
     ]
-
 
     @classmethod
     def register(cls, func: ChipType) -> ChipType:
@@ -54,28 +55,23 @@ class Registry:
 
             # NOTE: Don't check for duplicates
             cls._registry[clname] = RegistryEntry(
-                func = func,
-                request_type = req,
-                response_type = resp
+                func=func, request_type=req, response_type=resp
             )
             return func
         except rex.MalformedChipException as ex:
             raise rex.RegistryException(
-                module_name = module_name,
-                function_name = function_name,
+                module_name=module_name,
+                function_name=function_name,
             ) from ex
-
 
     @classmethod
     def registry(cls) -> RegistryType:
         return cls._registry
 
-
     @classmethod
     def register_chipsets(cls, path: str):
         if path not in cls._search_path:
             cls._search_path.append(path)
-
 
     @classmethod
     def get_chip(cls, name: str) -> typing.Optional[RegistryEntry]:
@@ -91,9 +87,10 @@ class Registry:
         # We have a total miss.
         return None
 
-
     @classmethod
-    def get_types(cls, func: ChipType) -> typing.Tuple[typing.Type[BaseModel], typing.Type[BaseModel]]:
+    def get_types(
+        cls, func: ChipType
+    ) -> typing.Tuple[typing.Type[BaseModel], typing.Type[BaseModel]]:
         """
         Retrieve the request and response types from a chip function.
         """
@@ -105,20 +102,21 @@ class Registry:
 
         if len(params) != 1:
             raise rex.MalformedChipException(
-                reason = "Chip functions must have exactly one parameter."
+                reason="Chip functions must have exactly one parameter."
             )
 
         request_type = type_hints[params[0].name]  # Get the request type
         response_type = type_hints["return"]  # Get the response type
 
         # Ensure both are subclasses of BaseModel
-        if not issubclass(request_type, BaseModel) or not issubclass(response_type, BaseModel):
+        if not issubclass(request_type, BaseModel) or not issubclass(
+            response_type, BaseModel
+        ):
             raise rex.MalformedChipException(
-                reason = "Request and response must be subclasses of Pydantic BaseModel."
+                reason="Request and response must be subclasses of Pydantic BaseModel."
             )
 
         return request_type, response_type
-
 
     @classmethod
     def _hunt_chip(cls, name: str) -> typing.Optional[RegistryEntry]:
@@ -133,7 +131,6 @@ class Registry:
                 return cls._registry[adjusted_name]
 
         return None
-
 
     @classmethod
     def _hunt_modules(cls, name: str) -> typing.Optional[RegistryEntry]:
@@ -162,9 +159,7 @@ class Registry:
 # ----- Registry Loader ------------------------------------------------------
 
 
-
 class RegistryLoader:
-
 
     @classmethod
     def load_module(cls, module_name: str) -> bool:
@@ -175,7 +170,6 @@ class RegistryLoader:
 
         except ModuleNotFoundError:
             return False
-
 
     @classmethod
     def load_module_tree(cls, module_name: str) -> bool:
@@ -190,7 +184,6 @@ class RegistryLoader:
 
         return True
 
-
     @classmethod
     def load_filepath(cls, path: str, module_base: str):
         # Add the module to the search path
@@ -201,21 +194,19 @@ class RegistryLoader:
 
         for root, dirs, files in os.walk(current_dir, topdown=True):
 
-            dirs[:] = [d for d in dirs if not d.startswith('_')]
+            dirs[:] = [d for d in dirs if not d.startswith("_")]
 
             for file in files:
-                if not file.endswith('.py') or file.startswith('_'):
+                if not file.endswith(".py") or file.startswith("_"):
                     continue
 
                 module_path = os.path.join(root, file)
 
                 # Convert the file path to a module name
-                module_name = os.path.relpath(
-                    module_path,
-                    current_dir
-                ).replace(os.sep, '.')[:-3]
+                module_name = os.path.relpath(module_path, current_dir).replace(
+                    os.sep, "."
+                )[:-3]
 
                 adjusted_module_name = f"{module_base}.{module_name}"
 
                 importlib.import_module(adjusted_module_name)
-

@@ -26,36 +26,24 @@ class RedisClientSettings(BaseModel):
     """
 
     host: str = Field(
-        default="localhost",
-        description="The Redis server hostname."
+        default="localhost", description="The Redis server hostname."
     )
-    port: int = Field(
-        default=6379,
-        description="The Redis server port."
-    )
-    db: int = Field(
-        default=0,
-        description="The Redis database number."
-    )
+    port: int = Field(default=6379, description="The Redis server port.")
+    db: int = Field(default=0, description="The Redis database number.")
     username: typing.Optional[str] = Field(
-        default=None,
-        description="The username for authentication."
+        default=None, description="The username for authentication."
     )
     password: typing.Optional[str] = Field(
-        default=None,
-        description="The password for authentication."
+        default=None, description="The password for authentication."
     )
     ssl: bool = Field(
-        default=False,
-        description="Whether to use SSL for the connection."
+        default=False, description="Whether to use SSL for the connection."
     )
     timeout: typing.Optional[float] = Field(
-        default=60,
-        description="Socket timeout in seconds."
+        default=60, description="Socket timeout in seconds."
     )
     max_connections: typing.Optional[int] = Field(
-        default=None,
-        description="Maximum number of connections in the pool."
+        default=None, description="Maximum number of connections in the pool."
     )
 
 
@@ -85,6 +73,7 @@ class RedisExecuteResponse(BaseModel):
     """
     Response structure for Redis command execution.
     """
+
     status: typing.Literal[
         "OK",
         "CONNECTION_ERROR",
@@ -96,11 +85,10 @@ class RedisExecuteResponse(BaseModel):
 
     result: typing.Optional[typing.Any] = Field(
         default=None,
-        description="The result of the Redis command (if successful)."
+        description="The result of the Redis command (if successful).",
     )
     error_message: typing.Optional[str] = Field(
-        default=None,
-        description="Error message if the command failed."
+        default=None, description="Error message if the command failed."
     )
 
 
@@ -173,5 +161,3 @@ async def redis_execute(request: RedisExecuteRequest) -> RedisExecuteResponse:
     finally:
         if client:
             await client.aclose()
-
-

@@ -19,14 +19,12 @@ class Client:
         self._cookie: uuid.UUID = cookie or uuid.uuid4()
         self._connection: typing.Optional[ConnectionInfo] = None
 
-
     async def __aenter__(self):
         logging.debug(f"Creating client with cookie: {self._cookie}")
         self._connection = await self._multiplexor.register(
-            connection_id = self._cookie,
+            connection_id=self._cookie,
         )
         return self
-
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         if self._connection:
@@ -34,15 +32,12 @@ class Client:
             self._connection = None
             logging.debug(f"Client released with cookie: {self._cookie}")
 
-
     def get_conn(self) -> ConnectionInfo:
         assert self._connection is not None
         return self._connection
 
-
     def get_cookie(self) -> uuid.UUID:
         return self._cookie
-
 
     async def send_packet(self, packet: SocketPacket) -> bool:
         conn = self.get_conn()
@@ -51,7 +46,6 @@ class Client:
             conn.connection_id,
             packet,
         )
-
 
     async def receive_packet(
         self,
@@ -73,4 +67,3 @@ class Client:
 
         assert isinstance(packet, SocketPacket)
         return packet
-

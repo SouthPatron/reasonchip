@@ -16,7 +16,9 @@ class SSLClientOptions:
     verify_hostname: bool = field(default=False)
 
     @classmethod
-    def from_args(cls, args: argparse.Namespace) -> typing.Optional["SSLClientOptions"]:
+    def from_args(
+        cls, args: argparse.Namespace
+    ) -> typing.Optional["SSLClientOptions"]:
 
         if not getattr(args, "ssl", False):
             return None
@@ -30,7 +32,6 @@ class SSLClientOptions:
             tls_version=getattr(args, "tls_version", None),
             verify_hostname=getattr(args, "verify_hostname", False),
         )
-
 
     def create_ssl_context(self) -> ssl.SSLContext:
         context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
@@ -56,7 +57,6 @@ class SSLClientOptions:
 
         return context
 
-
     def _enforce_tls_version(self, context: ssl.SSLContext):
         if self.tls_version == "1.2":
             context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -66,7 +66,6 @@ class SSLClientOptions:
             context.maximum_version = ssl.TLSVersion.TLSv1_3
         else:
             raise ValueError(f"Unsupported TLS version: {self.tls_version}")
-
 
 
 @dataclass
@@ -79,7 +78,9 @@ class SSLServerOptions:
     tls_version: typing.Optional[str] = field(default=None)
 
     @classmethod
-    def from_args(cls, args: argparse.Namespace) -> typing.Optional["SSLServerOptions"]:
+    def from_args(
+        cls, args: argparse.Namespace
+    ) -> typing.Optional["SSLServerOptions"]:
 
         if not getattr(args, "ssl", False):
             return None
@@ -92,7 +93,6 @@ class SSLServerOptions:
             ciphers=getattr(args, "ciphers", None),
             tls_version=getattr(args, "tls_version", None),
         )
-
 
     def create_ssl_context(self) -> ssl.SSLContext:
         if not self.cert or not self.key:
@@ -117,7 +117,6 @@ class SSLServerOptions:
 
         return context
 
-
     def _enforce_tls_version(self, context: ssl.SSLContext):
         if self.tls_version == "1.2":
             context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -127,5 +126,3 @@ class SSLServerOptions:
             context.maximum_version = ssl.TLSVersion.TLSv1_3
         else:
             raise ValueError(f"Unsupported TLS version: {self.tls_version}")
-
-

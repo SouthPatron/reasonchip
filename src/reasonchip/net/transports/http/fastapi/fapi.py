@@ -40,7 +40,6 @@ def setup_fapi(callbacks: CallbackHooks) -> FastAPI:
         response.headers["X-Process-Time"] = str(int(process_time))
         return response
 
-
     # ****************************** ENDPOINTS ********************************
 
     @app.get("/")
@@ -50,9 +49,7 @@ def setup_fapi(callbacks: CallbackHooks) -> FastAPI:
             status_code=302,
         )
 
-
     from . import v1
+
     v1.populate(app)
     return app
-
-

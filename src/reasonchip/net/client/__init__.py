@@ -4,8 +4,7 @@ from .multiplexor import Multiplexor
 
 
 __all__ = [
-    'Api',
-    'Client',
-    'Multiplexor',
+    "Api",
+    "Client",
+    "Multiplexor",
 ]
-

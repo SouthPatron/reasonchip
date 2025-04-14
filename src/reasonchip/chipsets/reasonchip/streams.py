@@ -4,6 +4,7 @@
 This module provides ReasonChips for handling standard input (stdin),
 standard output (stdout), and standard error (stderr) using bytes.
 """
+
 import sys
 
 from pydantic import BaseModel, Field
@@ -16,6 +17,7 @@ class StdinRequest(BaseModel):
         default=1024,
         description="Maximum number of bytes to read from stdin.",
     )
+
 
 class StdinResponse(BaseModel):
     data: bytes = Field(
@@ -148,6 +150,3 @@ async def read_line(request: ReadlineRequest) -> ReadlineResponse:
     """
     data = sys.stdin.buffer.readline(request.max_bytes)
     return ReadlineResponse(data=data)
-
-
-

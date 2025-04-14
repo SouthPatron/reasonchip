@@ -21,15 +21,12 @@ VariableMapType = typing.Dict[str, typing.Any]
 
 class Variables:
 
-
     def __init__(self, vmap: VariableMapType = {}) -> None:
         self._vmap: Dotty = dotty(vmap)
-
 
     @property
     def vmap(self) -> Dotty:
         return self._vmap
-
 
     @property
     def vdict(self) -> typing.Dict[str, typing.Any]:
@@ -45,12 +42,10 @@ class Variables:
     def vobj(self):
         return munch.munchify(self.vdict)
 
-
     def copy(self) -> Variables:
         v = Variables()
         v._vmap = self._vmap.copy()
         return v
-
 
     def load_file(self, filename: str):
         """
@@ -59,16 +54,17 @@ class Variables:
         :param filename: The file's name.
         """
         yml = YAML()
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             v = yml.load(f)
             if not v:
                 return
 
             if not isinstance(v, dict):
-                raise ValueError(f"Variable file must be a dictionary: {filename}")
+                raise ValueError(
+                    f"Variable file must be a dictionary: {filename}"
+                )
 
             self.update(v)
-
 
     def has(self, key: str) -> bool:
         try:
@@ -76,15 +72,12 @@ class Variables:
         except:
             return False
 
-
     def get(self, key: str) -> typing.Any:
         return self.vmap.get(key, None)
-
 
     def set(self, key: str, value: typing.Any) -> Variables:
         self.vmap[key] = value
         return self
-
 
     def deep_has(self, key: str) -> typing.Tuple[bool, typing.Any]:
         new_key, rem = self._hunt(key)
@@ -101,7 +94,7 @@ class Variables:
             return (True, obj)
 
         # Now deep dive into the object.
-        parts = rem.split('.')
+        parts = rem.split(".")
         while parts:
             part = parts.pop(0)
 
@@ -135,18 +128,19 @@ class Variables:
                 print(f"Obj: {obj}")
                 assert False, f"Unhandled type: {type(obj)}"
 
-
         return (True, obj)
-
 
     def deep_get(self, key: str) -> typing.Tuple[bool, typing.Any]:
         return self.deep_has(key)
 
-
     def update(self, vmap: VariableMapType) -> Variables:
         def _deep_update(dotty: Dotty, updates: dict) -> None:
             for key, value in updates.items():
-                if isinstance(value, dict) and key in dotty and isinstance(dotty[key], dict):
+                if (
+                    isinstance(value, dict)
+                    and key in dotty
+                    and isinstance(dotty[key], dict)
+                ):
                     # Recursively merge nested dicts
                     _deep_update(dotty[key], value)
                 else:
@@ -155,8 +149,9 @@ class Variables:
         _deep_update(self.vmap, vmap)
         return self
 
-
-    def interpolate(self, value: typing.Any, _seen: typing.Optional[set] = None) -> typing.Any:
+    def interpolate(
+        self, value: typing.Any, _seen: typing.Optional[set] = None
+    ) -> typing.Any:
         """
         Populate all variables in a value.
 
@@ -195,7 +190,6 @@ class Variables:
 
         return value
 
-
     def _render(self, text: str) -> typing.Any:
         pattern = r"{{\s*((?:[^\{\}]|\\\{|\\\})*?)\s*}}"
 
@@ -213,7 +207,6 @@ class Variables:
 
         return re.sub(pattern, replacer, text)
 
-
     def _evaluate(self, expr: str) -> typing.Any:
         """Evaluate the expression safely, allowing only the vobj context."""
         # Replace escaped braces
@@ -223,31 +216,29 @@ class Variables:
         result = eval(expr, {"__builtins__": {}}, self.vobj)
         return result
 
-
     def _hunt(self, key: str) -> typing.Tuple[str, str]:
         if self.has(key):
             return (key, "")
 
         # Hunt backwards through the key to find the first key that exists.
-        parts = key.split('.')
+        parts = key.split(".")
 
         remaining = []
         while parts:
-            fname = '.'.join(parts)
+            fname = ".".join(parts)
             if self.has(fname):
                 break
 
             remaining.insert(0, parts.pop())
 
-        return ('.'.join(parts), '.'.join(remaining))
-
+        return (".".join(parts), ".".join(remaining))
 
 
 if __name__ == "__main__":
 
     v = Variables()
 
-    v.set("result", { 'a': 1, 'b': { 'name': 'bob' }, 'c': "{{ snoot }}" })
+    v.set("result", {"a": 1, "b": {"name": "bob"}, "c": "{{ snoot }}"})
 
     v.set("chicken", "{{ result.c }}")
     v.set("chunks", "{{ chicken }}")
@@ -257,7 +248,7 @@ if __name__ == "__main__":
 
     assert v.has("result.b.surname") == False
 
-    v.update({ 'result': { 'b': { 'surname': 'presley' }}})
+    v.update({"result": {"b": {"surname": "presley"}}})
 
     print(v.vmap)
 
@@ -266,7 +257,7 @@ if __name__ == "__main__":
     assert v.has("result.b.surname") == True
     assert v.has("result.b.steve") == False
 
-    v.update({ 'result': { 'b': 5 }})
+    v.update({"result": {"b": 5}})
 
     print(v.vmap)
 
@@ -291,11 +282,10 @@ if __name__ == "__main__":
     except:
         pass
 
-
     class Test:
         def __init__(self):
             self.name: str = "elvis"
-            self.profile: dict = { 'age': 42 }
+            self.profile: dict = {"age": 42}
 
     v.set("myclass.nesting.test", Test())
 
@@ -325,5 +315,3 @@ This = [{{ this }}]
 
     str1 = "{{ snoot }} {{ snoot }} {{ f'\\{snoot\\}' + '\\{\\}' }}"
     print(v.interpolate(str1))
-
-

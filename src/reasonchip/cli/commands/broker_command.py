@@ -13,7 +13,6 @@ from reasonchip.net.protocol import DEFAULT_SERVERS, DEFAULT_LISTENERS
 from reasonchip.net.transports.utils import (
     broker_for_workers,
     broker_for_clients,
-
     SSLServerOptions,
 )
 
@@ -28,16 +27,13 @@ class BrokerCommand(AsyncCommand):
         super().__init__()
         self._die: asyncio.Event = asyncio.Event()
 
-
     @classmethod
     def command(cls) -> str:
         return "broker"
 
-
     @classmethod
     def help(cls) -> str:
         return "Starts a broker to dispatch tasks to engines"
-
 
     @classmethod
     def description(cls) -> str:
@@ -54,27 +50,25 @@ have engines, nothing can happen.
 This can listen on multiple sockets, IP4, and IP6 addresses.
 """
 
-
     @classmethod
     def build_parser(cls, parser: argparse.ArgumentParser):
         parser.add_argument(
-            '--listen',
-            action='append',
-            metavar='<path or ip address>',
+            "--listen",
+            action="append",
+            metavar="<path or ip address>",
             default=[],
-            help="Listen for workers on this endpoint"
+            help="Listen for workers on this endpoint",
         )
         parser.add_argument(
-            '--serve',
-            action='append',
-            metavar='<path or ip address>',
+            "--serve",
+            action="append",
+            metavar="<path or ip address>",
             default=[],
-            help="Serve clients on this endpoint"
+            help="Serve clients on this endpoint",
         )
 
         cls.add_default_options(parser)
         cls.add_ssl_server_options(parser)
-
 
     async def main(
         self,
@@ -90,8 +84,8 @@ This can listen on multiple sockets, IP4, and IP6 addresses.
 
         listeners = broker_for_workers(
             args.listen or DEFAULT_LISTENERS,
-            ssl_server_options = ssl_options,
-            ssl_context = ssl_context,
+            ssl_server_options=ssl_options,
+            ssl_context=ssl_context,
         )
         servers = broker_for_clients(args.serve or DEFAULT_SERVERS)
 
@@ -100,8 +94,8 @@ This can listen on multiple sockets, IP4, and IP6 addresses.
         try:
 
             broker = Broker(
-                client_transports = servers,
-                worker_transports = listeners,
+                client_transports=servers,
+                worker_transports=listeners,
             )
 
             await broker.start()
@@ -123,21 +117,16 @@ This can listen on multiple sockets, IP4, and IP6 addresses.
             traceback.print_exc()
             return ExitCode.ERROR
 
-
     async def _wait_for_exit(self) -> None:
         await self._die.wait()
-
 
     async def _handle_signal(self, signame: str) -> None:
         self._die.set()
 
-
     async def setup_signal_handlers(self):
         loop = asyncio.get_event_loop()
-        for signame in {'SIGINT', 'SIGTERM', 'SIGHUP'}:
+        for signame in {"SIGINT", "SIGTERM", "SIGHUP"}:
             loop.add_signal_handler(
                 getattr(signal, signame),
-                lambda: asyncio.create_task(self._handle_signal(signame))
+                lambda: asyncio.create_task(self._handle_signal(signame)),
             )
-
-

@@ -27,18 +27,18 @@ from ..pipelines import (
 )
 
 
-ResolverType = typing.Callable[[str], typing.Coroutine[None, None, typing.Optional[Pipeline]]]
+ResolverType = typing.Callable[
+    [str], typing.Coroutine[None, None, typing.Optional[Pipeline]]
+]
 
 
 class RunResult(enum.IntEnum):
-    OK                          = 0
-    SKIPPED                     = 10
-    RETURN_REQUEST              = 20
-
+    OK = 0
+    SKIPPED = 10
+    RETURN_REQUEST = 20
 
 
 class Processor:
-
 
     def __init__(
         self,
@@ -46,11 +46,9 @@ class Processor:
     ):
         self._resolver: ResolverType = resolver
 
-
     @property
     def resolver(self) -> ResolverType:
         return self._resolver
-
 
     async def run(
         self,
@@ -72,7 +70,6 @@ class Processor:
 
         return None
 
-
     async def _sub_run(
         self,
         variables: Variables,
@@ -90,8 +87,8 @@ class Processor:
             # Run the task
             try:
                 rc, result = await self.run_task(
-                    task = task,
-                    variables = variables,
+                    task=task,
+                    variables=variables,
                 )
             except rex.ProcessorException as ex:
                 raise rex.NestedProcessorException(task_no=i) from ex
@@ -107,12 +104,10 @@ class Processor:
             if rc in [RunResult.RETURN_REQUEST]:
                 return (rc, result)
 
-
             assert False, "Programmer Error. Unreachable code was reached."
 
         # Successfull completion. No specific return value
         return (RunResult.OK, None)
-
 
     async def run_task(
         self,
@@ -171,7 +166,6 @@ class Processor:
 
         return rc
 
-
     # --------  LOOP ---------------------------------------------------------
 
     async def _loop(
@@ -213,19 +207,18 @@ class Processor:
         for i, loop_var in enumerate(loop_vars):
 
             new_vars.set("item", loop_var)
-            new_vars.set("loop.index", i+1)
+            new_vars.set("loop.index", i + 1)
             new_vars.set("loop.index0", i)
             new_vars.set("loop.first", i == 0)
             new_vars.set("loop.last", i == (total_loops - 1))
             new_vars.set("loop.even", i % 2 == 1)  # Based in loop.index
-            new_vars.set("loop.odd", i % 2 == 0) # Based on loop.index
+            new_vars.set("loop.odd", i % 2 == 0)  # Based on loop.index
             new_vars.set("loop.revindex", total_loops - i)
             new_vars.set("loop.revindex0", total_loops - i - 1)
 
             # Handle the task
             rc = await handler(task, new_vars)
             yield rc
-
 
     # --------  INDIVIDUAL CHIP HANDLERS -------------------------------------
 
@@ -237,7 +230,6 @@ class Processor:
 
         fixed_rc = variables.interpolate(task.result)
         return (RunResult.RETURN_REQUEST, fixed_rc)
-
 
     async def _run_declaretask(
         self,
@@ -251,7 +243,6 @@ class Processor:
         fixed_rc = variables.interpolate(task.declare)
         return (RunResult.OK, fixed_rc)
 
-
     async def _run_taskset(
         self,
         task: TaskSet,
@@ -263,18 +254,19 @@ class Processor:
 
         # Run the tasks
         if task.run_async:
-            resp = asyncio.create_task(self._sub_run(
-                variables = variables,
-                flow = flow,
-            ))
+            resp = asyncio.create_task(
+                self._sub_run(
+                    variables=variables,
+                    flow=flow,
+                )
+            )
             return (RunResult.OK, resp)
 
         _, resp = await self._sub_run(
-            variables = variables,
-            flow = flow,
+            variables=variables,
+            flow=flow,
         )
         return (RunResult.OK, resp)
-
 
     async def _run_dispatchpipelinetask(
         self,
@@ -292,22 +284,25 @@ class Processor:
 
         # Run the tasks
         if task.run_async:
-            resp = asyncio.create_task(self._sub_run(
-                variables = variables,
-                flow = flow,
-            ))
+            resp = asyncio.create_task(
+                self._sub_run(
+                    variables=variables,
+                    flow=flow,
+                )
+            )
             return (RunResult.OK, resp)
 
         try:
             _, resp = await self._sub_run(
-                variables = variables,
-                flow = flow,
+                variables=variables,
+                flow=flow,
             )
         except rex.ProcessorException as ex:
-            raise rex.NestedProcessorException(pipeline_name = task.dispatch) from ex
+            raise rex.NestedProcessorException(
+                pipeline_name=task.dispatch
+            ) from ex
 
         return (RunResult.OK, resp)
-
 
     async def _run_chiptask(
         self,
@@ -326,8 +321,8 @@ class Processor:
             req = chip.request_type.model_validate(fixed_params)
         except ValidationError as ve:
             raise rex.InvalidChipParametersException(
-                chip = task.chip,
-                errors = ve.errors(),
+                chip=task.chip,
+                errors=ve.errors(),
             )
 
         # Call the chip ---------------------
@@ -338,10 +333,9 @@ class Processor:
         try:
             resp = await chip.func(req)
         except Exception as ex:
-            raise rex.ChipException(chip = task.chip) from ex
+            raise rex.ChipException(chip=task.chip) from ex
 
         return (RunResult.OK, resp)
-
 
     # --------  HELPER FUNCTIONS ----------------------------------------------
 
@@ -392,4 +386,3 @@ class Processor:
                 variables.set(name, val)
                 if dest:
                     dest.set(name, val)
-

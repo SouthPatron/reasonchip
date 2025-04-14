@@ -6,6 +6,7 @@ pipelines. Standard levels are supported.
 
 
 """
+
 import typing
 import logging
 
@@ -15,12 +16,16 @@ from reasonchip.core.engine.registry import Registry
 
 
 class LogRequest(BaseModel):
-    level: typing.Literal["info", "debug", "warning", "error", "critical" ] = Field(description="The log level to set")
-    message: typing.Any = Field(description="The message to log. It should be able to be converted to a string.")
+    level: typing.Literal["info", "debug", "warning", "error", "critical"] = (
+        Field(description="The log level to set")
+    )
+    message: typing.Any = Field(
+        description="The message to log. It should be able to be converted to a string."
+    )
+
 
 class LogResponse(BaseModel):
     pass
-
 
 
 @Registry.register
@@ -43,5 +48,3 @@ async def log(request: LogRequest) -> LogResponse:
         logging.critical(msg)
 
     return LogResponse()
-
-

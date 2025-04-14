@@ -6,13 +6,18 @@ from abc import ABC, abstractmethod
 from ..protocol import SocketPacket
 
 
-NewConnectionCallbackType = typing.Callable[['ServerTransport', uuid.UUID], typing.Awaitable[None]]
-ReadCallbackType = typing.Callable[[uuid.UUID, SocketPacket], typing.Awaitable[None]]
-ClosedConnectionCallbackType = typing.Callable[[uuid.UUID], typing.Awaitable[None]]
+NewConnectionCallbackType = typing.Callable[
+    ["ServerTransport", uuid.UUID], typing.Awaitable[None]
+]
+ReadCallbackType = typing.Callable[
+    [uuid.UUID, SocketPacket], typing.Awaitable[None]
+]
+ClosedConnectionCallbackType = typing.Callable[
+    [uuid.UUID], typing.Awaitable[None]
+]
 
 
 class ServerTransport(ABC):
-
 
     @abstractmethod
     async def start_server(
@@ -22,10 +27,8 @@ class ServerTransport(ABC):
         closed_connection_callback: ClosedConnectionCallbackType,
     ) -> bool: ...
 
-
     @abstractmethod
     async def stop_server(self) -> bool: ...
-
 
     @abstractmethod
     async def send_packet(
@@ -34,10 +37,8 @@ class ServerTransport(ABC):
         packet: SocketPacket,
     ) -> bool: ...
 
-
     @abstractmethod
     async def close_connection(
         self,
         connection_id: uuid.UUID,
     ) -> bool: ...
-

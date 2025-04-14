@@ -28,8 +28,8 @@ class WaitForRequest(BaseModel):
 
 class WaitForResponse(BaseModel):
     status: typing.Literal[
-        'OK',
-        'TIMEOUT',
+        "OK",
+        "TIMEOUT",
     ] = Field(
         title="Status of the wait operation.",
     )
@@ -47,9 +47,8 @@ async def wait_for(request: WaitForRequest) -> WaitForResponse:
     try:
         resp = await asyncio.wait_for(
             request.task,
-            timeout = request.timeout,
+            timeout=request.timeout,
         )
-        return WaitForResponse(status='OK', resp=resp)
+        return WaitForResponse(status="OK", resp=resp)
     except TimeoutError:
-        return WaitForResponse(status='TIMEOUT', resp=None)
-
+        return WaitForResponse(status="TIMEOUT", resp=None)

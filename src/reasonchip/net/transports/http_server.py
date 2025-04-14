@@ -37,9 +37,13 @@ class HttpServer(ServerTransport):
         self._death_signal: asyncio.Event = asyncio.Event()
 
         # Callbacks
-        self._new_connection_callback: typing.Optional[NewConnectionCallbackType] = None
+        self._new_connection_callback: typing.Optional[
+            NewConnectionCallbackType
+        ] = None
         self._read_callback: typing.Optional[ReadCallbackType] = None
-        self._closed_connection_callback: typing.Optional[ClosedConnectionCallbackType] = None
+        self._closed_connection_callback: typing.Optional[
+            ClosedConnectionCallbackType
+        ] = None
 
         # Management
         self._lock: asyncio.Lock = asyncio.Lock()
@@ -56,7 +60,6 @@ class HttpServer(ServerTransport):
             self._apply_ssl_to_config(cfg, ssl_options)
 
         self._config = cfg
-
 
     async def start_server(
         self,
@@ -75,17 +78,18 @@ class HttpServer(ServerTransport):
             self._thunk_disconnect,
         )
 
-        app = setup_fapi(callbacks = hooks)
+        app = setup_fapi(callbacks=hooks)
 
-        self._server = asyncio.create_task(serve(
-            app,                                    # type: ignore
-            self._config,
-            shutdown_trigger = self._death_signal.wait,
-        ))
+        self._server = asyncio.create_task(
+            serve(
+                app,  # type: ignore
+                self._config,
+                shutdown_trigger=self._death_signal.wait,
+            )
+        )
 
         logging.info(f"HTTP server listening on {self._host}")
         return True
-
 
     async def stop_server(self) -> bool:
         if not self._server:
@@ -99,7 +103,6 @@ class HttpServer(ServerTransport):
         logging.info("HTTP server stopped")
         return True
 
-
     async def send_packet(
         self,
         connection_id: uuid.UUID,
@@ -112,7 +115,6 @@ class HttpServer(ServerTransport):
 
             return False
 
-
     async def close_connection(self, connection_id: uuid.UUID) -> bool:
         async with self._lock:
             if session := self._connections.get(connection_id):
@@ -121,9 +123,7 @@ class HttpServer(ServerTransport):
 
             return False
 
-
     # --------------------- INTERMEDIATE CALLBACKS --------------------------
-
 
     async def _thunk_new(self, session: ClientSession):
         assert self._new_connection_callback
@@ -134,7 +134,6 @@ class HttpServer(ServerTransport):
                 self,
                 session.connection_id,
             )
-
 
     async def _thunk_read(self, session: ClientSession, packet: SocketPacket):
         assert self._read_callback
@@ -147,7 +146,6 @@ class HttpServer(ServerTransport):
                 packet,
             )
 
-
     async def _thunk_disconnect(self, session: ClientSession):
         assert self._closed_connection_callback
 
@@ -159,7 +157,6 @@ class HttpServer(ServerTransport):
             await self._closed_connection_callback(
                 session.connection_id,
             )
-
 
     def _apply_ssl_to_config(
         self,
@@ -180,4 +177,3 @@ class HttpServer(ServerTransport):
 
         if ssl_opts.ciphers:
             config.ciphers = ssl_opts.ciphers
-

@@ -12,7 +12,7 @@ class SystemFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         if self._fmt is None:
-            return ''
+            return ""
 
         rc = super().format(record)
 
@@ -20,14 +20,16 @@ class SystemFormatter(logging.Formatter):
             exclass = record.exc_info[0].__name__
             exc = record.exc_info[1]
 
-            rc = f'{rc} : [EXCEPTION]'
-            rc = f'{rc} : [{record.filename}({record.lineno})]'
-            rc = f'{rc} : [{exclass}] [{exc}]'
+            rc = f"{rc} : [EXCEPTION]"
+            rc = f"{rc} : [{record.filename}({record.lineno})]"
+            rc = f"{rc} : [{exclass}] [{exc}]"
 
             stack_trace_lines = traceback.format_exception(*record.exc_info)
-            stack_trace_one_line = ''.join(stack_trace_lines).replace('\n', '\\n')
+            stack_trace_one_line = "".join(stack_trace_lines).replace(
+                "\n", "\\n"
+            )
             stack_trace_json = json.dumps(stack_trace_one_line)
-            rc = f'{rc} : [TRACE] {stack_trace_json}'
+            rc = f"{rc} : [TRACE] {stack_trace_json}"
 
         return rc
 
@@ -41,5 +43,4 @@ class SystemFormatter(logging.Formatter):
         return s
 
     def formatException(self, ei) -> str:
-        return ''
-
+        return ""

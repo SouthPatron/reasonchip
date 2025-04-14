@@ -41,7 +41,6 @@ class GrpcClient(ClientTransport):
         # SSL
         self._ssl_options: typing.Optional[SSLClientOptions] = ssl_options
 
-
     async def connect(
         self,
         callback: ReadCallbackType,
@@ -83,7 +82,6 @@ class GrpcClient(ClientTransport):
             self._task = None
             return False
 
-
     async def disconnect(self):
         if not self._task:
             return
@@ -93,7 +91,7 @@ class GrpcClient(ClientTransport):
 
         self._task.cancel()
 
-        await asyncio.wait([ self._task ])
+        await asyncio.wait([self._task])
 
         if not self._sent_none and self._callback:
             await self._callback(self._cookie, None)
@@ -110,7 +108,6 @@ class GrpcClient(ClientTransport):
 
     # -------------------------- TUNNELS --------------------------------------
 
-
     async def send_packet(self, packet: SocketPacket) -> bool:
         # Just let caller know, to the best of our ability
         if self._outgoing_queue is None:
@@ -118,8 +115,6 @@ class GrpcClient(ClientTransport):
 
         await self._outgoing_queue.put(packet)
         return True
-
-
 
     # -------------------------- LOOPSKIES ------------------------------------
 
@@ -149,7 +144,6 @@ class GrpcClient(ClientTransport):
             self._sent_none = True
             await self._callback(self._cookie, None)
 
-
     # -------------------------- STUFF ----------------------------------------
 
     def create_secure_grpc_channel(
@@ -160,11 +154,14 @@ class GrpcClient(ClientTransport):
 
         assert options.ca
 
-        with open(options.ca, 'rb') as ca_file:
+        with open(options.ca, "rb") as ca_file:
             trusted_certs = ca_file.read()
 
         if options.cert and options.key:
-            with open(options.cert, 'rb') as cert_file, open(options.key, 'rb') as key_file:
+            with (
+                open(options.cert, "rb") as cert_file,
+                open(options.key, "rb") as key_file,
+            ):
                 client_cert = cert_file.read()
                 client_key = key_file.read()
 
@@ -175,8 +172,8 @@ class GrpcClient(ClientTransport):
             )
 
         else:
-            creds = grpc.ssl_channel_credentials(root_certificates=trusted_certs)
+            creds = grpc.ssl_channel_credentials(
+                root_certificates=trusted_certs
+            )
 
         return grpc.aio.secure_channel(target, creds)
-
-

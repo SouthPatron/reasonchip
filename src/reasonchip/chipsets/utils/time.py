@@ -15,6 +15,7 @@ class SleepRequest(BaseModel):
     """
     Request structure.
     """
+
     milliseconds: int
 
 
@@ -22,6 +23,7 @@ class SleepResponse(BaseModel):
     """
     Response structure.
     """
+
     status: typing.Literal[
         "OK",
         "ERROR",
@@ -32,9 +34,8 @@ class SleepResponse(BaseModel):
 async def sleep(request: SleepRequest) -> SleepResponse:
 
     if request.milliseconds <= 0:
-        return SleepResponse(status = 'ERROR')
+        return SleepResponse(status="ERROR")
 
     time.sleep(request.milliseconds / 1000)
 
-    return SleepResponse(status = 'OK')
-
+    return SleepResponse(status="OK")

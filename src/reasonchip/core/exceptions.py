@@ -3,10 +3,12 @@ import typing
 
 class ReasonChipException(Exception):
     """Base class for exceptions in this module."""
+
     pass
 
 
 # --------- Client-side Exceptions ------------------------------------------
+
 
 class ClientSideException(ReasonChipException):
     pass
@@ -21,9 +23,9 @@ class ServerSideException(ReasonChipException):
 
 # --------- General Exceptions ----------------------------------------------
 
+
 class ConfigurationException(ReasonChipException):
     pass
-
 
 
 class TooBusyException(ReasonChipException):
@@ -32,12 +34,13 @@ class TooBusyException(ReasonChipException):
 
 # --------- Parsing Exceptions ----------------------------------------------
 
+
 class ParsingException(ReasonChipException):
     """Raised when a parsing error occurs."""
+
     def __init__(self, source: typing.Optional[str] = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.source = source
-
 
     def __str__(self):
         resp = f"""PARSING EXCEPTION
@@ -52,6 +55,7 @@ LOCATION: {self.source}
 
 class TaskParseException(ParsingException):
     """Raised when a task cannot be parsed."""
+
     def __init__(
         self,
         message: str,
@@ -71,8 +75,8 @@ Message: {self.message}
 """
         if self.errors:
             for m in self.errors:
-                loc = m.get('loc', None)
-                msg = m.get('msg', None)
+                loc = m.get("loc", None)
+                msg = m.get("msg", None)
 
                 resp += f"\nLocation: {loc}"
                 resp += f"\nReason: {msg}\n"
@@ -108,7 +112,6 @@ class RegistryException(ReasonChipException):
         super().__init__(*args, **kwargs)
         self.module_name = module_name
         self.function_name = function_name
-
 
     def __str__(self):
         resp = "REGISTRY EXCEPTION\n"
@@ -222,7 +225,7 @@ class NestedProcessorException(ProcessorException):
         pipeline_name: typing.Optional[str] = None,
         task_no: typing.Optional[int] = None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.pipeline_name = pipeline_name
@@ -242,10 +245,10 @@ class NestedProcessorException(ProcessorException):
 
 class NoSuchPipelineException(ProcessorException):
     """Raised when a pipeline is not found."""
+
     def __init__(self, pipeline: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pipeline: str = pipeline
-
 
     def __str__(self) -> str:
         resp = f"Pipeline not found: {self.pipeline}\n"
@@ -254,10 +257,10 @@ class NoSuchPipelineException(ProcessorException):
 
 class NoSuchChipException(ProcessorException):
     """Raised when a chip is not found."""
+
     def __init__(self, chip: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.chip: str = chip
-
 
     def __str__(self) -> str:
         resp = f"Chip not found: {self.chip}"
@@ -266,6 +269,7 @@ class NoSuchChipException(ProcessorException):
 
 class InvalidChipParametersException(ProcessorException):
     """Raised when the parameters for a chip call don't validate."""
+
     def __init__(
         self,
         chip: str,
@@ -281,8 +285,8 @@ class InvalidChipParametersException(ProcessorException):
         resp = f"""Chip: {self.chip}"""
         if self.errors:
             for m in self.errors:
-                loc = m.get('loc', None)
-                msg = m.get('msg', None)
+                loc = m.get("loc", None)
+                msg = m.get("msg", None)
 
                 resp += f"\nLocation: {loc}"
                 resp += f"\nReason: {msg}\n"
@@ -292,6 +296,7 @@ class InvalidChipParametersException(ProcessorException):
 
 class ChipException(ProcessorException):
     """Raised when a chip call fails."""
+
     def __init__(self, chip: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.chip: str = chip
@@ -303,6 +308,7 @@ class ChipException(ProcessorException):
 
 class VariableNotFoundException(ProcessorException):
     """Raised when a variable is not found."""
+
     def __init__(self, variable: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.variable: str = variable
@@ -314,6 +320,7 @@ class VariableNotFoundException(ProcessorException):
 
 class EvaluationException(ProcessorException):
     """Raised when an evaluation fails."""
+
     def __init__(self, expr: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.expr = expr
@@ -325,6 +332,7 @@ class EvaluationException(ProcessorException):
 
 class LoopVariableNotIterable(ProcessorException):
     """Raised when a loop variable is not iterable."""
+
     pass
 
 
@@ -333,6 +341,7 @@ class LoopVariableNotIterable(ProcessorException):
 
 class FlowException(ProcessorException):
     """A flow exception raised from the chip."""
+
     pass
 
 
@@ -341,7 +350,6 @@ class TerminateRequestException(FlowException):
 
     def __init__(self, result: typing.Any):
         self.result = result
-
 
 
 # -------------------------- PRETTY PRINTER ---------------------------------
@@ -373,4 +381,3 @@ def print_reasonchip_exception(ex: ReasonChipException) -> str:
             tmp = None
 
     return resp
-
