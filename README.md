@@ -7,6 +7,8 @@
 
 Open source agentic workflow automation software
 
+Copyright &copy; 2025 South Patron LLC
+
 ## Quick links
 
 - [QuickStart](https://www.reasonchip.io/docs/quickstart/)
