@@ -14,7 +14,7 @@ Just focus on the work. Be cool.
 1. Clone the repository
 
    ```bash
-   git clone https://github.com/your-username/reasonchip.git
+   git clone https://github.com/SouthPatron/reasonchip.git
    cd reasonchip
    ```
 
@@ -23,15 +23,8 @@ Just focus on the work. Be cool.
     We use pre-commit to enforce formatting and clean code.
 
     ```bash
-    pip install -r requirements-dev.txt
-    pip install pre-commit
+    pip install -r requirements.txt
     pre-commit install
-    ```
-
-    Run checks manually (optional)
-
-    ```bash
-    pre-commit run --all-files
     ```
 
 3. Code Style
