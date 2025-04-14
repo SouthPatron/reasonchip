@@ -28,8 +28,3 @@ pip install reasonchip
 They're right here in the source tree: [Examples](./examples/README.md)
 
 
-## Additional Links
-
-- [PyPI package](https://pypi.org/project/reasonchip/)
-
-
