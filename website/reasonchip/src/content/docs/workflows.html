@@ -1,0 +1,184 @@
+---
+title: 'Workflow Overview'
+date: 2025-02-24
+---
+
+<h3 class="px-4 py-2 bg-primary-subtle border shadow">
+<i class="text-primary me-3 bi bi-arrow-right-square-fill"></i> Workflow Overview
+</h3>
+
+<div class="p-3">
+	<p>
+	A workflow is a structured execution of logical steps, defined
+	as a sequence of modular tasks which call chips, orchestrated within a
+	declarative pipeline.
+	</p>
+	<p>Each workflow represents a segment of intellectual
+	labor - such as decision-making, analysis, or automation - broken down into
+	reusable, well-defined operations.
+	</p>
+	<p>These workflows are described in YAML, executed top-down unless
+	redirected by flow controls (like branching or sidequests), and can
+	span across multiple pipelines for complex or multi-phase reasoning.
+	</p>
+	<p>By combining dynamic execution, asynchronous	processing, and real-time
+	feedback, workflows enable scalable, intelligent automation of
+	thought-driven processes.
+	</p>
+</div>
+
+<h3
+	class="px-4 py-2 bg-success-subtle border shadow"
+><i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Core Concepts</h3>
+
+
+<div class="p-3">
+	<h4>Pipeline</h4>
+	<p>
+		A <strong>pipeline</strong> is a declaratively defined sequence of
+		tasks, written in YAML. It models a segment of intellectual work — such
+		as a decision-making process, reasoning chain, or task automation
+		flow. Pipelines are:
+	</p>
+	<ul>
+	<li>Executed top-down unless flow is redirected</li>
+	<li>Composed of well-defined tasks</li>
+	<li>Parameterizable, observable, and interruptible</li>
+	</ul>
+</div>
+
+<div class="p-3">
+	<h3>Task</h3>
+	<p>
+		A <strong>task</strong> is a step within a pipeline. It maps directly
+		to a chip invocation and supports fields like:
+	</p>
+	<ul>
+	<li><code>name</code>: Human-readable identifier</li>
+	<li><code>method_name</code>: Fully qualified chip name</li>
+	<li><code>params</code>: Input arguments for the chip</li>
+	<li>Optional: <code>log</code>, <code>save_as</code>, <code>async_as</code>, <code>when</code></li>
+	</ul>
+</div>
+
+<div class="p-3">
+	<h4>Chip</h4>
+	<p>
+	A <strong>Chip</strong> is the atomic unit of work in ReasonChip. It
+	performs a single, well-defined action (e.g., sending a message, running
+	a query, making an API call). Each chip is:
+	</p>
+	<ul>
+	<li>An <code>async</code> Python function</li>
+	<li>Accepts and returns Pydantic models</li>
+	<li>Registered with the system via <code>@Registry.register</code></li>
+	<li>Discoverable and reusable within pipelines</li>
+	</ul>
+</div>
+
+
+<h3
+	class="px-4 py-2 bg-success-subtle border shadow"
+><i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Flow control</h3>
+
+<div class="p-3">
+	<p>
+		ReasonChip pipelines support advanced control patterns:
+	</p>
+	<ul>
+	<li><strong>Branching</strong>: Jump to a new pipeline</li>
+	<li><strong>Sidequest</strong>: Run a sub-pipeline and return</li>
+	<li><strong>Restart</strong> / <strong>Stop</strong> / <strong>Cancel</strong>: Control execution flow programmatically</li>
+	</ul>
+</div>
+
+
+
+
+
+
+
+<!-- OLD STUFF -- >
+
+<h2>Introduction</h2>
+<p>Chip provides a structured approach to automating intellectual labor
+through the use of <strong>Chips</strong> and <strong>Pipelines</strong>.
+This document outlines the core concepts behind Chip and its
+functionality.</p>
+
+<h2>Core Concepts</h2>
+
+<h3>Chip</h3>
+<p>A <strong>Chip</strong> is an individual computational unit that performs
+a specific action. It serves as a fundamental building block in a pipeline,
+handling discrete tasks that contribute to a broader reasoning or
+decision-making process.</p>
+
+<h3>Pipeline</h3>
+<p>A <strong>pipeline</strong> is an ordered sequence of Chips designed to
+accomplish a segment of intellectual labor. It allows for the modular
+execution of reasoning tasks, ensuring scalability and reusability.</p>
+
+<p>A pipeline is entered at the top and run through in sequence unless
+execution is explicitly stopped.</p>
+
+<h3>Collection of Pipelines</h3>
+<p>Multiple pipeline definitions (YAML files) are collectively referred
+to as a <strong>collection of pipelines</strong>. This allows for
+structured execution across multiple workflow definitions.</p>
+
+<h3>Task</h3>
+<p>A <strong>task</strong> represents a call to a Chip within a pipeline.
+Each task consists of:</p>
+<ul>
+	<li><strong>name</strong>: A human-readable identifier for the task.</li>
+	<li><strong>log</strong>: (Optional) A message to be logged before execution.</li>
+	<li><strong>method_name</strong>: The name of the Chip method being executed.</li>
+	<li><strong>params</strong>: The parameters required for the method execution.</li>
+	<li><strong>save_as</strong>: (Optional) A variable name to store the result of the task.</li>
+	<li><strong>async_as</strong>: (Optional) If defined, the task is executed asynchronously and the pipeline continues.</li>
+	<li><strong>when</strong>: (Optional) A conditional statement that determines if the task should run.</li>
+</ul>
+
+<h2>Pipeline Definition</h2>
+<p>Pipelines are defined using YAML, allowing for easy configuration and
+execution of tasks.</p>
+
+<h3>Example Task Definition</h3>
+<pre><code>- name: 'Say hello'
+  log: 'Saying hello'
+  reasonchip.debug.log:
+    level: info
+    msg: exit
+</code></pre>
+
+<h3>Explanation</h3>
+<ul>
+	<li>The task is named <strong>'Say hello'</strong>.</li>
+	<li>A log message is specified: <strong>'Saying hello'</strong>.</li>
+	<li>The method <strong>chip.debug.log</strong> is invoked with the parameters:</li>
+	<ul>
+		<li><strong>level</strong> set to <code>info</code></li>
+		<li><strong>msg</strong> set to <code>exit</code></li>
+	</ul>
+</ul>
+
+<p>This structure ensures that each task within a pipeline is well-defined,
+self-contained, and easily readable.</p>
+
+<h2>Branching and Execution Control</h2>
+<p>Pipelines provide mechanisms for controlling execution flow:</p>
+<ul>
+	<li><strong>Branching</strong> - All remaining tasks and pipelines are cancelled, and the target pipeline is started as requested.</li>
+	<li><strong>Sidequest</strong> - A new pipeline is executed immediately, and upon completion, the current pipeline resumes at the next task.</li>
+	<li><strong>Cancelling</strong> - The current pipeline is cancelled, and execution returns to the beginning of the sidequest. If no sidequest remains, the pipeline terminates.</li>
+	<li><strong>Restart</strong> - The current pipeline restarts from the beginning.</li>
+	<li><strong>Stop</strong> - The entire execution job terminates immediately.</li>
+</ul>
+
+<h2>Conclusion</h2>
+<p>Chip enables structured execution of reasoning tasks through its modular
+and pipeline-based approach. By defining pipelines using YAML and enforcing
+structured task definitions, it provides a scalable and efficient framework
+for automating intellectual labor.</p>
+

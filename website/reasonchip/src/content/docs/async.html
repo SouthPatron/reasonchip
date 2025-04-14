@@ -1,0 +1,101 @@
+---
+title: 'Asynchronous handling'
+date: 2025-02-24
+---
+
+
+<h2 class="px-4 py-2 bg-primary-subtle border shadow">
+<i class="text-primary me-3 bi bi-lightning-charge-fill"></i> Asynchronous Execution
+</h2>
+
+<div class="p-3">
+	<p>
+	  Workflows have the ability to execute tasks concurrently using the
+	  <code>run_async</code> field. This is ideal for tasks that are
+	  independent or rely on external systems (e.g., APIs, background jobs).
+	</p>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Why Use <code>run_async</code>?
+</h3>
+
+<div class="p-3">
+	<ul>
+	  <li>To avoid blocking the pipeline while waiting on long-running tasks</li>
+	  <li>To run multiple tasks in parallel for performance</li>
+	  <li>To perform background actions (e.g., notifications, processing jobs)</li>
+	</ul>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Where <code>run_async</code> Can Be Used
+</h3>
+
+<div class="p-3">
+	<p>You can use <code>run_async</code> on:</p>
+	<ul>
+		<li><code>ChipTask</code></li>
+		<li><code>DispatchPipelineTask</code></li>
+		<li><code>TaskSet</code></li>
+	</ul>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> How It Works
+</h3>
+
+<div class="p-3">
+	<p>
+	  When a task runs asynchronously, the result is not immediately usable - it
+	  is a <strong>task handle</strong>. You must store it using
+	  <code>store_result_as</code> or <code>append_result_into</code> and
+	  <strong>wait for it later</strong>.
+	</p>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Example: Async + Await
+</h3>
+
+<div class="p-3">
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- name: "Start background report"
+  run_async: true
+  chip: reports.generate
+  params:
+    user_id: user.id
+  store_result_as: background_task
+
+- name: "Wait for report"
+  chip: reasonchip.async.wait_for
+  params:
+    task: background_task
+  store_result_as: final_report
+	</code></pre>
+
+	<p>
+	  In this example:
+	  <ul>
+		<li><code>background_task</code> holds the async task reference</li>
+		<li><code>reasonchip.async.wait_for</code> waits for it to finish</li>
+		<li>The final result is stored in <code>final_report</code></li>
+	  </ul>
+	</p>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Best Practices & Considerations
+</h3>
+
+<div class="p-3">
+	<ul>
+	  <li><strong>Always</strong> use <code>store_result_as</code> with <code>run_async</code></li>
+	  <li>To get the actual result, you must <strong>await</strong> the task for completion.</li>
+	  <li>Do not use the task handle directly - it is not the final result</li>
+	  <li>Ensure the task’s result is not needed immediately if run asynchronously</li>
+	  <li>Avoid using async with tasks that modify shared data unless properly synchronized</li>
+	</ul>
+</div>
+
+

@@ -1,0 +1,230 @@
+---
+title: 'Task Types'
+date: 2025-02-24
+---
+
+<h3 class="px-4 py-2 bg-primary-subtle border shadow">
+<i class="text-primary me-3 bi bi-arrow-right-square-fill"></i> Task Types
+</h3>
+
+<div class="p-3">
+	<p>
+	  ReasonChip supports a variety of task types that form the backbone of
+	  any pipeline. Each task performs a specific role, but they all share a
+	  set of powerful features that provide control over execution flow,
+	  result handling, and logic.
+	</p>
+</div>
+
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Common Fields (Most Tasks)
+</h3>
+
+<div class="p-3">
+	<p>
+	These are common fields that can be used in most task types. They provide
+	the same functionality throughout. Refer to the individual task type to
+	see if they are explicitly supported.
+	</p>
+
+	<ul>
+	  <li><strong>name</strong>: A human-readable identifier for the task, not used. Just for you.</li>
+	  <li><strong>when</strong>: Conditional expression. If false, the task is skipped.</li>
+	  <li><strong>loop</strong>: Repeats the task over a list, range, or object.</li>
+	  <li><strong>run_async</strong>: Runs the task asynchronously if true.</li>
+	  <li><strong>store_result_as</strong>: Saves the task result in a named variable.</li>
+	  <li><strong>append_result_into</strong>: Appends the result into a list variable (created if needed).</li>
+	</ul>
+	<p>Loop context variables include:</p>
+	<ul>
+		<li><strong>item</strong>: The item within the loop</li>
+		<li><strong>loop.index</strong>: The counter of the loop, starting at 1</li>
+		<li><strong>loop.index0</strong>: The counter of the loop, starting at 0</li>
+		<li><strong>loop.first</strong>: True if the first iteration of the loop</li>
+		<li><strong>loop.last</strong>: True if the last iteration of the loop</li>
+		<li><strong>loop.even</strong>: True if an even iteration of the loop</li>
+		<li><strong>loop.odd</strong>: True if an odd iteration of the loop</li>
+		<li><strong>loop.revindex</strong>: The reverse counter of the loop, which starts at 1</li>
+		<li><strong>loop.revindex0</strong>: The reverse counter of the loop, which starts at 0</li>
+	</ul>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> TaskSet
+</h3>
+
+<div class="p-3">
+	<p>
+	  A group of tasks executed in sequence. Can include its own variable
+	  scope, conditional logic, and loop execution.
+	</p>
+	<ul>
+	  <li><strong>variables</strong>: Scoped variable declarations for the set.</li>
+	  <li><strong>tasks</strong>: A list of task definitions.</li>
+	</ul>
+	<p>Supports all <strong>common fields</strong>.</p>
+	<p><strong>Note:</strong> If a <code>ReturnTask</code> is used inside a <code>TaskSet</code>, the set is exited immediately.</p>
+
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- name: "Grouped steps"
+  variables:
+    greeting: "Hello"
+  tasks:
+    - name: "Step 1"
+      chip: myapp.chips.say
+      params:
+        text: "{{ greeting }} {{ item }}"
+    - name: "Step 2"
+      chip: myapp.chips.wait
+      params:
+        seconds: 1
+  loop: items
+	</code></pre>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> DispatchPipelineTask
+</h3>
+
+<div class="p-3">
+	<p>
+	  Calls another pipeline from within the current one. Execution can
+	  continue afterward or branch away permanently.
+	</p>
+	<ul>
+	  <li><strong>variables</strong>: Variables passed into the new pipeline context.</li>
+	  <li><strong>dispatch</strong>: Name of the pipeline to call</li>
+	</ul>
+	<p>Supports all <strong>common fields</strong>.</p>
+
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- name: "Run follow-up pipeline"
+  when: should_run
+  variables:
+    user_id: "{{ user.id }}"
+  dispatch: "notifications.send_summary"
+	</code></pre>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> ChipTask
+</h3>
+
+<div class="p-3">
+	<p>
+	  Invokes a registered chip by name, with specified parameters. The most
+	  common task type.
+	</p>
+	<ul>
+	  <li><strong>variables</strong>: A set of temporary set of variables to use
+		  within the call</li>
+	  <li><strong>chip</strong>: Fully qualified name of the chip.</li>
+	  <li><strong>params</strong>: Input arguments for the chip.</li>
+	</ul>
+	<p>Supports all <strong>common fields</strong>.</p>
+
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- chip: chatbot.send_message
+  when: new_user
+  variables:
+    greeting: "Welcome!"
+  params:
+    user_id: "{{ user.id }}"
+    message: "{{ greeting }}"
+  store_result_as: "send_result"
+	</code></pre>
+
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> ReturnTask
+</h3>
+
+<div class="p-3">
+	<p>
+	  Ends the current pipeline or <code>TaskSet</code> early and returns a
+	  result to the pipeline that dispatched it, or as a result to the entire
+	  workflow if used at the top level.
+	</p>
+	<ul>
+	  <li><strong>return</strong>: The value to return.</li>
+	</ul>
+	<p>Supports: <strong>name</strong>, <strong>when</strong></p>
+
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- name: "Stop if error occurred"
+  when: result.status != 'OK'
+  return:
+    status: "error"
+    message: "{{ error_message }}"
+	</code></pre>
+
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> DeclareTask
+</h3>
+
+<div class="p-3">
+	<p>
+	  Declares or overrides variables in the current context. These declarations
+	  are available to all tasks in the current pipeline, <code>TaskSet</code>,
+      or any dispatched pipelines.
+	</p>
+	<ul>
+	  <li><strong>variables</strong>: A temporary set of variables to use
+		  within the declare field</li>
+	  <li><strong>declare</strong>: Key-value dictionary of variables to
+		  declare.</li>
+	</ul>
+	<p>Does not support: <strong>run_async</strong></p>
+
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- declare:
+    attempt: 0
+    is_retry: false
+	</code></pre>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> CommentTask
+</h3>
+
+<div class="p-3">
+	<p>
+	  A non-executing task used for documentation or inline notes.
+	</p>
+	<ul>
+	  <li><strong>comment</strong>: Text to display as a comment.</li>
+	</ul>
+	<p>Supports: <strong>name</strong></p>
+
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- comment: "This section will validate the user input and sanitize fields."
+	</code></pre>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> TerminateTask
+</h3>
+
+<div class="p-3">
+	<p>
+	  Stops the entire workflow immediately and returns a value to the
+	  caller of the entire workflow.
+	</p>
+	<ul>
+	  <li><strong>terminate</strong>: Final result.</li>
+	</ul>
+	<p>Supports: <strong>name</strong></p>
+
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- when: shutdown_signal == True
+  terminate:
+    reason: "Manual shutdown"
+    status: "terminated"
+	</code></pre>
+</div>
+
+

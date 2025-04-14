@@ -1,0 +1,108 @@
+---
+title: 'Conditionals'
+date: 2025-02-24
+---
+
+<h3 class="px-4 py-2 bg-primary-subtle border shadow">
+<i class="text-primary me-3 bi bi-arrow-right-square-fill"></i> Conditionals
+</h3>
+
+<div class="p-3">
+	<p>
+	  The <code>when</code> field in ReasonChip tasks lets you control
+	  whether a task should run based on a Python expression. It's evaluated
+	  securely using only the current variable context—no built-in functions
+	  or external access are allowed.
+	</p>
+</div>
+
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> How It Works
+</h3>
+
+<div class="p-3">
+	<p>
+	  Internally, <code>when</code> expressions are evaluated using:
+	</p>
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+result = eval(expr, {"__builtins__": {}}, variables.vobj)
+	</code></pre>
+	<p>
+	  This means your pipeline variables are available as Python-safe attributes:
+	</p>
+	<ul>
+	  <li><code>user.is_active</code></li>
+	  <li><code>result.success == True</code></li>
+	  <li><code>counter > 10</code></li>
+	</ul>
+	<p>
+	  Errors during evaluation raise a safe <code>EvaluationException</code>
+	  with helpful debug info.
+	</p>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Allowed Expressions
+</h3>
+
+<div class="p-3">
+	<ul>
+	  <li>Access to your variables only (<code>variables.vobj</code>)</li>
+	  <li>Standard Python logic operators (<code>and</code>, <code>or</code>, <code>not</code>, comparisons)</li>
+	  <li>Safe attribute, dict, or object traversal</li>
+	</ul>
+	<p>
+	  <strong>✅ Example:</strong>
+	</p>
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+when: user.age > 18 and user.country == "ZA"
+	</code></pre>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Not Allowed
+</h3>
+
+<div class="p-3">
+	<p>
+	  For safety and consistency, the following are <strong>not allowed</strong>:
+	</p>
+
+	<ul>
+	  <li>No built-in functions like <code>len()</code>, <code>sum()</code>, <code>sorted()</code></li>
+	  <li>No imports or external libraries</li>
+	  <li>No access to Python internals</li>
+	</ul>
+
+	<p><strong>❌ Example that will fail:</strong></p>
+
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+when: len(items) > 0
+	</code></pre>
+
+	<p>Instead, calculate length with a chip or prepare it in advance:</p>
+
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- name: "Store length"
+  declare:
+    item_count: "{{ len(data) }}"
+
+- name: "Use it safely"
+  when: item_count > 0
+	</code></pre>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Tips and Best Practices
+</h3>
+
+<div class="p-3">
+	<ul>
+	  <li>Keep <code>when</code> logic simple and safe.</li>
+	  <li>Pre-compute complex conditions using Chips or <code>DeclareTask</code>.</li>
+	  <li>Use <code>variables.vobj</code> as your mental model: it's a flattened, attribute-accessible object view of all variables.</li>
+	  <li>If an expression fails, the pipeline will raise an <code>EvaluationException</code> and halt unless caught upstream.</li>
+	</ul>
+</div>
+

@@ -1,0 +1,173 @@
+---
+title: 'Developer Overview'
+date: 2025-02-24
+---
+
+<h3 class="px-4 py-2 bg-primary-subtle border shadow">
+<i class="text-primary me-3 bi bi-arrow-right-square-fill"></i> Developer Overview
+</h3>
+
+<div class="p-3">
+	<p>A developer using ReasonChip plays the role of a workflow architect
+	and chip engineer. They design pipelines by composing modular tasks
+	(Chips) to automate reasoning or decision-making processes. Developers
+	create Chips as asynchronous Python functions with well-defined inputs
+	and outputs, register them for use, and structure them into pipelines
+	using YAML. They focus on clarity, reusability, and reliability,
+	enabling complex workflows to be broken down into simple, testable
+	units. With ReasonChip, developers can build distributed systems that
+	coordinate logic, handle branching, and scale across infrastructure -
+	without writing orchestration logic from scratch.
+	</p>
+</div>
+
+<h3
+	class="px-4 py-2 bg-success-subtle border shadow"
+><i class="text-success me-3 bi bi-arrow-right-square-fill"></i> What is a chip?</h3>
+
+<div class="p-3">
+	<ul>
+	<li>Is a self-contained function that does one job well.</li>
+	<li>Accepts a Pydantic-validated input model.</li>
+	<li>Returns a Pydantic-validated output model.</li>
+	<li>Can be executed standalone or as part of a larger pipeline.</li>
+	<li>Is registered with the ReasonChip <code>Registry</code> so it can be discovered and invoked dynamically.</li>
+	</ul>
+</div>
+
+<h3
+	class="px-4 py-2 bg-success-subtle border shadow"
+><i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Writing a chip</h3>
+
+<div class="p-3">
+	<p><strong>Chips</strong> are the modular units of execution in
+	pipelines. Each chip is a Python function, typically asynchronous, that
+	performs a discrete task (e.g., send a message, call an API, run a
+	transformation). Chips are dynamically registered and executed by the
+	ReasonChip engine.</p>
+
+	<p>This guide walks through the structure, requirements, and best
+	practices for writing your own chip.</p>
+</div>
+
+<div class="p-3">
+	<p>Creating a new chip is straightforward. Here’s the anatomy:</p>
+	<pre class="bg-secondary-subtle m-5 p-3 rounded"><code>
+from reasonchip import Registry
+from pydantic import BaseModel, Field
+
+class MyChipRequest(BaseModel):
+    """
+    Request structure documentation.
+    """
+    field1: str = Field(description="Description of field1.")
+
+
+class MyChipResponse(BaseModel):
+    """
+    Response structure documentation.
+    """
+    status: typing.Literal["OK", "ERROR"] = Field(description="Status of the request.")
+    result: typing.Optional[typing.Any] = Field(
+        default=None,
+        description="The result of the operation (if successful).",
+    )
+    error_message: typing.Optional[str] = Field(
+        default=None,
+        description="Error message if the operation failed.",
+    )
+
+
+@Registry.register
+async def my_chip(request: MyChipRequest) -> MyChipResponse:
+    try:
+        # Perform logic here
+        return MyChipResponse(status='OK', result=5)
+
+    except Exception as e:
+        return MyChipResponse(status='ERROR', error_message=str(e))
+</code></pre>
+</div>
+
+<h3
+	class="px-4 py-2 bg-success-subtle border shadow"
+><i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Calling your chip</h3>
+
+<div class="p-3">
+	<p>
+		Ensure that your chip is loaded within your pipeline context. Then
+		all you do is reference the chip directly by its full module name
+		and provide the parameters required.
+	</p>
+
+	<p>
+		<pre class="bg-secondary-subtle m-5 p-3 rounded"><code>
+- name: 'Calling my custom chip'
+  chip: full.module.name.my_chip
+  params:
+    field1: "Howdy"
+  store_result_as: rc
+		</code></pre>
+	</p>
+</div>
+
+
+<h3
+	class="px-4 py-2 bg-success-subtle border shadow"
+><i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Chip requirements</h3>
+
+<div class="p-3">
+
+	<h4>1. Input and Output Must Be Pydantic Models</h4>
+	<p>Use Pydantic’s <code>BaseModel</code> to define inputs and outputs. This ensures validation, auto-documentation, and structured communication between chips.</p>
+
+	<h4>2. Use the <code>@Registry.register</code> Decorator</h4>
+	<p>This exposes the chip to ReasonChip’s pipeline engine and registry. Without this, your chip won’t be discoverable or executable in pipelines.</p>
+
+	<h4>3. Use <code>async def</code> for Your Chip</h4>
+	<p>Chips must be asynchronous to support concurrent pipeline execution. Always define chips with <code>async def</code>.</p>
+</div>
+
+<h3
+	class="px-4 py-2 bg-success-subtle border shadow"
+><i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Best practices</h3>
+
+<div class="p-3">
+	<h4>Structure</h4>
+	<ul>
+	<li>Keep logic simple, focused, and testable.</li>
+	<li>Offload shared logic to utility functions or libraries.</li>
+	</ul>
+
+	<h4>Error Handling</h4>
+	<ul>
+	<li>Catch and categorize known exceptions.</li>
+	<li>Return informative error messages in your output model.</li>
+	<li>Avoid crashing the pipeline with unhandled exceptions.</li>
+	</ul>
+
+	<h4>Documentation</h4>
+	<ul>
+	<li>Include clear docstrings.</li>
+	<li>Use Pydantic <code>Field</code> descriptions for auto-generated docs.</li>
+	</ul>
+
+	<h4>Idempotence</h4>
+	<ul>
+	<li>Ensure chips don’t produce unexpected side effects if retried.</li>
+	</ul>
+</div>
+
+
+<h3
+	class="px-4 py-2 bg-success-subtle border shadow"
+><i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Notes</h3>
+
+<div class="p-3">
+	<ul>
+	<li>All chips can be invoked by ReasonChip pipelines, CLI tools, or remote orchestrators.</li>
+	<li>Chips should never block or sleep synchronously.</li>
+	<li>Output should always include a status field or success indicator.</li>
+	</ul>
+</div>
+

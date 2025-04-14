@@ -1,0 +1,125 @@
+---
+title: telegram
+date: 2025-04-07
+---
+
+<h1>Telegram Sending Chipset</h1>
+<p>This module provides a flexible wrapper for sending messages via Telegram's Bot API.
+It defines a dynamic chip that can execute any Telegram sending method asynchronously,
+with configurable client settings and error handling.</p>
+<h2>Features:</h2>
+<ul>
+<li>Supports all Telegram Bot API sending methods (e.g., sendMessage, sendPhoto, sendVideo).</li>
+<li>Configurable Telegram bot token and chat settings.</li>
+<li>Dynamic method execution with flexible parameters.</li>
+<li>Handles connection errors, rate limits, and invalid methods gracefully.</li>
+</ul>
+
+
+<div>
+	<p>
+		View source code here:
+		<a
+			href="https://github.com/SouthPatron/reasonchip/blob/main/src/reasonchip/chipsets/telegram.py"
+		>GitHub</a>
+	</p>
+</div>
+
+
+
+<div class="chip-section my-5 p-2 bg-light">
+
+	<h3
+		class="px-4 py-2 bg-success-subtle border shadow"
+	><i class="text-success me-3 bi bi-cpu-fill"></i> telegram.telegram_send</h3>
+
+	<div class="p-3">
+
+		
+		<p class="lead">
+			<p>Sends a message or media using Telegram's Bot API.</p>
+<p>This chip dynamically executes any Telegram sending method (e.g.,
+sendMessage, sendPhoto) based on the provided method name and parameters.
+Refer to the Telegram Bot API documentation for available methods and
+parameters:</p>
+<p><a href="https://core.telegram.org/bots/api">Telegram Bot API Reference</a></p>
+		</p>
+		
+
+		
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Request Parameters</h4>
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				
+				<tr>
+					<td><strong>client_settings</strong></td>
+					<td><class 'reasonchip.chipsets.telegram.TelegramClientSettings'></td>
+					<td>Configuration for the Telegram Bot client.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>chat_id</strong></td>
+					<td>typing.Union[str, int]</td>
+					<td>Unique identifier for the target chat or username of the target channel (e.g., '@channelusername').</td>
+				</tr>
+				
+				<tr>
+					<td><strong>method</strong></td>
+					<td><class 'str'></td>
+					<td>The Telegram Bot API method to execute (e.g., 'sendMessage', 'sendPhoto', 'sendDocument').</td>
+				</tr>
+				
+				<tr>
+					<td><strong>params</strong></td>
+					<td>typing.Dict[str, typing.Any]</td>
+					<td>Additional parameters for the method (e.g., 'text', 'photo', 'caption').</td>
+				</tr>
+				
+			</table>
+		</div>
+		
+
+		
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Response</h4>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				
+				<tr>
+					<td><strong>status</strong></td>
+					<td>typing.Literal['OK', 'CONNECTION_ERROR', 'RATE_LIMIT', 'INVALID_TOKEN', 'METHOD_NOT_FOUND', 'TELEGRAM_ERROR', 'ERROR']</td>
+					<td>Status of the request.</td>
+				</tr>
+				
+				<tr>
+					<td><strong>result</strong></td>
+					<td>typing.Optional[typing.Any]</td>
+					<td>The result of the Telegram operation (if successful).</td>
+				</tr>
+				
+				<tr>
+					<td><strong>error_message</strong></td>
+					<td>typing.Optional[str]</td>
+					<td>Error message if the operation failed.</td>
+				</tr>
+				
+			</table>
+		</div>
+		
+
+	</div>
+
+</div>

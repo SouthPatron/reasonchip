@@ -1,0 +1,141 @@
+---
+title: 'Conceptual Overview'
+date: 2025-02-24
+---
+
+<h3 class="px-4 py-2 bg-primary-subtle border shadow">
+<i class="text-primary me-3 bi bi-arrow-right-square-fill"></i> Conceptual Overview
+</h3>
+
+<div class="p-3">
+	<p>
+	ReasonChip is a modular framework for automating complex intellectual labor
+	through declarative pipelines and dynamic execution units called
+	<strong>Chips</strong>. Its architecture is designed to be scalable,
+	distributed, and developer-friendly, making it ideal for building advanced
+	reasoning systems, automation tools, and smart agents.
+	</p>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Workflows
+</h3>
+
+<div class="p-3">
+	<p>
+	  A <strong>workflow</strong> is the execution of one or more pipelines -
+	  moving step by step through a reasoning or automation process. Workflows
+	  are top-down and sequential by default, but can branch, pause, restart,
+	  or cancel based on logic defined in the pipeline. They can span multiple
+	  pipelines and respond dynamically to real-time results.
+	</p>
+
+	<p>
+	  A <strong>pipeline</strong> is a YAML-defined sequence of tasks that express how work is carried out.
+	  Pipelines are clean, configurable, and declarative, removing the need for orchestration code.
+	  They support conditional logic, branching, sidequests, async tasks, and more.
+	</p>
+
+	<p>
+	  A <strong>task</strong> is a single step in a pipeline. It is used to 
+	  call chips to perform the function of the task.
+	</p>
+
+	<p>
+	  A <strong>Chip</strong> is an async Python function that performs a focused task—such as sending a message, making a decision, or calling an API.
+	  Chips are registered using <code>@Registry.register</code> and are discoverable by pipelines.
+	  Each Chip uses Pydantic for structured input/output validation and can be composed into larger workflows.
+	</p>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> System Architecture
+</h3>
+
+<div class="p-3">
+	<p>
+	  ReasonChip operates as a distributed system composed of three roles:
+	</p>
+	<ul>
+	  <li><strong>Clients:</strong> Submit workflows and receive results</li>
+	  <li><strong>Brokers:</strong> Manage execution flow and dispatch tasks to workers</li>
+	  <li><strong>Workers:</strong> Run chips and return results, logs, or intermediate states</li>
+	</ul>
+	<p>This architecture supports secure, scalable execution locally or across
+	cloud environments.</p>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Developer Experience
+</h3>
+
+<div class="p-3">
+	<p>
+	  Developers using ReasonChip focus on logic - not orchestration. They:
+	</p>
+	<ul>
+	  <li>Write async Chips with validated input/output</li>
+	  <li>Register Chips with the system for dynamic execution</li>
+	  <li>Compose pipelines in YAML to model reasoning and automation</li>
+	  <li>Debug workflows via streaming logs and result tracking</li>
+	</ul>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Why ReasonChip?
+</h3>
+<div class="p-3">
+	<ul>
+	  <li><strong>Modular:</strong> Reuse small Chips across many workflows</li>
+	  <li><strong>Declarative:</strong> Define what should happen, not how</li>
+	  <li><strong>Async-native:</strong> Designed for concurrency and responsiveness</li>
+	  <li><strong>Composable:</strong> Easily build intelligent systems from simple parts</li>
+	</ul>
+</div>
+
+<h3 class="px-4 py-2 bg-primary-subtle border shadow">
+<i class="text-primary me-3 bi bi-arrow-right-square-fill"></i> Summary
+</h3>
+
+<div class="p-3">
+	<table border="1" cellpadding="8">
+	<thead>
+	  <tr>
+		<th>Concept</th>
+		<th>Description</th>
+	  </tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td><strong>Workflow</strong></td>
+			<td>A sequence of pipelines executed in sequence to achieve
+				an outcome</td>
+		</tr>
+	  <tr>
+		<td><strong>Pipeline</strong></td>
+		<td>YAML-defined sequence of tasks</td>
+	  </tr>
+	  <tr>
+		<td><strong>Task</strong></td>
+		<td>A single chip execution in a pipeline</td>
+	  </tr>
+	  <tr>
+		<td><strong>Chip</strong></td>
+		<td>A single function that performs an operation</td>
+	  </tr>
+	  <tr>
+		<td><strong>Client</strong></td>
+		<td>Sends pipeline jobs and receives output</td>
+	  </tr>
+	  <tr>
+		<td><strong>Broker</strong></td>
+		<td>Manages job routing, state, and lifecycle</td>
+	  </tr>
+	  <tr>
+		<td><strong>Worker</strong></td>
+		<td>Executes pipelines and returns results</td>
+	  </tr>
+	</tbody>
+	</table>
+</div>
+

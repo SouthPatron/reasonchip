@@ -1,0 +1,81 @@
+---
+title: {{ mod_name }}
+date: {{ today }}
+---
+{% if module_doc %}
+{{ module_doc | markdown | safe }}
+{% endif %}
+
+<div>
+	<p>
+		View source code here:
+		<a
+			href="https://github.com/SouthPatron/reasonchip/blob/main/src/reasonchip/chipsets/{{ url_path }}.py"
+		>GitHub</a>
+	</p>
+</div>
+
+
+{% for chip_name, entry in chips_in_module %}
+<div class="chip-section my-5 p-2 bg-light">
+
+	<h3
+		class="px-4 py-2 bg-success-subtle border shadow"
+	><i class="text-success me-3 bi bi-cpu-fill"></i> {{ chip_name }}</h3>
+
+	<div class="p-3">
+
+		{% if entry.func.__doc__ %}
+		<p class="lead">
+			{{ entry.func.__doc__ | markdown | safe }}
+		</p>
+		{% endif %}
+
+		{% if entry.request_type.model_fields %}
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Request Parameters</h4>
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				{% for field_name, field in entry.request_type.model_fields.items() %}
+				<tr>
+					<td><strong>{{ field_name }}</strong></td>
+					<td>{{ field.annotation }}</td>
+					<td>{{ field.description or "No description" }}</td>
+				</tr>
+				{% endfor %}
+			</table>
+		</div>
+		{% endif %}
+
+		{% if entry.response_type.model_fields %}
+		<div class="bg-secondary-subtle mt-5">
+			<h4 class="px-3 py-2 m-0">Response</h4>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				{% for field_name, field in entry.response_type.model_fields.items() %}
+				<tr>
+					<td><strong>{{ field_name }}</strong></td>
+					<td>{{ field.annotation }}</td>
+					<td>{{ field.description or "No description" }}</td>
+				</tr>
+				{% endfor %}
+			</table>
+		</div>
+		{% endif %}
+
+	</div>
+
+</div>
+{% endfor %}

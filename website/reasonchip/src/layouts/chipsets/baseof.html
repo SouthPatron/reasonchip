@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html
+	lang="{{ site.Language.LanguageCode }}"
+	dir="{{ or site.Language.LanguageDirection `ltr` }}">
+<head>
+  {{ partial "head.html" . }}
+  {{ partial "style.html" . }}
+</head>
+<body class="bg-body-tertiary">
+
+<div class="
+	min-vh-100 w-100
+
+	d-flex flex-column
+	align-items-stretch justify-content-start
+">
+
+	<div class="bg-white p-4 border-bottom">
+	{{ partial "header.html" . }}
+	</div>
+
+	<div class="
+		flex-fill
+
+		d-flex
+		flex-column-reverse flex-md-row
+
+		align-items-stretch
+		justify-content-end justify-content-md-start
+	">
+		<div class="
+			p-4
+			border-md-end
+			sidemenu
+		">
+			<h5>Chipsets</h5>
+
+			{{ partial "chip_menu.html" . }}
+		</div>
+
+		<div class="flex-md-fill p-4">
+			{{ block "main" . }}{{ end }}
+		</div>
+	</div>
+
+	<div class="bg-white pt-5 pb-3 px-5 border-top">
+	{{ partial "footer.html" . }}
+	</div>
+
+</div>
+
+{{ partial "post_scripts.html" . }}
+
+</body>
+</html>

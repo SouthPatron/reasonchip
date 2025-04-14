@@ -1,0 +1,175 @@
+---
+title: 'Variables'
+date: 2025-02-24
+---
+
+<h3 class="px-4 py-2 bg-primary-subtle border shadow">
+<i class="text-primary me-3 bi bi-arrow-right-square-fill"></i> Variables
+</h3>
+
+<div class="p-3">
+    <p>
+      ReasonChip supports <strong>dynamic variables</strong> that you can
+	  define, reuse, and resolve across your entire pipeline. These variables
+	  help make workflows clean, reusable, and data-driven.
+    </p>
+</div>
+
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Defining Variables
+</h3>
+
+<div class="p-3">
+	<p>
+		You can define variables in two main ways: A DeclareTask, or directly
+		in a task.
+	</p>
+
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- name: "Declare example"
+  declare:
+    greeting: "Hello"
+    is_active: True
+
+- name: "Prepare message"
+  variables:
+    text: "Welcome, {{ user_name }}"
+  chip: chatbot.say
+  params:
+    message: text
+	</code></pre>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Referencing Variables
+</h3>
+
+<div class="p-3">
+	<p>You can use variables in two ways:</p>
+	<ul>
+	  <li><strong>Bare names</strong> – <code>greeting</code></li>
+	  <li><strong>Interpolated strings</strong> – <code>{{ user.name }}</code></li>
+	</ul>
+	<p>
+	<strong>Bare variables</strong> are supported in most task
+	fields: <code>params</code>, <code>loop</code>, <code>when</code>, etc.</p>
+
+	<p>✅ <strong>Example using bare name:</strong></p>
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+	- name: "Send greeting"
+	method_name: chatbot.say
+	params:
+	message: greeting
+	</code></pre>
+
+	<p>✅ <strong>Example using interpolation inside a string:</strong></p>
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+	- name: "Compose greeting"
+	vars:
+	greeting: "Hello, {{ user.name }}!"
+	</code></pre>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Recursive Resolution
+</h3>
+
+<div class="p-3">
+	<p>
+	Variables can reference other variables, and ReasonChip will resolve
+	them recursively:
+	</p>
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+variables:
+  a: b
+  b: c
+  c: 42
+  # Result: a == 42
+	</code></pre>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Full Variable Flow Example
+</h3>
+
+<div class="p-3">
+<pre class="rounded p-3 bg-secondary-subtle"><code>
+- name: "Declare context"
+  declare:
+    name: Elvis
+    greeting: "Hello, {{ name }}"
+
+- name: "Send message"
+  chip: chatbot.send
+  params:
+    message: greeting
+</code></pre>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Advanced Access
+</h3>
+
+<div class="p-3">
+	<p>ReasonChip supports nested resolution across dicts, objects, and attributes:</p>
+	<ul>
+	  <li><code>user.email</code> – nested object</li>
+	  <li><code>data['status']</code> – dict-style access</li>
+	  <li><code>profile.age</code> – object attribute access</li>
+	</ul>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Python Expressions in {{ ... }}
+</h3>
+
+<div class="p-3">
+	<p>
+	  Expressions inside <code>{{ ... }}</code> are evaluated using standard Python syntax, with access to the current variable context.
+	  This means you can use methods, arithmetic, and indexing:
+	</p>
+
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- name: "Custom message"
+vars:
+user: { name: "Elvis", age: 42 }
+
+- name: "Say message"
+method_name: chatbot.say
+params:
+message: "User {{ user.name.upper() }} is {{ user.age + 1 }} years old"
+	</code></pre>
+
+	<p>
+	  You can use any valid Python operation that works within the safe <code>vobj</code> context (your variables, safely exposed).
+	</p>
+
+	<p><strong>Examples:</strong></p>
+
+	<ul>
+	  <li><code>{{ name.upper() }}</code> → "ELVIS"</li>
+	  <li><code>{{ price * quantity }}</code> → numeric calculation</li>
+	  <li><code>{{ user.get('email', 'not set') }}</code> → dict fallback</li>
+	</ul>
+
+	<p>
+	  Built-ins and external libraries are not available—only your variables are exposed to keep evaluation secure and deterministic.
+	</p>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Notes
+</h3>
+
+<div class="p-3">
+	<ul>
+	  <li><strong>Bare names</strong> are preferred in structured fields (e.g. <code>params</code>, <code>when</code>).</li>
+	  <li><code>{{ ... }}</code> is best used for inline string construction or complex expressions.</li>
+	  <li>Variables are <strong>scoped</strong>: task-scoped variables override inherited ones.</li>
+	  <li>Recursive resolution prevents loops and supports complex dependency chains.</li>
+	  <li>Missing or invalid references are handled gracefully with clear errors.</li>
+	</ul>
+</div>
+
+

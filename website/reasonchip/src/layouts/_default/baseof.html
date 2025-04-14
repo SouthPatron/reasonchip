@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html
+	lang="{{ site.Language.LanguageCode }}"
+	dir="{{ or site.Language.LanguageDirection `ltr` }}">
+<head>
+  {{ partial "head.html" . }}
+  {{ partial "style.html" . }}
+</head>
+<body class="bg-body-tertiary">
+
+<div class="
+	min-vh-100 w-100
+
+	d-flex flex-column
+	align-items-stretch justify-content-start">
+
+	<div class="container-fluid bg-white p-4 border-bottom">
+	{{ partial "header.html" . }}
+	</div>
+
+	<div class="
+		flex-fill
+		d-flex flex-column
+	">
+	{{ block "main" . }}{{ end }}
+	</div>
+
+	<div class="container-fluid bg-white pt-5 pb-3 px-5 border-top">
+	{{ partial "footer.html" . }}
+	</div>
+
+</div>
+
+{{ partial "post_scripts.html" . }}
+
+</body>
+</html>

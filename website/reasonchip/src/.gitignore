@@ -1,0 +1,9 @@
+# Hugo build artifacts
+/public/
+/resources/
+/assets/js/bundle.js
+
+# Hugo cache
+/hugo_cache/
+
+.hugo_build.lock
