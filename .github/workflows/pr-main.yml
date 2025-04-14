@@ -69,6 +69,6 @@ jobs:
 
       - name: Build website
         run: |
-          cd ${{ github.workspace }}/website/reasonchip/
+          cd ${{ github.workspace }}/website/reasonchip/src/
           hugo --minify
 
