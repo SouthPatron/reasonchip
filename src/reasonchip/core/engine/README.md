@@ -1,12 +1,14 @@
-# Core libraries
+# Engine
 
+The Engine is the core part of the system responsible for loading
+and running of pipelines.
 
 ## Filesystem layout
 
 | Location | Description |
 | ------------------------- | ----------------------------------------------- |
-| [config](./config/README.md) | Config |
-| [engine](./engine/README.md) | Engine |
-
+| [context](./context/) | Context classes |
+| [parsers](./parsers/) | Parser locations |
+| [processor](./processor/) | The processor |
 
 

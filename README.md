@@ -7,25 +7,33 @@
 
 Open source agentic workflow automation software
 
-
 ## Quick links
 
 - [QuickStart](https://www.reasonchip.io/docs/quickstart/)
 - [Documentation](https://www.reasonchip.io/docs/)
 - [Website](https://www.reasonchip.io/)
 
+## Filesystem layout
+
+| Location | Description |
+| ------------------------- | ----------------------------------------------- |
+| [examples](./examples/) | Example workflows |
+| [src](./src/reasonchip/) | ReasonChip package code |
+| [website](./website/reasonchip/) | ReasonChip.io website code |
+
 ## Installation
 
-Easy peasy, lemon squeezy
+Easy peasy, lemon squeezy:
 
 ```bash
-pip install reasonchip
+$ pip install reasonchip
 ```
 
-## Example workflows
+and then run with:
 
-They're right here in the source tree: [Examples](./examples/README.md)
-
+```bash
+$ reasonchip
+```
 
 ## License
 

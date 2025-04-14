@@ -4,9 +4,9 @@
 
 | Location | Description |
 | ------------------------- | ----------------------------------------------- |
-| [chipsets](./chipsets/README.md) | Chipsets |
-| [cli](./cli/README.md) | Command line interface |
-| [core](./core/README.md) | Core libraries |
-| [net](./net/README.md) | Networking for clients, servers, and gateways |
-
+| [chipsets](./chipsets/) | Chipsets |
+| [cli](./cli/) | Command line interface |
+| [core](./core/) | Core libraries |
+| [data](./data/) | Packaged data files |
+| [net](./net/) | Networking for clients, servers, and gateways |
 
