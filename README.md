@@ -1,5 +1,7 @@
 # ReasonChip
 
+![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)
+
 Open source agentic workflow automation software
 
 ## Quick links
