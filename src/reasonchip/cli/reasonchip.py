@@ -3,18 +3,10 @@
 # This file is part of ReasonChip and licensed under the GPLv3+.
 # See <https://www.gnu.org/licenses/> for details.
 
-#!/usr/bin/env python
-
 import sys
 import argparse
 import asyncio
-import logging
-import logging.config
-import os
-
 import setproctitle
-
-from importlib.resources import files
 
 from ..core.logging.configure import configure_logging
 
