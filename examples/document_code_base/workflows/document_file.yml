@@ -1,0 +1,71 @@
+
+- chip: reasoning.openai.chat.chat_completion
+  params:
+    client_settings:
+      api_key: "{{ secrets.openai.api_key }}"
+      organization: "{{ secrets.openai.org_id }}"
+    create_params:
+      model: "gpt-4o"
+      messages:
+        - role: system
+          content: |
+            You are a psychological profiler assistant.
+
+            Analyze the user's conversation and describe:
+            - Their current mood (in a few words or sentence).
+            - Their personality (1–2 nuanced descriptive sentences).
+            - Whether the bot’s stored personality should change.
+            - Why or why not the bot’s personality should change.
+
+            Do not make up fields. Use the schema provided.
+
+            Stored personality:
+            {{ current_personality.result or 'None' }}
+
+            Recent conversation:
+            {{ '\n'.join([ x.decode('utf-8') for x in recent_messages.result ]) }}
+      response_format:
+        type: "json_schema"
+        json_schema:
+          name: "myobj"
+          strict: true
+          schema:
+            type: "object"
+            properties:
+              mood:
+                type: "string"
+                description: "The user's current mood in a few words or sentence"
+              personality:
+                type: "string"
+                description: "A nuanced 1–2 sentence description of the user's personality."
+              should_update:
+                type: "boolean"
+                description: "Whether there is a significant change in mood or personality which needs to be acknowleged and updated."
+              reason:
+                  type: "string"
+                  description: "Reason for updating or not updating the bot's personality."
+            additionalProperties: false
+            required:
+              - "mood"
+              - "personality"
+              - "should_update"
+              - "reason"
+  store_result_as: response
+
+- name: "Handle Response: Failure"
+  when: "response.status != 'OK'"
+  terminate: true
+
+- chip: utils.json.loads
+  params:
+    string: "{{ response.completion.choices[0].message.content }}"
+  store_result_as: response_object_object
+
+- name: "Handle Response: Failure"
+  when: "response.status != 'OK'"
+  terminate: true
+
+- declare:
+    response_object: response_object_object.result
+
+
