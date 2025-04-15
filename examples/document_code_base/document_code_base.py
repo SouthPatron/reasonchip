@@ -43,9 +43,8 @@ def should_ignore_dir(dir_name):
 
 # --------- REASONING --------------------------------------------------------
 
-
 local_runner = LocalRunner(
-    collections=[str(Path(__file__).resolve() / "workflows")],
+    collections=[str(Path(__file__).resolve().parent / "workflows")],
 )
 
 

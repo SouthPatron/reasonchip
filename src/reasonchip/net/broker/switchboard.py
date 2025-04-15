@@ -18,6 +18,9 @@ from ..protocol import (
     ResultCode,
 )
 
+# Setup logging
+log = logging.getLogger(__name__)
+
 
 @dataclass
 class Route:
@@ -44,6 +47,11 @@ class Switchboard:
         self,
         writer_callback: WriterCallbackType,
     ):
+        """
+        Initialize the Switchboard with a writer callback function.
+
+        :param writer_callback: A callback function to handle SocketPacket writing.
+        """
         # Writer callback
         self._writer_callback: WriterCallbackType = writer_callback
 
@@ -63,7 +71,11 @@ class Switchboard:
 
     async def eliminate_client(self, connection_id: uuid.UUID):
         """
+        Mark all routes for the specified client connection as client_gone.
+
         NOTE: The workers are still busy doing things so we don't cancel them.
+
+        :param connection_id: The UUID of the client to eliminate.
         """
         async with self._lock:
             # Mark existing routes as orphans
@@ -76,8 +88,10 @@ class Switchboard:
 
     async def eliminate_worker(self, connection_id: uuid.UUID):
         """
-        NOTE: We have to inform all clients that the connection went away and
-        then clean up the routes.
+        Clean up all routes associated with the specified worker connection and
+        inform clients about the disconnection.
+
+        :param connection_id: The UUID of the worker to eliminate.
         """
 
         async with self._lock:
@@ -124,6 +138,13 @@ class Switchboard:
         connection_id: uuid.UUID,
         packet: SocketPacket,
     ):
+        """
+        Handle a client payload by directing it to the appropriate handler based
+        on its packet type.
+
+        :param connection_id: The UUID of the client connection.
+        :param packet: The packet received from the client.
+        """
         handlers = {
             PacketType.RUN: self._cl_run,
             PacketType.CANCEL: self._cl_passthru,
@@ -137,6 +158,13 @@ class Switchboard:
         connection_id: uuid.UUID,
         packet: SocketPacket,
     ):
+        """
+        Handle a worker payload by directing it to the appropriate handler based
+        on its packet type.
+
+        :param connection_id: The UUID of the worker connection.
+        :param packet: The packet received from the worker.
+        """
         handlers = {
             PacketType.REGISTER: self._wk_register,
             PacketType.RESULT: self._wk_result,
@@ -155,8 +183,15 @@ class Switchboard:
         rc: ResultCode,
         error: str,
     ):
+        """
+        Create and send a response packet indicating an error or special condition back to the client.
+
+        :param payload: The original client payload.
+        :param rc: Result code to return.
+        :param error: Error message to return.
+        """
         # Log the error
-        logging.error(
+        log.error(
             f"Sending error response [{payload.connection_id}] [{payload.packet.packet_type}] [{rc}] [{error}]"
         )
 
@@ -175,6 +210,11 @@ class Switchboard:
         await self._writer_callback(payload.connection_id, resp)
 
     async def _unsupported_packet(self, payload: ClientPayload):
+        """
+        Handle unsupported packet types by sending an error response back to the client.
+
+        :param payload: The original client payload.
+        """
         return await self._respond(
             payload=payload,
             rc=ResultCode.UNSUPPORTED_PACKET_TYPE,
@@ -182,6 +222,12 @@ class Switchboard:
         )
 
     async def _bad_packet(self, payload: ClientPayload, reason: str):
+        """
+        Handle bad or malformed packets by sending an error response back to the client.
+
+        :param payload: The original client payload.
+        :param reason: The reason why the packet is considered bad.
+        """
         return await self._respond(
             payload=payload,
             rc=ResultCode.BAD_PACKET,
@@ -191,6 +237,11 @@ class Switchboard:
     # --------------------- CLIENTS -------------------------------------------
 
     async def _cl_run(self, payload: ClientPayload):
+        """
+        Process a RUN packet from a client, initiating a task on a worker.
+
+        :param payload: The original client payload containing a RUN packet.
+        """
 
         # Get the packet
         pkt = payload.packet
@@ -235,7 +286,7 @@ class Switchboard:
             self._routes_by_worker[conn].append(route)
 
             # Log what happened
-            logging.info(
+            log.info(
                 f"CLIENT RUN: cookie=[{cookie}] pipeline=[{pkt.pipeline}] client=[{payload.connection_id}] connection=[{conn}]"
             )
 
@@ -243,6 +294,11 @@ class Switchboard:
             await self._writer_callback(conn, pkt)
 
     async def _cl_passthru(self, payload: ClientPayload):
+        """
+        Directly pass through a CANCEL packet from a client to the appropriate worker.
+
+        :param payload: The original client payload containing a CANCEL packet.
+        """
 
         # Get the packet
         pkt = payload.packet
@@ -273,6 +329,11 @@ class Switchboard:
     # --------------------- WORKERS -------------------------------------------
 
     async def _wk_register(self, payload: ClientPayload):
+        """
+        Register a new worker and make its connections available.
+
+        :param payload: The original worker payload containing a REGISTER packet.
+        """
 
         # Make sure the worker has capacity
         pkt = payload.packet
@@ -287,6 +348,11 @@ class Switchboard:
             await self.print_status()
 
     async def _wk_result(self, payload: ClientPayload):
+        """
+        Process a RESULT packet from a worker, returning information back to the client.
+
+        :param payload: The original worker payload containing a RESULT packet.
+        """
 
         # Get the packet
         pkt = payload.packet
@@ -318,12 +384,12 @@ class Switchboard:
 
             # Send through to the worker
             if route.client_gone:
-                logging.warning(f"Client gone [{route.client_id}]")
+                log.warning(f"Client gone [{route.client_id}]")
             else:
                 await self._writer_callback(route.client_id, pkt)
 
             # Log what happened
-            logging.info(
+            log.info(
                 f"WORKER RESULT: cookie=[{cookie}] rc=[{pkt.rc}] error=[{pkt.error}] client=[{route.client_id}] connection=[{route.connection_id}]"
             )
 
@@ -333,10 +399,13 @@ class Switchboard:
     # --------------------- CLEANUP -------------------------------------------
 
     async def print_status(self):
+        """
+        Log the current status of available connections and routes.
+        """
         avail = len(self._available)
         routes = len(self._routes)
         rbw = len(self._routes_by_worker)
         rbc = len(self._routes_by_client)
 
         msg = f"STATS: available [{avail}] | routes [{routes}] rbw [{rbw}] rbc [{rbc}]"
-        logging.info(msg)
+        log.info(msg)

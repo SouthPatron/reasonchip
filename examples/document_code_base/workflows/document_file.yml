@@ -107,13 +107,13 @@
               changed:
                 type: "string"
                 description: "YES or NO depending on whether you performed changes"
-              content:
+              contents:
                 type: "string"
                 description: "A blank string or the full content of the file with your changes"
             additionalProperties: false
             required:
-              - "changed"
-              - "content"
+              - changed
+              - contents
   store_result_as: response
 
 - when: "response.status != 'OK'"
@@ -122,10 +122,10 @@
 - chip: utils.json.loads
   params:
     string: "{{ response.completion.choices[0].message.content }}"
-  store_result_as: result
+  store_result_as: rc
 
-- when: "result.changed == 'NO'"
+- when: "rc.result['changed'] == 'NO'"
   terminate: None
 
-- return: result.content
+- return: "{{ rc.result['contents'] }}"
 
