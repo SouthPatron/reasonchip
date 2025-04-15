@@ -1,9 +1,27 @@
 #!/usr/bin/env python
 
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 South Patron LLC
+# This file is part of ReasonChip and licensed under the GPLv3+.
+# See <https://www.gnu.org/licenses/> for details.
+
+import os
 import argparse
 import typing
+import asyncio
 
 from pathlib import Path
+
+from reasonchip.utils import LocalRunner
+
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_ORG_ID = os.getenv("OPENAI_ORG_ID")
+
+if not OPENAI_API_KEY or not OPENAI_ORG_ID:
+    raise ValueError(
+        "Please set the OPENAI_API_KEY and OPENAI_ORG_ID environment variables."
+    )
 
 
 # Directories to ignore during traversal
@@ -26,15 +44,29 @@ def should_ignore_dir(dir_name):
 # --------- REASONING --------------------------------------------------------
 
 
-def document_file(
-    content: str,
-    filepath: Path,
-) -> typing.Optional[str]:
-
-    return content
+local_runner = LocalRunner(
+    collections=[str(Path(__file__).resolve() / "workflows")],
+)
 
 
-def document_directory(
+async def document_file(content: str) -> typing.Optional[str]:
+    rc = await local_runner.run(
+        pipeline="document_file",
+        variables={
+            "content": content,
+            "secrets": {
+                "openai": {
+                    "api_key": OPENAI_API_KEY,
+                    "org_id": OPENAI_ORG_ID,
+                }
+            },
+        },
+    )
+    print(f"Received result: {rc}")
+    return rc
+
+
+async def document_directory(
     files: dict,
     readmes: dict,
     original_readme: typing.Optional[str] = None,
@@ -46,7 +78,7 @@ def document_directory(
 # --------- FILE PROCESSING --------------------------------------------------
 
 
-def process_files(dir_path: Path, depth: int):
+async def process_files(dir_path: Path, depth: int):
     # Now process the files within this directory
     files = {}
     for f in dir_path.glob("*.py"):
@@ -54,7 +86,7 @@ def process_files(dir_path: Path, depth: int):
 
         content = f.read_text(encoding="utf-8")
 
-        new_content = document_file(content, f)
+        new_content = await document_file(content)
         if new_content:
             f.write_text(new_content, encoding="utf-8")
             files[f] = new_content
@@ -64,7 +96,7 @@ def process_files(dir_path: Path, depth: int):
     return files
 
 
-def traverse_and_document(dir_path: Path, depth: int):
+async def traverse_and_document(dir_path: Path, depth: int):
     # Print the current directory being processed
     print(f"{'  ' * depth}{dir_path}/")
 
@@ -77,10 +109,10 @@ def traverse_and_document(dir_path: Path, depth: int):
 
     # Deep dive subdirectories first so they are documented
     for subdir in subdirs:
-        traverse_and_document(subdir, depth + 1)
+        await traverse_and_document(subdir, depth + 1)
 
     # Now process the files within this directory
-    files = process_files(dir_path, depth)
+    files = await process_files(dir_path, depth)
 
     # Now load all the README.md files in the subdirectories
     readmes = {}
@@ -97,7 +129,7 @@ def traverse_and_document(dir_path: Path, depth: int):
         original_readme = None
 
     # Now we process the README.md for this directory
-    readme = document_directory(files, readmes, original_readme)
+    readme = await document_directory(files, readmes, original_readme)
     if readme:
         f = dir_path / "README.md"
         f.write_text(readme, encoding="utf-8")
@@ -105,7 +137,7 @@ def traverse_and_document(dir_path: Path, depth: int):
     return
 
 
-def main():
+async def main():
     # Parse the arguments
     parser = argparse.ArgumentParser(
         description="Recursively document a python codebase.",
@@ -118,8 +150,8 @@ def main():
     args = parser.parse_args()
 
     # Begin traversal and documentation
-    traverse_and_document(args.root_dir, 0)
+    await traverse_and_document(args.root_dir, 0)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

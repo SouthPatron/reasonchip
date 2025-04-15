@@ -9,21 +9,93 @@
       messages:
         - role: system
           content: |
-            You are a psychological profiler assistant.
+            You are a senior developer who has been tasked with documenting and
+            adding logging to a python file.
 
-            Analyze the user's conversation and describe:
-            - Their current mood (in a few words or sentence).
-            - Their personality (1–2 nuanced descriptive sentences).
-            - Whether the bot’s stored personality should change.
-            - Why or why not the bot’s personality should change.
+            These are your instructions:
 
-            Do not make up fields. Use the schema provided.
+            LOGGING
+            -------
 
-            Stored personality:
-            {{ current_personality.result or 'None' }}
+            All files should import logging a global logger should be defined:
 
-            Recent conversation:
-            {{ '\n'.join([ x.decode('utf-8') for x in recent_messages.result ]) }}
+            ```
+            import logging
+
+            log = logging.getLogger(__name__)
+            ```
+
+            All logging within the file should reference this log.
+            If there is an existing logging approach, replace it with this
+            approach. For example:
+
+            ```
+            log.info("Doing something")
+            ```
+
+
+            METHODS OR FUNCTIONS
+            --------------------
+
+            The docstring of a method or function should give a brief description
+            of what it does along with any notes.
+
+            All parameters should be documented using sphinx notation, for
+            example:
+
+            ```
+            def add(a: int, b: int, do_good: bool) -> typing.Optional[int]:
+              """
+              This function adds two numbers and returns the result.
+
+              :param a: The first number to add.
+              :param b: The second number to add.
+              :param do_good: Return the correct result if True else return None
+
+              :return: The result if do_good else None
+              """
+              return (a + b) if do_good else None
+
+
+            COMMENTS
+            --------
+
+            Add brief and terse comments to code to give an idea of what the
+            code is trying to do from a high-level approach:
+
+            ```
+            # First we stop all the incoming clients
+            for t in self._client_transports:
+                await t.stop_server()
+
+            # Then we stop all the workers
+            for t in self._worker_transports:
+                await t.stop_server()
+            ```
+
+            Generally only add comments around conceptual blocks as demonstrated
+            above: Something happens to clients, then something happens to
+            workers.
+
+
+            YOUR RESPONSE
+            -------------
+
+            Reply in JSON.
+
+            If the file:
+              - Is adequately compliant with your instructions;
+              - Appears to already meet the requirements;
+              - Only has trivial differences;
+            Then do not update the file and return an empty content response.
+
+            Otherwise, return the complete file with your modifications.
+            Do not change any logic or reasoning or fix any bugs you can see.
+            Just do what has been requested.
+
+        - role: user
+          content: content
+
       response_format:
         type: "json_schema"
         json_schema:
@@ -32,40 +104,28 @@
           schema:
             type: "object"
             properties:
-              mood:
+              changed:
                 type: "string"
-                description: "The user's current mood in a few words or sentence"
-              personality:
+                description: "YES or NO depending on whether you performed changes"
+              content:
                 type: "string"
-                description: "A nuanced 1–2 sentence description of the user's personality."
-              should_update:
-                type: "boolean"
-                description: "Whether there is a significant change in mood or personality which needs to be acknowleged and updated."
-              reason:
-                  type: "string"
-                  description: "Reason for updating or not updating the bot's personality."
+                description: "A blank string or the full content of the file with your changes"
             additionalProperties: false
             required:
-              - "mood"
-              - "personality"
-              - "should_update"
-              - "reason"
+              - "changed"
+              - "content"
   store_result_as: response
 
-- name: "Handle Response: Failure"
-  when: "response.status != 'OK'"
-  terminate: true
+- when: "response.status != 'OK'"
+  terminate: None
 
 - chip: utils.json.loads
   params:
     string: "{{ response.completion.choices[0].message.content }}"
-  store_result_as: response_object_object
+  store_result_as: result
 
-- name: "Handle Response: Failure"
-  when: "response.status != 'OK'"
-  terminate: true
+- when: "result.changed == 'NO'"
+  terminate: None
 
-- declare:
-    response_object: response_object_object.result
-
+- return: result.content
 
