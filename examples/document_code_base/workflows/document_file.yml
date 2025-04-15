@@ -94,7 +94,7 @@
             Just do what has been requested.
 
         - role: user
-          content: content
+          content: "{{ content }}"
 
       response_format:
         type: "json_schema"
@@ -117,7 +117,7 @@
   store_result_as: response
 
 - when: "response.status != 'OK'"
-  terminate: None
+  terminate: True
 
 - chip: utils.json.loads
   params:
@@ -125,7 +125,7 @@
   store_result_as: rc
 
 - when: "rc.result['changed'] == 'NO'"
-  terminate: None
+  return: ""
 
 - return: "{{ rc.result['contents'] }}"
 
