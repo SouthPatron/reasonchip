@@ -18,7 +18,6 @@ from ..protocol import (
     ResultCode,
 )
 
-# Setup logging
 log = logging.getLogger(__name__)
 
 
