@@ -65,6 +65,8 @@ async def document_file(filename: str, content: str) -> typing.Optional[str]:
         },
     )
 
+    print(f"Received response: {rc}")
+
     status = rc["status"]
 
     if status == "ERROR":

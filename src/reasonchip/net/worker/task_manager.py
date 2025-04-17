@@ -24,6 +24,8 @@ from ..protocol import (
     ResultCode,
 )
 
+log = logging.getLogger(__name__)
+
 
 @dataclass
 class TaskInfo:
@@ -43,7 +45,14 @@ class TaskManager:
         transport: ClientTransport,
         max_capacity: int = 4,
     ):
-        logging.debug(f"Creating TaskManager with capacity {max_capacity}")
+        """
+        Initialize the TaskManager.
+
+        :param engine: The Engine instance to run tasks.
+        :param transport: The ClientTransport used for communication.
+        :param max_capacity: Maximum number of concurrent tasks allowed.
+        """
+        log.debug(f"Creating TaskManager with capacity {max_capacity}")
 
         assert max_capacity > 0
 
@@ -60,29 +69,34 @@ class TaskManager:
         self._handler: typing.Optional[asyncio.Task] = None
         self._tasks: typing.Dict[uuid.UUID, TaskInfo] = {}
 
-        logging.debug(f"TaskManager created")
+        log.debug(f"TaskManager created")
 
     # ------------------------- LIFECYCLE ------------------------------------
 
     async def start(self):
-        logging.info(f"Starting TaskManager...")
+        """
+        Start the TaskManager, connect transport and begin multiplexing.
+
+        :return: None
+        """
+        log.info(f"Starting TaskManager...")
 
         assert self._handler is None
 
         self._dying.clear()
 
-        logging.info(f"Starting Transport...")
+        log.info(f"Starting Transport...")
 
         rc = await self._transport.connect(callback=self._incoming_packet)
         if rc is False:
             raise ConnectionError("Failed to connect the transport")
 
-        logging.info("Spawning the multiplexing task...")
+        log.info("Spawning the multiplexing task...")
 
         self._handler = asyncio.create_task(self._multiplexing())
 
         # Send the register packet
-        logging.info("Sending registration packet...")
+        log.info("Sending registration packet...")
         rc = await self._transport.send_packet(
             SocketPacket(
                 packet_type=PacketType.REGISTER,
@@ -92,41 +106,51 @@ class TaskManager:
         if rc is False:
             raise ConnectionError("Failed to send registration packet")
 
-        logging.info(f"TaskManager started...")
+        log.info(f"TaskManager started...")
 
     async def wait(self, timeout: typing.Optional[float] = None) -> bool:
-        logging.info(
-            f"Waiting for TaskManager to finish: timeout=[{timeout}] ..."
-        )
+        """
+        Wait for the multiplexing handler task to complete.
+
+        :param timeout: Optional timeout in seconds.
+        :return: True if finished, False if timeout.
+        """
+        log.info(f"Waiting for TaskManager to finish: timeout=[{timeout}] ...")
 
         if self._handler is None:
-            logging.warning("TaskManager is already dead")
+            log.warning("TaskManager is already dead")
             return True
 
         assert self._handler is not None
 
         done, _ = await asyncio.wait([self._handler], timeout=timeout)
         if not done:
-            logging.debug("Timeout occurred")
+            log.debug("Timeout occurred")
             return False
 
         self._handler = None
 
-        logging.info(f"TaskManager is finished.")
+        log.info(f"TaskManager is finished.")
         return True
 
     async def stop(self, timeout: typing.Optional[float] = None) -> bool:
-        logging.debug(f"Stopping TaskManager...")
+        """
+        Stop the TaskManager gracefully.
+
+        :param timeout: Optional timeout in seconds.
+        :return: True if stopped cleanly, False if timeout.
+        """
+        log.debug(f"Stopping TaskManager...")
 
         if not self._dying.is_set():
             self._dying.set()
 
         rc = await self.wait(timeout=timeout)
         if rc is False:
-            logging.info(f"Timeout occurred while stopping TaskManager.")
+            log.info(f"Timeout occurred while stopping TaskManager.")
             return False
 
-        logging.info(f"TaskManager stopped.")
+        log.info(f"TaskManager stopped.")
         return True
 
     # ------------------------- PLEXORS --------------------------------------
@@ -136,7 +160,15 @@ class TaskManager:
         cookie: uuid.UUID,
         packet: typing.Optional[SocketPacket],
     ):
-        logging.debug(f"Received packet on task manager")
+        """
+        Callback for incoming packets to be put into the internal queue.
+
+        :param cookie: Unique identifier for the packet.
+        :param packet: The incoming SocketPacket or None.
+
+        :return: None
+        """
+        log.debug(f"Received packet on task manager")
         await self._incoming_queue.put(packet)
 
     async def _wait_for_engine(
@@ -144,8 +176,16 @@ class TaskManager:
         task: asyncio.Task,
         cookie: uuid.UUID,
     ) -> uuid.UUID:
+        """
+        Wait for an engine run task to complete.
 
-        logging.debug(f"Waiting for engine run to complete: {cookie}")
+        :param task: The asyncio.Task running the engine.
+        :param cookie: The task's unique identifier.
+
+        :return: The cookie when done.
+        """
+
+        log.debug(f"Waiting for engine run to complete: {cookie}")
 
         # Wait for an engine run to complete
         done, _ = await asyncio.wait(
@@ -159,8 +199,13 @@ class TaskManager:
         return cookie
 
     async def _multiplexing(self):
+        """
+        Multiplexing loop to manage incoming packets, task completion and shutdown.
 
-        logging.debug(f"Entering multiplexing loop")
+        :return: None
+        """
+
+        log.debug(f"Entering multiplexing loop")
 
         t_dying = asyncio.create_task(self._dying.wait())
         t_incoming = asyncio.create_task(self._incoming_queue.get())
@@ -183,14 +228,14 @@ class TaskManager:
                 assert isinstance(cookie, uuid.UUID)
                 self._tasks.pop(cookie)
 
-                logging.debug(f"Recognized task completion: {cookie}")
+                log.debug(f"Recognized task completion: {cookie}")
 
             # Consider death
             if t_dying in done:
                 assert t_dying and t_dying.done()
                 t_dying = None
 
-                logging.debug("Started dying because we were requested to die")
+                log.debug("Started dying because we were requested to die")
 
                 if t_incoming:
                     t_incoming.cancel()
@@ -199,7 +244,7 @@ class TaskManager:
             if t_incoming in done:
                 assert t_incoming and t_incoming.done()
 
-                logging.debug("Received packet on incoming queue")
+                log.debug("Received packet on incoming queue")
 
                 rc = t_incoming.result()
 
@@ -211,12 +256,12 @@ class TaskManager:
 
                 # Restart the task if advised and we're not dying
                 if restart and not self._dying.is_set():
-                    logging.debug("Restarting the incoming queue task")
+                    log.debug("Restarting the incoming queue task")
                     t_incoming = asyncio.create_task(self._incoming_queue.get())
                 else:
                     if not self._dying.is_set():
                         self._dying.set()
-                    logging.debug("Not restarting the incoming queue task")
+                    log.debug("Not restarting the incoming queue task")
 
             # Rebuild the waiting list, adding any running engines
             wl = [x for x in (t_dying, t_incoming) if x is not None]
@@ -230,7 +275,7 @@ class TaskManager:
         assert self._transport is not None
         await self._transport.disconnect()
 
-        logging.debug(f"Exiting multiplexing loop")
+        log.debug(f"Exiting multiplexing loop")
 
     # ------------------------- HANDLERS -------------------------------------
 
@@ -238,13 +283,19 @@ class TaskManager:
         self,
         packet: typing.Optional[SocketPacket] = None,
     ) -> bool:
+        """
+        Process incoming server packets and dispatch to appropriate handlers.
+
+        :param packet: The SocketPacket received.
+        :return: True to continue processing, False to stop.
+        """
 
         # The incoming connection is dead.
         if packet is None:
-            logging.warning("Received None on incoming queue. Time to die.")
+            log.warning("Received None on incoming queue. Time to die.")
             return False
 
-        logging.debug(
+        log.debug(
             f"Processing server packet: [{packet.packet_type}] [{packet.cookie}]"
         )
 
@@ -260,23 +311,29 @@ class TaskManager:
         return await handler(packet)
 
     async def _srv_run(self, packet: SocketPacket) -> bool:
+        """
+        Handle RUN packet type: start a new engine task.
+
+        :param packet: The incoming RUN SocketPacket.
+        :return: True if the task is accepted, False otherwise.
+        """
         # Make sure we have capacity
         if len(self._tasks) >= self._max_capacity:
-            logging.fatal(
+            log.fatal(
                 "Capacity reached on worker. We should never have been asked."
             )
             return False
 
         # Check if the packet is fine
         if not packet.cookie or not packet.pipeline:
-            logging.fatal(
+            log.fatal(
                 "Missing cookie or pipeline in packet. Should have been checked beforehand."
             )
             return False
 
         # Check for collisions
         if packet.cookie in self._tasks:
-            logging.fatal(
+            log.fatal(
                 "Cookie collision has occurred. Should never have been allowed."
             )
             return False
@@ -296,21 +353,25 @@ class TaskManager:
         return True
 
     async def _srv_cancel(self, packet: SocketPacket) -> bool:
+        """
+        Handle CANCEL packet type: cancel a running task.
+
+        :param packet: The incoming CANCEL SocketPacket.
+        :return: True if cancellation was handled or ignored, False on error.
+        """
         # Check if the packet is fine
         if not packet.cookie:
-            logging.fatal(
-                "Missing cookie. Should have been checked beforehand."
-            )
+            log.fatal("Missing cookie. Should have been checked beforehand.")
             return False
 
         # Check for the task
         if packet.cookie not in self._tasks:
-            logging.warning(
+            log.warning(
                 f"Cookie not found trying to cancel. Could be a race condition: [{packet.cookie}]"
             )
             return True
 
-        logging.info(f"Cancelling task: [{packet.cookie}]")
+        log.info(f"Cancelling task: [{packet.cookie}]")
 
         task_info = self._tasks[packet.cookie]
         assert task_info.task is not None
@@ -318,11 +379,23 @@ class TaskManager:
         return True
 
     async def _srv_shutdown(self, packet: SocketPacket) -> bool:
-        logging.info(f"Shutdown request received from server")
+        """
+        Handle SHUTDOWN packet type: initiate shutdown.
+
+        :param packet: The incoming SHUTDOWN SocketPacket.
+        :return: False to indicate shutdown should occur.
+        """
+        log.info(f"Shutdown request received from server")
         return False
 
     async def _srv_unsupported_packet_type(self, packet: SocketPacket) -> bool:
-        logging.fatal(f"Unsupported packet type: [{packet.packet_type}]")
+        """
+        Handle unsupported packet types.
+
+        :param packet: The incoming SocketPacket.
+        :return: False to stop processing.
+        """
+        log.fatal(f"Unsupported packet type: [{packet.packet_type}]")
         return False
 
     # ------------------------- ENGINE RUNNER --------------------------------
@@ -333,10 +406,19 @@ class TaskManager:
         pipeline: str,
         variables: typing.Optional[str] = None,
     ):
+        """
+        Run the engine with provided pipeline and variables, handle results and exceptions.
+
+        :param task_info: TaskInfo associated with this engine run.
+        :param pipeline: The pipeline name to execute.
+        :param variables: JSON string of variables to pass.
+
+        :return: None
+        """
         start_time = time.perf_counter()
 
         try:
-            logging.info(f"Running engine: [{task_info.cookie}] [{pipeline}]")
+            log.info(f"Running engine: [{task_info.cookie}] [{pipeline}]")
 
             # Process the variables
             v = json.loads(variables) if variables else {}
@@ -361,7 +443,7 @@ class TaskManager:
             )
 
         except Exception as e:
-            logging.exception(
+            log.exception(
                 f"Exception occurred during engine run: [{task_info.cookie}] [{pipeline}]"
             )
 
@@ -383,6 +465,6 @@ class TaskManager:
         time_ms = elapsed / 1_000
         time_s = time_ms / 1_000
 
-        logging.info(
+        log.info(
             f"Engine task completed: [{task_info.cookie}] [{pipeline}] [{elapsed:.2f}us] [{time_ms:.2f}ms] [{time_s:.2f}s]"
         )

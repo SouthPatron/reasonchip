@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from ..protocol import SocketPacket, PacketType, ResultCode
 from ..transports import ClientTransport
 
+log = logging.getLogger(__name__)
+
 
 @dataclass
 class ConnectionInfo:
@@ -37,7 +39,12 @@ class Multiplexor:
     # -------------------------- LIFECYCLE -----------------------------------
 
     async def start(self) -> bool:
-        logging.debug("Starting multiplexor")
+        """
+        Start the multiplexor by connecting the transport and setting it up.
+
+        :return: True if started successfully.
+        """
+        log.debug("Starting multiplexor")
 
         # Clear the event
         self._dead.clear()
@@ -47,11 +54,17 @@ class Multiplexor:
         if rc is False:
             raise ConnectionError("Failed to connect to server")
 
-        logging.debug("Multiplexor started")
+        log.debug("Multiplexor started")
         return True
 
     async def wait(self, timeout: typing.Optional[float] = None) -> bool:
-        logging.debug("Waiting for multiplexor to stop")
+        """
+        Wait for the multiplexor to stop or until the optional timeout.
+
+        :param timeout: Maximum time to wait in seconds, or None to wait indefinitely.
+        :return: True if stopped, False if timed out.
+        """
+        log.debug("Waiting for multiplexor to stop")
 
         # Wait for death
         if not timeout:
@@ -61,15 +74,21 @@ class Multiplexor:
             t = asyncio.create_task(self._dead.wait())
             done, _ = await asyncio.wait([t], timeout=timeout)
             if not done:
-                logging.debug("Timeout waiting for transport to stop")
+                log.debug("Timeout waiting for transport to stop")
                 return False
 
         # Successful exit
-        logging.debug("Multiplexor stopped")
+        log.debug("Multiplexor stopped")
         return True
 
     async def stop(self, timeout: typing.Optional[float] = None) -> bool:
-        logging.debug("Stopping multiplexor")
+        """
+        Stop the multiplexor by disconnecting the transport and waiting for shutdown.
+
+        :param timeout: Maximum time to wait for shutdown in seconds, or None.
+        :return: True if stopped successfully, False if timed out.
+        """
+        log.debug("Stopping multiplexor")
 
         await self._transport.disconnect()
 
@@ -78,28 +97,43 @@ class Multiplexor:
     # -------------------------- REGISTRATION --------------------------------
 
     async def register(self, connection_id: uuid.UUID) -> ConnectionInfo:
-        logging.debug(f"Registering connection: {connection_id}")
+        """
+        Register a new connection by its unique identifier.
+
+        :param connection_id: The UUID of the connection to register.
+        :return: The ConnectionInfo object for the registered connection.
+        :raises ValueError: If the connection is already registered.
+        """
+        log.debug(f"Registering connection: {connection_id}")
 
         async with self._lock:
             if connection_id in self._connections:
-                logging.error(f"Connection already registered: {connection_id}")
+                log.error(f"Connection already registered: {connection_id}")
                 raise ValueError("Client already registered")
 
             cl = ConnectionInfo(connection_id=connection_id)
             self._connections[connection_id] = cl
 
-            logging.debug(f"Registered connection: {connection_id}")
+            log.debug(f"Registered connection: {connection_id}")
             return cl
 
     async def release(self, connection_id: uuid.UUID) -> bool:
-        logging.debug(f"Releasing connection: {connection_id}")
+        """
+        Release a registered connection, signaling it is no longer active.
+
+        :param connection_id: The UUID of the connection to release.
+        :return: True if connection was found and released, False otherwise.
+        """
+        log.debug(f"Releasing connection: {connection_id}")
 
         async with self._lock:
             if connection_id not in self._connections:
-                logging.debug(f"Connection not found: {connection_id}")
+                log.debug(f"Connection not found: {connection_id}")
                 return False
 
-            logging.debug(f"Released connection: {connection_id}")
+            # Actual removal or cleanup logic is not shown in existing code,
+            # so only log release and return True here.
+            log.debug(f"Released connection: {connection_id}")
             return True
 
     # -------------------------- SEND & RECV PACKET --------------------------
@@ -109,11 +143,18 @@ class Multiplexor:
         connection_id: uuid.UUID,
         packet: SocketPacket,
     ) -> bool:
+        """
+        Send a packet over the transport associated with the given connection.
+
+        :param connection_id: The UUID of the connection to send through.
+        :param packet: The SocketPacket to send.
+        :return: True on successful send, False if connection not found.
+        """
 
         async with self._lock:
             conn = self._connections.get(connection_id, None)
             if not conn:
-                logging.warning(f"Connection not found: {connection_id}")
+                log.warning(f"Connection not found: {connection_id}")
                 return False
 
             cookie = packet.cookie
@@ -128,6 +169,13 @@ class Multiplexor:
     async def _incoming_callback(
         self, transport_cookie: uuid.UUID, packet: typing.Optional[SocketPacket]
     ):
+        """
+        Callback for incoming packets from the transport, routing them to
+        the appropriate connection's queue or handling disconnection.
+
+        :param transport_cookie: The cookie identifying the transport packet.
+        :param packet: The incoming SocketPacket or None if disconnected.
+        """
         # Transport is disconnected. Kill everything.
         if packet is None:
             await self._death_process()
@@ -141,7 +189,7 @@ class Multiplexor:
 
             conn = self._cookies.get(cookie, None)
             if not conn:
-                logging.error(f"Received packet with unknown cookie: {cookie}")
+                log.error(f"Received packet with unknown cookie: {cookie}")
                 return
 
             await conn.incoming_queue.put(packet)
@@ -153,8 +201,12 @@ class Multiplexor:
     # -------------------------- THE DEATH PROCESS ---------------------------
 
     async def _death_process(self):
+        """
+        Handle cleanup and notify all connections that the broker has gone away.
+        """
 
         async with self._lock:
+            # Notify each connection queue with a error result packet
             for conn in self._connections.values():
                 for cookie in conn.cookies:
                     await conn.incoming_queue.put(

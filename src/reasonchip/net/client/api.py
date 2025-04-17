@@ -17,10 +17,17 @@ from ..protocol import (
 from .multiplexor import Multiplexor
 from .client import Client
 
+log = logging.getLogger(__name__)
+
 
 class Api:
 
     def __init__(self, multiplexor: Multiplexor) -> None:
+        """
+        Initialize the API with a multiplexor.
+
+        :param multiplexor: The multiplexor instance managing connections.
+        """
         self._multiplexor = multiplexor
 
     async def run_pipeline(
@@ -29,13 +36,23 @@ class Api:
         variables: typing.Any = None,
         cookie: typing.Optional[uuid.UUID] = None,
     ) -> typing.Any:
+        """
+        Run a pipeline with optional variables and a cookie.
+
+        :param pipeline: The name of the pipeline to execute.
+        :param variables: Optional variables for the pipeline.
+        :param cookie: Optional UUID cookie identifier.
+
+        :return: The result of the pipeline run.
+        """
 
         async with Client(
             multiplexor=self._multiplexor,
             cookie=cookie,
         ) as client:
 
-            logging.debug(
+            # Log the pipeline run request
+            log.debug(
                 f"Request to run pipeline: [{client.get_cookie()}] {pipeline}"
             )
 
@@ -47,25 +64,27 @@ class Api:
                 variables=json_variables,
             )
 
-            logging.debug("Dispatching request")
+            # Dispatch the run request
+            log.debug("Dispatching request")
             rc = await client.send_packet(req)
             if not rc:
-                logging.debug("Failed to dispatch request")
+                log.debug("Failed to dispatch request")
                 raise ConnectionError("Lost connection to engine client")
 
-            logging.debug("Waiting for all the responses")
+            # Wait for all the responses
+            log.debug("Waiting for all the responses")
             while resp := await client.receive_packet():
                 if not resp:
-                    logging.debug("Lost connection to engine client")
+                    log.debug("Lost connection to engine client")
                     raise ConnectionError("Lost connection to engine client")
 
-                logging.debug(f"Received packet: {resp.packet_type}")
+                log.debug(f"Received packet: {resp.packet_type}")
 
                 # This is in response to a cancel
                 if resp.packet_type == PacketType.CANCEL:
-                    logging.debug("Job was confirmed as cancelled")
+                    log.debug("Job was confirmed as cancelled")
                     if resp.result != ResultCode.CANCELLED:
-                        logging.warning(f"Job cancellation failed. [{resp.rc}]")
+                        log.warning(f"Job cancellation failed. [{resp.rc}]")
                     break
 
                 # This is the end of the job
@@ -77,10 +96,11 @@ class Api:
                 if rc == False:
                     req = SocketPacket(packet_type=PacketType.CANCEL)
 
-                    logging.debug("Dispatching request")
+                    # Dispatch the cancel request
+                    log.debug("Dispatching request")
                     rc = await client.send_packet(req)
                     if not rc:
-                        logging.debug("Failed to dispatch request")
+                        log.debug("Failed to dispatch request")
                         raise ConnectionError(
                             "Lost connection to engine client"
                         )

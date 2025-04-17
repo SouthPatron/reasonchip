@@ -28,6 +28,8 @@ from .server_transport import (
 
 from .ssl_options import SSLServerOptions
 
+log = logging.getLogger(__name__)
+
 
 @dataclass
 class ClientSession:
@@ -45,6 +47,18 @@ class ReasonChipServiceImpl(ReasonChipServiceServicer):
         self.server = server
 
     async def EstablishConnection(self, request_iterator, context):
+        """
+        gRPC bi-directional streaming method for establishing a client connection.
+
+        This method handles incoming streams of packets from clients and yields
+        outgoing packets back to clients. It manages connection lifecycle and
+        calls registered callbacks.
+
+        :param request_iterator: An async iterator of incoming ReasonChipPacket messages.
+        :param context: The gRPC ServicerContext.
+
+        :return: An async generator yielding ReasonChipPacket messages to the client.
+        """
         session = ClientSession()
         connection_id = session.connection_id
 
@@ -56,12 +70,13 @@ class ReasonChipServiceImpl(ReasonChipServiceServicer):
                     self.server, connection_id
                 )
 
-        # Stream reading and writing
+        # Stream reading and writing tasks
         async def reader():
             try:
                 async for packet in request_iterator:
                     if self.server._read_callback:
 
+                        # Convert gRPC packet to SocketPacket
                         pkt = SocketPacket(
                             packet_type=packet.packet_type,
                             cookie=packet.cookie,
@@ -74,20 +89,23 @@ class ReasonChipServiceImpl(ReasonChipServiceServicer):
                             result=packet.result,
                         )
 
+                        # Invoke the read callback with the received packet
                         await self.server._read_callback(connection_id, pkt)
 
             except Exception as e:
-                logging.warning(f"Connection {connection_id} reader error: {e}")
+                log.warning(f"Connection {connection_id} reader error: {e}")
             finally:
                 session.death_signal.set()
 
         try:
+            # Create async tasks for reading, writing and connection termination
             t_read = asyncio.create_task(reader())
             t_write = asyncio.create_task(session.outgoing_queue.get())
             t_die = asyncio.create_task(session.death_signal.wait())
 
             wl = [t_read, t_write, t_die]
 
+            # Loop while there are tasks to wait for
             while wl:
                 done, _ = await asyncio.wait(
                     wl,
@@ -106,6 +124,7 @@ class ReasonChipServiceImpl(ReasonChipServiceServicer):
                         packet = t_write.result()
                         assert isinstance(packet, SocketPacket)
 
+                        # Convert SocketPacket to gRPC packet for sending
                         grpc_packet = ReasonChipPacket(
                             packet_type=packet.packet_type,
                             cookie=packet.cookie,
@@ -117,8 +136,10 @@ class ReasonChipServiceImpl(ReasonChipServiceServicer):
                             stacktrace=packet.stacktrace,
                             result=packet.result,
                         )
+                        # Yield the packet to client
                         yield grpc_packet
 
+                        # Restart write task fetching next packet
                         t_write = asyncio.create_task(
                             session.outgoing_queue.get()
                         )
@@ -130,6 +151,7 @@ class ReasonChipServiceImpl(ReasonChipServiceServicer):
                 if t_die in done:
                     wl.remove(t_die)
 
+                    # Cancel reader and writer tasks if still active
                     if t_read:
                         t_read.cancel()
 
@@ -137,6 +159,7 @@ class ReasonChipServiceImpl(ReasonChipServiceServicer):
                         t_write.cancel()
 
         finally:
+            # Cleanup: remove connection and notify closed connection callback
             async with self.server._lock:
                 self.server._connections.pop(connection_id, None)
                 if self.server._closed_connection_callback:
@@ -150,6 +173,12 @@ class GrpcServer(ServerTransport):
         host: typing.Optional[str],
         ssl_options: typing.Optional[SSLServerOptions] = None,
     ):
+        """
+        Initialize the gRPC server transport.
+
+        :param host: The host address to bind the gRPC server to.
+        :param ssl_options: Optional SSL options for secure connections.
+        """
         super().__init__()
 
         self._host = host or "[::]"
@@ -167,7 +196,7 @@ class GrpcServer(ServerTransport):
             ClosedConnectionCallbackType
         ] = None
 
-        # gRPC code
+        # gRPC server initialization
         self._server = grpc.aio.server()
         self._servicer = ReasonChipServiceImpl(self)
 
@@ -186,6 +215,15 @@ class GrpcServer(ServerTransport):
         read_callback: ReadCallbackType,
         closed_connection_callback: ClosedConnectionCallbackType,
     ) -> bool:
+        """
+        Start the gRPC server and set connection callbacks.
+
+        :param new_connection_callback: Called when a new connection is established.
+        :param read_callback: Called when a packet is read from a connection.
+        :param closed_connection_callback: Called when a connection is closed.
+
+        :return: True if server started successfully.
+        """
 
         self._new_connection_callback = new_connection_callback
         self._read_callback = read_callback
@@ -193,12 +231,17 @@ class GrpcServer(ServerTransport):
 
         await self._server.start()
 
-        logging.info(f"gRPC server listening on {self._host}")
+        log.info(f"gRPC server listening on {self._host}")
         return True
 
     async def stop_server(self) -> bool:
+        """
+        Stop the gRPC server.
+
+        :return: True when the server stopped successfully.
+        """
         await self._server.stop(0)
-        logging.info("gRPC server stopped")
+        log.info("gRPC server stopped")
         return True
 
     async def send_packet(
@@ -206,6 +249,14 @@ class GrpcServer(ServerTransport):
         connection_id: uuid.UUID,
         packet: SocketPacket,
     ) -> bool:
+        """
+        Send a packet to a specific client identified by connection_id.
+
+        :param connection_id: The unique ID of the client connection.
+        :param packet: The packet to send.
+
+        :return: True if the packet was queued successfully, False if connection not found.
+        """
         async with self._lock:
             if session := self._connections.get(connection_id):
                 await session.outgoing_queue.put(packet)
@@ -214,6 +265,13 @@ class GrpcServer(ServerTransport):
             return False
 
     async def close_connection(self, connection_id: uuid.UUID) -> bool:
+        """
+        Close a client connection by setting its death signal.
+
+        :param connection_id: The unique ID of the client connection to close.
+
+        :return: True if the connection was found and closed, else False.
+        """
         async with self._lock:
             if session := self._connections.get(connection_id):
                 session.death_signal.set()
@@ -225,6 +283,13 @@ class GrpcServer(ServerTransport):
         self,
         options: SSLServerOptions,
     ) -> grpc.ServerCredentials:
+        """
+        Create gRPC server SSL credentials from SSLServerOptions.
+
+        :param options: SSLServerOptions containing cert, key and CA paths.
+
+        :return: grpc.ServerCredentials object for secure server setup.
+        """
 
         assert options.cert and options.key and options.ca
 

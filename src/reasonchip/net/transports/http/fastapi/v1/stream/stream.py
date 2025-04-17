@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 
 from ....common import ClientSession, SocketPacket, PacketType
 
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -32,7 +33,17 @@ async def stream(
     req: SocketPacket,
     callbacks: di.CallbackHooks = Depends(di.get_callbacks),
 ) -> StreamingResponse:
+    """
+    Handle streaming connections from clients.
 
+    Registers new connection, sends initial packet, then streams packets back asynchronously.
+
+    :param request: The incoming FastAPI request.
+    :param req: The initial socket packet from the client.
+    :param callbacks: Dependency injection callbacks for connection lifecycle.
+
+    :return: A StreamingResponse yielding encoded socket packets.
+    """
     session = ClientSession()
 
     # Register connection
@@ -42,8 +53,13 @@ async def stream(
     await callbacks.read_callback(session, req)
 
     async def log_stream() -> typing.AsyncGenerator[bytes, None]:
+        """
+        Async generator that yields packets to stream until session death or result packet.
 
+        :yield: Encoded JSON string of SocketPacket objects.
+        """
         try:
+            # Create tasks to wait for session death and outgoing packets
             t_die = asyncio.create_task(session.death_signal.wait())
             t_reader = asyncio.create_task(session.outgoing_queue.get())
 
@@ -90,7 +106,7 @@ async def stream(
                         t_reader = None
 
         except Exception as e:
-            logging.exception("Exception in log_stream")
+            log.exception("Exception in log_stream")
 
         finally:
             # This one is gone
