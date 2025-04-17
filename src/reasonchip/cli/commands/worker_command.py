@@ -9,6 +9,7 @@ import signal
 import asyncio
 import traceback
 import ssl
+import logging
 
 from reasonchip.core import exceptions as rex
 from reasonchip.core.engine.engine import Engine
@@ -22,6 +23,8 @@ from reasonchip.net.transports import SSLClientOptions
 from .exit_code import ExitCode
 from .command import AsyncCommand
 
+log = logging.getLogger(__name__)
+
 
 class WorkerCommand(AsyncCommand):
 
@@ -31,14 +34,23 @@ class WorkerCommand(AsyncCommand):
 
     @classmethod
     def command(cls) -> str:
+        """
+        Returns the string command used to invoke this command.
+        """
         return "worker"
 
     @classmethod
     def help(cls) -> str:
+        """
+        Returns a brief help description of the command.
+        """
         return "Launch an engine process to perform work for a broker"
 
     @classmethod
     def description(cls) -> str:
+        """
+        Returns a detailed multi-line description of the command.
+        """
         return """
 This is an engine process which provides workers to a broker. This process isn't meant to be used directly. It registers the number of tasks available with the broker and the broker dispatches tasks to this engine up to that capacity.
 
@@ -63,6 +75,11 @@ It's an incredibly intolerant process by design. It will die if anything strange
 
     @classmethod
     def build_parser(cls, parser: argparse.ArgumentParser):
+        """
+        Builds and configures the argument parser for the command.
+
+        :param parser: The argparse.ArgumentParser instance to configure.
+        """
         parser.add_argument(
             "--collection",
             dest="collections",
@@ -96,7 +113,14 @@ It's an incredibly intolerant process by design. It will die if anything strange
         rem: typing.List[str],
     ) -> ExitCode:
         """
-        Main entry point for the application.
+        Main entry point for running the worker command.
+
+        Sets up SSL context and transport to the broker, initializes engine and task manager, and runs the event loop.
+
+        :param args: Parsed command line arguments.
+        :param rem: Remaining arguments (not used).
+
+        :return: ExitCode indicating success or failure.
         """
 
         if not args.collections:
@@ -105,7 +129,7 @@ It's an incredibly intolerant process by design. It will die if anything strange
         ssl_options = SSLClientOptions.from_args(args)
         ssl_context = ssl_options.create_ssl_context() if ssl_options else None
 
-        # Let's create the SSL context right up front.
+        # Create the transport to communicate with the broker with SSL if needed
         transport = worker_to_broker(
             args.broker,
             ssl_client_options=ssl_options,
@@ -115,19 +139,22 @@ It's an incredibly intolerant process by design. It will die if anything strange
         await self.setup_signal_handlers()
 
         try:
-            # Let us create the engine.
+            log.info("Starting Engine with collections: %s", args.collections)
+
+            # Let us create the engine and initialize with pipeline collections
             engine: Engine = Engine()
             engine.initialize(pipelines=args.collections)
 
-            # Now we start the loop to receive requests and process them.
+            # Create and start the task manager to handle work
             tm = TaskManager(
                 engine=engine,
                 transport=transport,
                 max_capacity=args.tasks,
             )
             await tm.start()
+            log.info("Task manager started with max capacity: %d", args.tasks)
 
-            # Wait for signals or the client to stop
+            # Wait for signals or task manager to stop
             task_wait = asyncio.create_task(self._die.wait())
             task_manager = asyncio.create_task(tm.wait())
 
@@ -143,38 +170,57 @@ It's an incredibly intolerant process by design. It will die if anything strange
                     wl.remove(task_wait)
                     task_wait = None
 
+                    # If the task manager still running stop it
                     if task_manager in wl:
+                        log.info("Received stop signal, stopping task manager")
                         await tm.stop()
 
                 if task_manager in done:
                     wl.remove(task_manager)
                     task_manager = None
 
+                    # If we have not received stop signal set it
                     if task_wait in wl:
+                        log.info("Task manager stopped, setting stop event")
                         self._die.set()
 
-            # Shutdown the engine
+            # Shutdown the engine cleanly
             engine.shutdown()
+            log.info("Engine shutdown complete")
             return ExitCode.OK
 
         except rex.ReasonChipException as ex:
             msg = rex.print_reasonchip_exception(ex)
+            log.error("ReasonChip exception occurred: %s", msg)
             print(msg)
             return ExitCode.ERROR
 
         except Exception as ex:
+            log.error("Unhandled exception occurred: %s", ex, exc_info=True)
             print(f"************** UNHANDLED EXCEPTION **************")
             print(f"\n\n{ex}\n\n")
             traceback.print_exc()
             return ExitCode.ERROR
 
     async def _handle_signal(self, signame: str) -> None:
+        """
+        Handles incoming signals by setting the internal event to trigger shutdown.
+
+        :param signame: The name of the signal received.
+        """
+        log.info("Received signal: %s", signame)
         self._die.set()
 
     async def setup_signal_handlers(self):
+        """
+        Setup signal handlers for SIGINT, SIGTERM and SIGHUP to handle graceful shutdown.
+        """
         loop = asyncio.get_event_loop()
         for signame in {"SIGINT", "SIGTERM", "SIGHUP"}:
             loop.add_signal_handler(
                 getattr(signal, signame),
-                lambda: asyncio.create_task(self._handle_signal(signame)),
+                lambda signame=signame: asyncio.create_task(
+                    self._handle_signal(signame)
+                ),
             )
+        log.info("Signal handlers established for SIGINT, SIGTERM, SIGHUP")

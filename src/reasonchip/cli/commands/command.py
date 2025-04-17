@@ -3,6 +3,7 @@
 # This file is part of ReasonChip and licensed under the GPLv3+.
 # See <https://www.gnu.org/licenses/> for details.
 
+import logging
 import typing
 import argparse
 
@@ -10,30 +11,61 @@ from abc import ABC, abstractmethod
 
 from .exit_code import ExitCode
 
+log = logging.getLogger(__name__)
+
 
 class BaseCommand(ABC):
 
     @classmethod
     @abstractmethod
-    def command(cls) -> str: ...
+    def command(cls) -> str:
+        """
+        Return the command string associated with this command.
+
+        :return: The command as a string.
+        """
+        ...
 
     @classmethod
     @abstractmethod
-    def help(cls) -> str: ...
+    def help(cls) -> str:
+        """
+        Return the help string for the command.
+
+        :return: The help description.
+        """
+        ...
 
     @classmethod
     @abstractmethod
-    def description(cls) -> str: ...
+    def description(cls) -> str:
+        """
+        Return the full description for the command.
+
+        :return: The command description.
+        """
+        ...
 
     @classmethod
     @abstractmethod
-    def build_parser(cls, parser: argparse.ArgumentParser): ...
+    def build_parser(cls, parser: argparse.ArgumentParser):
+        """
+        Build the argument parser for this command.
+
+        :param parser: The argparse.ArgumentParser instance to configure.
+        """
+        ...
 
     @classmethod
     def add_default_options(
         cls,
         parser: argparse.ArgumentParser,
     ):
+        """
+        Add common options used by many commands to the parser.
+
+        :param parser: The argparse.ArgumentParser instance to add options to.
+        """
         group = parser.add_argument_group("Common Options")
         group.add_argument(
             "--log-level",
@@ -49,6 +81,11 @@ class BaseCommand(ABC):
         cls,
         parser: argparse.ArgumentParser,
     ):
+        """
+        Add SSL/TLS client-related options to the parser.
+
+        :param parser: The argparse.ArgumentParser instance to add options to.
+        """
         group = parser.add_argument_group("SSL/TLS Client Options")
 
         group.add_argument(
@@ -104,6 +141,11 @@ class BaseCommand(ABC):
         cls,
         parser: argparse.ArgumentParser,
     ):
+        """
+        Add SSL/TLS server-related options to the parser.
+
+        :param parser: The argparse.ArgumentParser instance to add options to.
+        """
         group = parser.add_argument_group("SSL/TLS Server Options")
 
         group.add_argument(
@@ -154,7 +196,12 @@ class Command(BaseCommand):
     @abstractmethod
     def main(self, args: argparse.Namespace, rem: typing.List[str]) -> ExitCode:
         """
-        Main method.
+        The main method to execute the command.
+
+        :param args: Parsed command line arguments namespace.
+        :param rem: Remaining command line arguments that were not parsed.
+
+        :return: ExitCode representing success or failure.
         """
         pass
 
@@ -166,6 +213,11 @@ class AsyncCommand(BaseCommand):
         self, args: argparse.Namespace, rem: typing.List[str]
     ) -> ExitCode:
         """
-        Main method.
+        The async main method to execute the command.
+
+        :param args: Parsed command line arguments namespace.
+        :param rem: Remaining command line arguments that were not parsed.
+
+        :return: ExitCode representing success or failure.
         """
         pass

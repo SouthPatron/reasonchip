@@ -9,6 +9,7 @@ import asyncio
 import signal
 import traceback
 import ssl
+import logging
 
 from reasonchip.core import exceptions as rex
 from reasonchip.net.broker import Broker
@@ -21,9 +22,10 @@ from reasonchip.net.transports.utils import (
     SSLServerOptions,
 )
 
-
 from .exit_code import ExitCode
 from .command import AsyncCommand
+
+log = logging.getLogger(__name__)
 
 
 class BrokerCommand(AsyncCommand):
@@ -82,11 +84,17 @@ This can listen on multiple sockets, IP4, and IP6 addresses.
     ) -> ExitCode:
         """
         Main entry point for the application.
+
+        :param args: Parsed command line arguments.
+        :param rem: Remaining command line arguments.
+
+        :return: ExitCode indicating success or failure.
         """
 
         ssl_options = SSLServerOptions.from_args(args)
         ssl_context = ssl_options.create_ssl_context() if ssl_options else None
 
+        # Create transports for workers (listeners) and clients (servers)
         listeners = broker_for_workers(
             args.listen or DEFAULT_LISTENERS,
             ssl_server_options=ssl_options,
@@ -97,38 +105,55 @@ This can listen on multiple sockets, IP4, and IP6 addresses.
         await self.setup_signal_handlers()
 
         try:
-
             broker = Broker(
                 client_transports=servers,
                 worker_transports=listeners,
             )
 
+            log.info("Starting broker")
             await broker.start()
 
+            # Wait here until exit signal is received
             await self._wait_for_exit()
 
+            log.info("Stopping broker")
             await broker.stop()
 
             return ExitCode.OK
 
         except rex.ReasonChipException as ex:
             msg = rex.print_reasonchip_exception(ex)
+            log.error(f"ReasonChip exception occurred: {msg}")
             print(msg)
             return ExitCode.ERROR
 
         except Exception as ex:
+            log.error("************** UNHANDLED EXCEPTION **************")
+            log.error(f"Exception: {ex}", exc_info=True)
             print(f"************** UNHANDLED EXCEPTION **************")
             print(f"\n\n{ex}\n\n")
             traceback.print_exc()
             return ExitCode.ERROR
 
     async def _wait_for_exit(self) -> None:
+        """
+        Wait for the exit event to be set.
+        """
         await self._die.wait()
 
     async def _handle_signal(self, signame: str) -> None:
+        """
+        Handle incoming OS signals by setting the exit event.
+
+        :param signame: The name of the signal received.
+        """
+        log.info(f"Received signal {signame}, setting exit event.")
         self._die.set()
 
     async def setup_signal_handlers(self):
+        """
+        Setup handlers for SIGINT, SIGTERM, and SIGHUP signals to trigger graceful shutdown.
+        """
         loop = asyncio.get_event_loop()
         for signame in {"SIGINT", "SIGTERM", "SIGHUP"}:
             loop.add_signal_handler(

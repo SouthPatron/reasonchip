@@ -7,6 +7,7 @@ import typing
 import argparse
 import re
 import json
+import logging
 
 from reasonchip.core import exceptions as rex
 from reasonchip.core.engine.context import Variables
@@ -15,23 +16,45 @@ from reasonchip.utils.local_runner import LocalRunner
 from .exit_code import ExitCode
 from .command import AsyncCommand
 
+log = logging.getLogger(__name__)
+
 
 class RunLocalCommand(AsyncCommand):
 
     @classmethod
     def command(cls) -> str:
+        """
+        Return the command name for this class.
+
+        :return: Command string
+        """
         return "run-local"
 
     @classmethod
     def help(cls) -> str:
+        """
+        Return brief help string for this command.
+
+        :return: Help description string
+        """
         return "Run a pipeline locally"
 
     @classmethod
     def description(cls) -> str:
+        """
+        Return extended description for this command.
+
+        :return: Description string
+        """
         return "Run a pipeline locally"
 
     @classmethod
     def build_parser(cls, parser: argparse.ArgumentParser):
+        """
+        Build the argument parser with command-specific options.
+
+        :param parser: ArgumentParser instance to configure
+        """
         parser.add_argument(
             "pipeline",
             metavar="<name>",
@@ -72,16 +95,22 @@ class RunLocalCommand(AsyncCommand):
         rem: typing.List[str],
     ) -> ExitCode:
         """
-        Main entry point for the application.
+        Main entry point for running the local pipeline command.
+
+        :param args: Parsed command line arguments
+        :param rem: Remaining arguments after parsing
+
+        :return: ExitCode indicating success or failure
         """
 
         if not args.collections:
             args.collections = ["."]
 
         try:
-            # Load variables
+            # Load variables from files and key-value overrides
             variables = Variables()
             for x in args.vars:
+                log.info(f"Loading variable file: {x}")
                 variables.load_file(x)
 
             for x in args.set:
@@ -90,21 +119,29 @@ class RunLocalCommand(AsyncCommand):
                     raise ValueError(f"Invalid key value pair: {x}")
 
                 key, value = m[1], m[2]
+                log.info(f"Setting variable {key}={value}")
                 variables.set(key, value)
 
-            # Create the local runner
+            # Create the local runner with the specified collections and variables
+            log.info(
+                f"Creating LocalRunner with collections: {args.collections}"
+            )
             runner = LocalRunner(
                 collections=args.collections,
                 default_variables=variables.vdict,
             )
 
-            # Run the engine
+            # Run the specified pipeline
+            log.info(f"Running pipeline: {args.pipeline}")
             rc = await runner.run(args.pipeline)
 
             if rc:
-                print(json.dumps(rc))
+                output = json.dumps(rc)
+                print(output)
+                log.info(f"Pipeline returned: {output}")
 
-            # Shutdown the engine
+            # Shutdown the runner
+            log.info("Shutting down LocalRunner")
             runner.shutdown()
 
             return ExitCode.OK
@@ -112,10 +149,12 @@ class RunLocalCommand(AsyncCommand):
         except rex.ReasonChipException as ex:
             msg = rex.print_reasonchip_exception(ex)
             print(msg)
+            log.error(f"ReasonChip exception occurred: {msg}")
             return ExitCode.ERROR
 
         except Exception as ex:
             print(f"************** UNHANDLED EXCEPTION **************")
             print(f"\n\n{type(ex)}\n\n")
             print(ex)
+            log.error(f"Unhandled exception: {ex}", exc_info=True)
             return ExitCode.ERROR
