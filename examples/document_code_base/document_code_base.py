@@ -103,6 +103,8 @@ async def document_directory(
         },
     )
 
+    print(f"Received response: {rc}")
+
     status = rc["status"]
 
     if status == "ERROR":
