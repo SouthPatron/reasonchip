@@ -26,6 +26,20 @@
       will be read by other developers so it doesn't need to be flowery
       or explanatory.
 
+      Please keep an empty line between a header and the paragraph beneath.
+
+      Do not document the `__init__.py` if it does nothing apart from
+      exporting, declaring, or is empty.
+
+      Do not document on a per-file bases. Rather document on a per-concept
+      basis and preferably tersely, describing how the concepts fit together
+      and and how.
+
+      A brief conceptual paragraph, how they work together, etc, is the
+      preference.
+
+      Preferred line length is 80 characters.
+
       Now you will be provided with, if they exist:
         - The `README.md` files within the subdirectories for reference.
         - The source code files within this directory.

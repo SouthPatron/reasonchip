@@ -14,6 +14,22 @@
 
             These are your instructions:
 
+            HEADER
+            ------
+
+            Ensure that all files include this at the top of the file.
+
+            ```
+            # SPDX-License-Identifier: GPL-3.0-or-later
+            # Copyright (C) 2025 South Patron LLC
+            # This file is part of ReasonChip and licensed under the GPLv3+.
+            # See <https://www.gnu.org/licenses/> for details.
+            ```
+
+            Obviously, a shebang should come first. Keep a newline after
+            the above header.
+
+
             LOGGING
             -------
 
@@ -32,6 +48,9 @@
             ```
             log.info("Doing something")
             ```
+
+            Do not add a logger into the `__init__.py`. If one exists within
+            there and it's not being used, remove it.
 
 
             METHODS OR FUNCTIONS
@@ -94,7 +113,12 @@
             Just do what has been requested.
 
         - role: user
-          content: params.content
+          content: |
+            The filename is: `{{ params.filename }}`
+
+            [--------------- FILE CONTENT: START ---------- ]
+            {{ params.content }}
+            [--------------- FILE CONTENT: END ------------ ]
 
       response_format:
         type: "json_schema"

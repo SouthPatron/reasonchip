@@ -9,7 +9,6 @@ This directory contains the broker service of the ReasonChip system. The broker 
 | ------------------ | ----------------------------------------- |
 | [broker.py](./broker.py)       | Main Broker class managing transports and connections |
 | [switchboard.py](./switchboard.py) | Switchboard class handling routing logic between clients and workers |
-| [__init__.py](./__init__.py)   | Package initialization, exports Broker |
 
 ## Components
 

@@ -48,12 +48,12 @@ local_runner = LocalRunner(
 )
 
 
-async def document_file(content: str) -> typing.Optional[str]:
-    return None
+async def document_file(filename: str, content: str) -> typing.Optional[str]:
     rc = await local_runner.run(
         pipeline="document_file",
         variables={
             "params": {
+                "filename": filename,
                 "content": content,
             },
             "secrets": {
@@ -131,7 +131,7 @@ async def process_files(dir_path: Path, depth: int):
 
         content = f.read_text(encoding="utf-8")
 
-        new_content = await document_file(content)
+        new_content = await document_file(f.name, content)
         if new_content:
             f.write_text(new_content, encoding="utf-8")
             files[f] = new_content

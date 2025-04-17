@@ -84,6 +84,7 @@ class Switchboard:
                 for r in routes:
                     r.client_gone = True
 
+            # Log the status after eliminating client
             await self.print_status()
 
     async def eliminate_worker(self, connection_id: uuid.UUID):
@@ -128,7 +129,7 @@ class Switchboard:
             # Now we purge the available connections of the worker
             self._available = [c for c in self._available if c != connection_id]
 
-            # Tell the world
+            # Log the status after eliminating worker
             await self.print_status()
 
     # --------------------- PAYLOAD HANDLING ----------------------------------
@@ -344,7 +345,7 @@ class Switchboard:
             for _ in range(pkt.capacity):
                 self._available.append(payload.connection_id)
 
-            # Tell the world
+            # Log status after registering new worker capacity
             await self.print_status()
 
     async def _wk_result(self, payload: ClientPayload):

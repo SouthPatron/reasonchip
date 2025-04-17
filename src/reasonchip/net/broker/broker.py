@@ -13,7 +13,6 @@ from ..transports import ServerTransport
 
 from .switchboard import Switchboard
 
-# Initialize logger
 log = logging.getLogger(__name__)
 
 
