@@ -1,145 +1,128 @@
 
-- name: 'Log incoming message'
-  chip: redis.redis_execute
-  params:
-    client_settings:
-      host: "{{ secrets.redis.host }}"
-      port: "{{ secrets.redis.port }}"
-      db: 0
-    method: 'lpush'
-    args:
-      - "user:{{ user_id }}:messages"
-      - "User: {{ message }}"
+- declare:
+    prompt: |
+      You are a senior developer who has been tasked with documenting and
+      adding a `README.md` to the code base.
 
-- name: 'Trim message log'
-  chip: redis.redis_execute
-  params:
-    client_settings:
-      host: "{{ secrets.redis.host }}"
-      port: "{{ secrets.redis.port }}"
-      db: 0
-    method: 'ltrim'
-    args:
-      - "user:{{ user_id }}:messages"
-      - 0
-      - 19
+      For the `README.md` structure, please use the following approach,
+      approximately. You can adjust as is necessary.
 
-- name: 'Get personality'
-  chip: redis.redis_execute
-  params:
-    client_settings:
-      host: "{{ secrets.redis.host }}"
-      port: "{{ secrets.redis.port }}"
-      db: 0
-    method: 'get'
-    args:
-      - "user:{{ user_id }}:personality"
-  store_result_as: personality
+      - (#) First title: A brief title relevant to the directory purpose
+      - (##) Overview: Literal "Overview" title with a brief overview
+        from a high-level of what purpose the directory and the subdirectories
+        serve.
+      - (##) Filesystem Overview: Literal "Filesystem Overview" and then
+        a table of the subdirectories and what their purposes are. For
+        example:
 
-- name: 'Get current stored mood'
-  chip: redis.redis_execute
-  params:
-    client_settings:
-      host: "{{ secrets.redis.host }}"
-      port: "{{ secrets.redis.port }}"
-      db: 0
-    method: 'get'
-    args:
-      - "user:{{ user_id }}:mood"
-  store_result_as: mood
+        | Location | Description |
+        | -------- | ----------- |
+        | [Cool name](./subdir1/) | The pluggable components |
 
-- name: 'Get memory'
-  chip: redis.redis_execute
-  params:
-    client_settings:
-      host: "{{ secrets.redis.host }}"
-      port: "{{ secrets.redis.port }}"
-      db: 0
-    method: 'get'
-    args:
-      - "user:{{ user_id }}:memory"
-  store_result_as: memory
+      - (##) ... free form from here on out. If there is something of
+        interest that you feel you need to document, then add it here.
 
-- name: 'Fetch all messages'
-  chip: redis.redis_execute
-  params:
-    client_settings:
-      host: "{{ secrets.redis.host }}"
-      port: "{{ secrets.redis.port }}"
-      db: 0
-    method: 'lrange'
-    args:
-      - "user:{{ user_id }}:messages"
-      - 0
-      - -1
-  store_result_as: message_log
+      Please keep your language short, technical, and explicit. The code
+      will be read by other developers so it doesn't need to be flowery
+      or explanatory.
 
-- name: 'Generate response'
-  chip: reasoning.openai.chat.chat_completion
+      Now you will be provided with, if they exist:
+        - The `README.md` files within the subdirectories for reference.
+        - The source code files within this directory.
+        - The existing `README.md` within this directory.
+
+      Respond in JSON.
+
+      If the existing `README.md` file:
+        - Is adequately compliant with these instructions;
+        - Appears to already meet the requirements;
+        - Only has trivial differences;
+      Then do not update the file and return an empty content response.
+
+- declare:
+    prompt: |
+      {{ prompt }}
+
+      This is the content of a file within the current directory:
+      [-------- START: {{ item[0] }} ---------]
+      {{ item[1] }}
+      [---------- END: {{ item[0] }} ---------]
+
+  loop: "{{ params.files.items() }}"
+
+
+- declare:
+    prompt: |
+      {{ prompt }}
+
+      This is the content of a `README.md` from a subdirectory:
+      [-------- START: {{ item[0] }} ---------]
+      {{ item[1] }}
+      [---------- END: {{ item[0] }} ---------]
+
+  loop: "{{ params.readmes.items() }}"
+
+- declare:
+    prompt: |
+      {{ prompt }}
+
+      This is the content of the original `README.md` from this directory:
+      [-------- START: README.md ---------]
+      {{ params.original_readme }}
+      [---------- END: README.md ---------]
+
+
+- chip: reasoning.openai.chat.chat_completion
   params:
     client_settings:
       api_key: "{{ secrets.openai.api_key }}"
       organization: "{{ secrets.openai.org_id }}"
     create_params:
-      model: "gpt-4o-mini"
+      model: "gpt-4.1-mini"
       messages:
-        - role: "system"
-          content: |
-            You are a chatbot.
+        - role: system
+          content: prompt
 
-            This is your current personality:
+      response_format:
+        type: "json_schema"
+        json_schema:
+          name: "myobj"
+          strict: true
+          schema:
+            type: "object"
+            properties:
+              changed:
+                type: "string"
+                description: "YES or NO depending on whether you performed changes"
+              contents:
+                type: "string"
+                description: "A blank string or the full content of the file with your changes"
+            additionalProperties: false
+            required:
+              - changed
+              - contents
+  store_result_as: response
 
-            {{ personality }}
+- when: "response.status != 'OK'"
+  terminate:
+    status: 'ERROR'
+    error_message: 'Response from OpenAI: {{ response }}'
 
-            This is your current mood:
-
-            {{ mood }}
-
-            Make sure you respond in a way that suits your personality and mood.
-
-            User context: {{ memory }}
-
-            Message log:
-
-            {{ '\n'.join([ x.decode('utf-8') for x in message_log.result]) }}
-
-        - role: "user"
-          content: "{{ message }}"
-  store_result_as: bot_response
-
-- name: 'Log bot response'
-  chip: redis.redis_execute
+- chip: utils.json.loads
   params:
-    client_settings:
-      host: "{{ secrets.redis.host }}"
-      port: "{{ secrets.redis.port }}"
-      db: 0
-    method: 'lpush'
-    args:
-      - "user:{{ user_id }}:messages"
-      - "Bot: {{ bot_response.completion.choices[0].message.content }}"
+    string: "{{ response.completion.choices[0].message.content }}"
+  store_result_as: rc
 
-- name: 'Trim message log again'
-  chip: redis.redis_execute
-  params:
-    client_settings:
-      host: "{{ secrets.redis.host }}"
-      port: "{{ secrets.redis.port }}"
-      db: 0
-    method: 'ltrim'
-    args:
-      - "user:{{ user_id }}:messages"
-      - 0
-      - 19
+- when: "rc.status != 'OK'"
+  terminate:
+    status: 'ERROR'
+    error_message: 'Unable to parse response: {{ response }}'
 
-- name: 'Output response'
-  chip: reasonchip.debug.log
-  params:
-    level: info
-    message: "{{ bot_response.completion.choices[0].message.content }}"
+- when: "rc.result['changed'] == 'NO'"
+  return:
+    status: 'UNCHANGED'
 
-- name: 'Send response via STDOUT'
-  chip: reasonchip.streams.print_stdout
-  params:
-    message: "{{ bot_response.completion.choices[0].message.content }}"
+- return:
+    status: 'CHANGED'
+    content: "{{ rc.result['contents'] }}"
 

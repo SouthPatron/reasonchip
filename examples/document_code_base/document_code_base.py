@@ -49,10 +49,13 @@ local_runner = LocalRunner(
 
 
 async def document_file(content: str) -> typing.Optional[str]:
+    return None
     rc = await local_runner.run(
         pipeline="document_file",
         variables={
-            "content": content,
+            "params": {
+                "content": content,
+            },
             "secrets": {
                 "openai": {
                     "api_key": OPENAI_API_KEY,
@@ -61,8 +64,20 @@ async def document_file(content: str) -> typing.Optional[str]:
             },
         },
     )
-    print(f"Received result: {rc}")
-    return rc
+
+    status = rc["status"]
+
+    if status == "ERROR":
+        error_message = rc["error_message"]
+        raise RuntimeError(error_message)
+
+    if status == "UNCHANGED":
+        return None
+
+    assert status == "CHANGED"
+
+    content = rc["content"]
+    return content
 
 
 async def document_directory(
@@ -71,7 +86,36 @@ async def document_directory(
     original_readme: typing.Optional[str] = None,
 ) -> typing.Optional[str]:
 
-    return original_readme
+    rc = await local_runner.run(
+        pipeline="document_path",
+        variables={
+            "params": {
+                "files": files,
+                "readmes": readmes,
+                "original_readme": original_readme or "",
+            },
+            "secrets": {
+                "openai": {
+                    "api_key": OPENAI_API_KEY,
+                    "org_id": OPENAI_ORG_ID,
+                }
+            },
+        },
+    )
+
+    status = rc["status"]
+
+    if status == "ERROR":
+        error_message = rc["error_message"]
+        raise RuntimeError(error_message)
+
+    if status == "UNCHANGED":
+        return None
+
+    assert status == "CHANGED"
+
+    content = rc["content"]
+    return content
 
 
 # --------- FILE PROCESSING --------------------------------------------------

@@ -5,7 +5,7 @@
       api_key: "{{ secrets.openai.api_key }}"
       organization: "{{ secrets.openai.org_id }}"
     create_params:
-      model: "gpt-4o"
+      model: "gpt-4.1-mini"
       messages:
         - role: system
           content: |
@@ -94,7 +94,7 @@
             Just do what has been requested.
 
         - role: user
-          content: "{{ content }}"
+          content: params.content
 
       response_format:
         type: "json_schema"
@@ -117,15 +117,25 @@
   store_result_as: response
 
 - when: "response.status != 'OK'"
-  terminate: True
+  terminate:
+    status: 'ERROR'
+    error_message: 'Response from OpenAI: {{ response }}'
 
 - chip: utils.json.loads
   params:
     string: "{{ response.completion.choices[0].message.content }}"
   store_result_as: rc
 
-- when: "rc.result['changed'] == 'NO'"
-  return: ""
+- when: "rc.status != 'OK'"
+  terminate:
+    status: 'ERROR'
+    error_message: 'Unable to parse response: {{ response }}'
 
-- return: "{{ rc.result['contents'] }}"
+- when: "rc.result['changed'] == 'NO'"
+  return:
+    status: 'UNCHANGED'
+
+- return:
+    status: 'CHANGED'
+    content: "{{ rc.result['contents'] }}"
 
