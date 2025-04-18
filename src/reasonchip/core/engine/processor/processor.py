@@ -16,7 +16,7 @@ from ... import exceptions as rex
 from ..context import Variables, FlowControl
 
 from ..registry import Registry
-from ..parsers.conditional import evaluate
+from ..parsers.evaluator import evaluator
 from ..pipelines import (
     TaskSet,
     ChipTask,
@@ -126,7 +126,7 @@ class Processor:
 
         # The rest of the tasks have a when condition.
         if task.when:
-            proceed = evaluate(task.when, variables)
+            proceed = evaluator(task.when, variables.vobj)
             if not proceed:
                 return (RunResult.SKIPPED, None)
 
