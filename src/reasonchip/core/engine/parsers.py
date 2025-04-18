@@ -5,7 +5,7 @@
 
 import munch
 
-from .. import exceptions as rex
+from reasonchip.core import exceptions as rex
 
 # ------------------------ LEXER -------------------------------------------
 
@@ -28,6 +28,7 @@ def evaluator(expr: str, variables: munch.Munch):
         "tuple": tuple,
         "dict": dict,
         "sorted": sorted,
+        "reversed": reversed,
         "enumerate": enumerate,
         "range": range,
         "all": all,

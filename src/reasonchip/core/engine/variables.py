@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2025 South Patron LLC
 # This file is part of ReasonChip and licensed under the GPLv3+.
@@ -17,7 +19,10 @@ from dotty_dict import dotty, Dotty
 
 from ruamel.yaml import YAML
 
-from .parsers import evaluator
+try:
+    from .parsers import evaluator
+except ImportError:
+    from parsers import evaluator
 
 
 VariableMapType = typing.Dict[str, typing.Any]
@@ -249,3 +254,88 @@ class Variables:
             remaining.insert(0, parts.pop())
 
         return (".".join(parts), ".".join(remaining))
+
+
+if __name__ == "__main__":
+
+    v = Variables()
+
+    v.set("result", {"a": 1, "b": {"name": "bob"}, "c": "{{ snoot }}"})
+
+    v.set("chicken", "{{ result.c }}")
+    v.set("chunks", "{{ chicken }}")
+    v.set("snoot", 99)
+
+    print(v.vmap)
+
+    assert v.has("result.b.surname") == False
+
+    v.update({"result": {"b": {"surname": "presley"}}})
+
+    print(v.vmap)
+
+    assert v.has("result.b") == True
+    assert v.has("result.b.name") == True
+    assert v.has("result.b.surname") == True
+    assert v.has("result.b.steve") == False
+
+    v.update({"result": {"b": 5}})
+
+    print(v.vmap)
+
+    assert v.has("result") == True
+    assert v.has("result.c.steve") == False
+    assert v.has("snoot") == True
+    assert v.has("chunks") == True
+    assert v.has("elvis") == False
+
+    assert v.interpolate("{{ chunks }}") == 99
+    assert v.interpolate("{{ result.b }}") == 5
+
+    try:
+        v.interpolate("{{ result.b.name }}")
+        assert False
+    except:
+        pass
+
+    try:
+        val = v.interpolate("{{ snoop }}")
+        assert False
+    except:
+        pass
+
+    class Test:
+        def __init__(self):
+            self.name: str = "elvis"
+            self.profile: dict = {"age": 42}
+
+    v.set("myclass.nesting.test", Test())
+
+    print(v.vmap)
+
+    assert v.has("myclass.nesting.test") == True
+    assert v.has("myclass.nesting.test.name") == False
+    assert v.has("myclass.nesting.test.profile.age") == False
+
+    assert v.deep_has("myclass.nesting.test.name")[0] == True
+    assert v.deep_has("myclass.nesting.test.profile.age")[0] == True
+    assert v.deep_has("myclass.nesting.test.profile.amber")[0] == False
+
+    v.set("this", "this")
+
+    crazy_string = """
+I am {{ myclass.nesting.test.name }} and I am {{ myclass.nesting.test.profile['age'] }}
+years old.
+You're looking for {{ snoot }}.
+The value of result.b is [{{ result.b }}].
+A class renders as: [{{ myclass.nesting.test }}]
+This = [{{ this }}]
+"""
+    string1 = v.interpolate(crazy_string)
+
+    print(string1)
+
+    str1 = "{{ snoot }} {{ snoot }} {{ f'\\{snoot\\}' + '\\{\\}' }}"
+    print(v.interpolate(str1))
+
+    print("Success.")
