@@ -5,7 +5,7 @@
 
 import munch
 
-from ... import exceptions as rex
+from .. import exceptions as rex
 
 # ------------------------ LEXER -------------------------------------------
 

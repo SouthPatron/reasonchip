@@ -14,7 +14,7 @@ import time
 from dataclasses import dataclass
 
 from reasonchip.core.engine.engine import Engine
-from reasonchip.core.engine.context import Variables
+from reasonchip.core.engine.variables import Variables
 
 from ..transports import ClientTransport
 

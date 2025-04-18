@@ -13,8 +13,9 @@ from .pipelines import (
     DispatchPipelineTask,
     ChipTask,
 )
-from .processor.processor import Processor
-from .context import Variables, FlowControl
+from .processor import Processor
+from .variables import Variables
+from .flow_control import FlowControl
 from .registry import Registry
 
 from .. import exceptions as rex

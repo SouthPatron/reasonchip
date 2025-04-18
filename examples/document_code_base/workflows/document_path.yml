@@ -52,11 +52,11 @@
 
 - declare:
     prompt: |
-      {{ prompt }}
+      {{{ prompt }}}
 
       This is the content of a file within the current directory:
       [-------- START: {{ item[0] }} ---------]
-      {{ item[1] }}
+      {{{ item[1] }}}
       [---------- END: {{ item[0] }} ---------]
 
   loop: "{{ params.files.items() }}"
@@ -64,22 +64,22 @@
 
 - declare:
     prompt: |
-      {{ prompt }}
+      {{{ prompt }}}
 
       This is the content of a `README.md` from a subdirectory:
       [-------- START: {{ item[0] }} ---------]
-      {{ item[1] }}
+      {{{ item[1] }}}
       [---------- END: {{ item[0] }} ---------]
 
   loop: "{{ params.readmes.items() }}"
 
 - declare:
     prompt: |
-      {{ prompt }}
+      {{{ prompt }}}
 
       This is the content of the original `README.md` from this directory:
       [-------- START: README.md ---------]
-      {{ params.original_readme }}
+      {{{ params.original_readme }}}
       [---------- END: README.md ---------]
 
 

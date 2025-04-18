@@ -9,7 +9,7 @@ import re
 import json
 
 from reasonchip.core import exceptions as rex
-from reasonchip.core.engine.context import Variables
+from reasonchip.core.engine.variables import Variables
 from reasonchip.utils.local_runner import LocalRunner
 
 from .exit_code import ExitCode
@@ -61,7 +61,7 @@ class RunLocalCommand(AsyncCommand):
             default=[],
             metavar="<variable file>",
             type=str,
-            help="Variable file to load into context",
+            help="Variable file to load",
         )
 
         cls.add_default_options(parser)

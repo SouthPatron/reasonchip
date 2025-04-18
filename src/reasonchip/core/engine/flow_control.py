@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import typing
 
-from ..pipelines import Task
+from .pipelines import Task
 
 
 FlowType = typing.List[Task]

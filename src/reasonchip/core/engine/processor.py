@@ -11,13 +11,14 @@ from collections.abc import Iterable, Sized
 
 from pydantic import ValidationError
 
-from ... import exceptions as rex
+from .. import exceptions as rex
 
-from ..context import Variables, FlowControl
+from .variables import Variables
+from .flow_control import FlowControl
 
-from ..registry import Registry
-from ..parsers.evaluator import evaluator
-from ..pipelines import (
+from .registry import Registry
+from .parsers import evaluator
+from .pipelines import (
     TaskSet,
     ChipTask,
     DispatchPipelineTask,

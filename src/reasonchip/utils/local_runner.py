@@ -7,7 +7,7 @@
 import typing
 
 from ..core.engine.engine import Engine
-from ..core.engine.context import Variables
+from ..core.engine.variables import Variables
 
 
 class LocalRunner:

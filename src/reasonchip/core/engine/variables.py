@@ -17,7 +17,7 @@ from dotty_dict import dotty, Dotty
 
 from ruamel.yaml import YAML
 
-from ..parsers.evaluator import evaluator
+from .parsers import evaluator
 
 
 VariableMapType = typing.Dict[str, typing.Any]
