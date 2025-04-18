@@ -33,7 +33,17 @@
 
       Do not document on a per-file bases. Rather document on a per-concept
       basis and preferably tersely, describing how the concepts fit together
-      and their responsibilities.
+      and their responsibilities. Use a short story approach, but obviously
+      without lyrical language. For example:
+
+        "A ClassA is the core component of this structure. Several ClassBs
+        are instantiated and provided to ClassA for management of the
+        things. The management consists of something, something. Once
+        added, there is no way to unadd a ClassB. It will be cleaned up
+        by ClassA."
+
+      Remove documentation which appears to be stale or no longer relevant
+      to the directory.
 
       Preferred line length is 80 characters.
 
