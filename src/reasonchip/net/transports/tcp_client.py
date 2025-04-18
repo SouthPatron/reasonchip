@@ -12,8 +12,6 @@ from ..protocol import receive_packet, send_packet, SocketPacket
 
 from .client_transport import ClientTransport, ReadCallbackType
 
-log = logging.getLogger(__name__)
-
 
 class TcpClient(ClientTransport):
     """
@@ -41,21 +39,6 @@ class TcpClient(ClientTransport):
         Constructor.
 
         Maps directly to `asyncio.open_connection`.
-
-        :param host: The host name or IP to connect to.
-        :param port: The port number to connect to.
-        :param limit: Stream reader buffer limit.
-        :param ssl: SSL context or None.
-        :param family: Socket family.
-        :param proto: Socket protocol.
-        :param flags: Socket flags.
-        :param sock: Custom socket.
-        :param local_addr: Local address to bind.
-        :param server_hostname: Hostname for SSL handshake.
-        :param ssl_handshake_timeout: Timeout for SSL handshake.
-        :param ssl_shutdown_timeout: Timeout for SSL shutdown.
-        :param happy_eyeballs_delay: Delay for Happy Eyeballs algorithm.
-        :param interleave: Interleave setting.
         """
         super().__init__()
 
@@ -88,14 +71,6 @@ class TcpClient(ClientTransport):
         callback: ReadCallbackType,
         cookie: typing.Optional[uuid.UUID] = None,
     ) -> bool:
-        """
-        Connect to the TCP server.
-
-        :param callback: The callback to invoke on received data.
-        :param cookie: Optional cookie identifier for this connection.
-
-        :return: True if connection succeeds, False otherwise.
-        """
 
         assert self._cookie is None
         assert self._callback is None
@@ -109,10 +84,6 @@ class TcpClient(ClientTransport):
             self._cookie = cookie or uuid.uuid4()
 
             self._callback = callback
-
-            log.info(
-                f"Connecting to {self._host}:{self._port} with cookie {self._cookie}"
-            )
 
             self._reader, self._writer = await asyncio.open_connection(
                 host=self._host,
@@ -132,7 +103,6 @@ class TcpClient(ClientTransport):
             )
 
             self._handler = asyncio.create_task(self._loop())
-            log.info(f"Connection established with cookie {self._cookie}")
             return True
 
         except Exception:
@@ -142,28 +112,20 @@ class TcpClient(ClientTransport):
             self._writer = None
             self._handler = None
 
-            log.exception("Connect failed")
+            logging.exception("Connect failed")
             return False
 
     async def disconnect(self):
-        """
-        Disconnect the current TCP connection.
-        """
         if not self._handler:
-            log.info("Disconnect called but no active handler.")
             return
 
         assert self._cookie
         assert self._callback
 
-        log.info(f"Disconnecting connection with cookie {self._cookie}")
-
         self._handler.cancel()
 
-        # Wait for handler task to finish
         await asyncio.wait([self._handler])
 
-        # Notify callback with None if not already done
         if self._sent_none is False:
             await self._callback(self._cookie, None)
 
@@ -173,42 +135,21 @@ class TcpClient(ClientTransport):
         self._writer = None
         self._handler = None
 
-        log.info("Disconnected successfully")
-
     async def send_packet(self, packet: SocketPacket) -> bool:
-        """
-        Send a packet over the TCP connection.
-
-        :param packet: The packet to send.
-
-        :return: True if sent successfully, False otherwise.
-        """
         assert self._writer
-        log.debug(f"Sending packet: {packet}")
         return await send_packet(self._writer, packet)
 
     async def _loop(self):
-        """
-        Internal receive loop that listens for incoming packets
-        and dispatches them to the callback.
-        """
         assert self._reader
         assert self._callback
         assert self._cookie
-
-        log.info(f"Started receive loop with cookie {self._cookie}")
 
         while True:
             pkt = await receive_packet(self._reader)
             assert pkt is None or isinstance(pkt, SocketPacket)
 
-            log.debug(f"Received packet: {pkt}")
-
             await self._callback(self._cookie, pkt)
 
             if pkt is None:
                 self._sent_none = True
-                log.info(
-                    f"Received None packet, terminating receive loop for cookie {self._cookie}"
-                )
                 break

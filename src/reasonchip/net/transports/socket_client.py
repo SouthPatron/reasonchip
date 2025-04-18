@@ -12,8 +12,6 @@ from ..protocol import receive_packet, send_packet, SocketPacket
 
 from .client_transport import ClientTransport, ReadCallbackType
 
-log = logging.getLogger(__name__)
-
 
 class SocketClient(ClientTransport):
     """
@@ -36,14 +34,6 @@ class SocketClient(ClientTransport):
         No typing here just to send through as received.
 
         Maps directly to `asyncio.open_unix_connection`.
-
-        :param path: The path to the UNIX socket.
-        :param limit: Buffer limit for the connection.
-        :param sock: Optional pre-existing socket.
-        :param ssl: SSL context if using SSL.
-        :param server_hostname: Hostname for SSL server.
-        :param ssl_handshake_timeout: Timeout for SSL handshake.
-        :param ssl_shutdown_timeout: Timeout for SSL shutdown.
         """
         super().__init__()
 
@@ -69,14 +59,6 @@ class SocketClient(ClientTransport):
         callback: ReadCallbackType,
         cookie: typing.Optional[uuid.UUID] = None,
     ) -> bool:
-        """
-        Connects to the UNIX socket and prepares for reading and writing.
-
-        :param callback: The callback function to handle received packets.
-        :param cookie: Optional UUID for the connection session.
-
-        :return: True if connection is successful, False otherwise.
-        """
 
         assert self._cookie is None
         assert self._callback is None
@@ -102,11 +84,6 @@ class SocketClient(ClientTransport):
             )
 
             self._handler = asyncio.create_task(self._loop())
-
-            log.info(
-                f"Connected to UNIX socket at {self._path} with cookie {self._cookie}"
-            )
-
             return True
 
         except Exception:
@@ -116,71 +93,44 @@ class SocketClient(ClientTransport):
             self._writer = None
             self._handler = None
 
-            log.exception("Connect failed")
+            logging.exception("Connect failed")
             return False
 
     async def disconnect(self):
-        """
-        Disconnects from the socket and cleans up resources.
-        """
         if not self._handler:
             return
 
         assert self._cookie
         assert self._callback
 
-        # Cancel the handler task
         self._handler.cancel()
 
-        # Wait for the handler to finish
         await asyncio.wait([self._handler])
 
-        # If no None packet sent yet, send callback with None
         if self._sent_none is False:
             await self._callback(self._cookie, None)
 
-        # Clear all state
         self._cookie = None
         self._callback = None
         self._reader = None
         self._writer = None
         self._handler = None
 
-        log.info(f"Disconnected from UNIX socket at {self._path}")
-
     async def send_packet(self, packet: SocketPacket) -> bool:
-        """
-        Sends a packet to the socket.
-
-        :param packet: The packet to send.
-
-        :return: True if sending was successful, False otherwise.
-        """
         assert self._writer
-        result = await send_packet(self._writer, packet)
-        log.info(f"Sent packet {packet} to UNIX socket at {self._path}")
-        return result
+        return await send_packet(self._writer, packet)
 
     async def _loop(self):
-        """
-        Loop that continuously receives packets from the socket and calls the callback.
-        """
         assert self._reader
         assert self._callback
         assert self._cookie
 
-        # Continuously receive packets and invoke the callback
         while True:
             pkt = await receive_packet(self._reader)
-
-            # Ensure packet is None or of type SocketPacket
             assert pkt is None or isinstance(pkt, SocketPacket)
 
             await self._callback(self._cookie, pkt)
 
             if pkt is None:
                 self._sent_none = True
-                log.info(
-                    f"Received termination packet on UNIX socket at {self._path}"
-                )
                 break

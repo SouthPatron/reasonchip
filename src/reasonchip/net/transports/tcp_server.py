@@ -7,7 +7,6 @@ import asyncio
 import typing
 import uuid
 import socket
-import logging
 
 from dataclasses import dataclass, field
 
@@ -19,8 +18,6 @@ from .server_transport import (
     ReadCallbackType,
     ClosedConnectionCallbackType,
 )
-
-log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -85,15 +82,7 @@ class TcpServer(ServerTransport):
         read_callback: ReadCallbackType,
         closed_connection_callback: ClosedConnectionCallbackType,
     ) -> bool:
-        """
-        Start the TCP server and register the necessary callbacks.
 
-        :param new_connection_callback: Callback for new connections.
-        :param read_callback: Callback for when data is read.
-        :param closed_connection_callback: Callback for closed connections.
-
-        :return: True if server started successfully
-        """
         self._new_connection_callback = new_connection_callback
         self._read_callback = read_callback
         self._closed_connection_callback = closed_connection_callback
@@ -114,20 +103,13 @@ class TcpServer(ServerTransport):
             ssl_shutdown_timeout=self._ssl_shutdown_timeout,
         )
 
-        log.info(f"TCP server started on hosts={self._hosts} port={self._port}")
         return True
 
     async def stop_server(self) -> bool:
-        """
-        Stop the TCP server by signaling all connections to close.
-
-        :return: True when stop process initiated
-        """
         async with self._lock:
             for conn in self._connections.values():
                 conn.death_signal.set()
 
-        log.info("TCP server stop signal sent to all connections.")
         return True
 
     async def send_packet(
@@ -135,51 +117,27 @@ class TcpServer(ServerTransport):
         connection_id: uuid.UUID,
         packet: SocketPacket,
     ) -> bool:
-        """
-        Send a packet to a specific client connection.
 
-        :param connection_id: UUID of the connection to send the packet to.
-        :param packet: The packet to send.
-
-        :return: True if packet successfully queued, False otherwise
-        """
         async with self._lock:
             conn = self._connections.get(connection_id, None)
             if conn is None:
-                log.warning(
-                    f"send_packet: No connection found for ID {connection_id}"
-                )
                 return False
 
             # Put the packet in the outgoing queue
             await conn.outgoing_queue.put(packet)
-            log.debug(f"Packet queued for connection {connection_id}")
             return True
 
     async def close_connection(
         self,
         connection_id: uuid.UUID,
     ) -> bool:
-        """
-        Close a specific client connection.
-
-        :param connection_id: UUID of the connection to close.
-
-        :return: True if connection found and death signal set, False otherwise
-        """
         async with self._lock:
             conn = self._connections.get(connection_id, None)
             if conn is None:
-                log.warning(
-                    f"close_connection: No connection found for ID {connection_id}"
-                )
                 return False
 
             # Set the death signal
             conn.death_signal.set()
-            log.info(
-                f"close_connection: Death signal set for connection {connection_id}"
-            )
             return True
 
     # ------------------------------------------------------------------------
@@ -189,12 +147,6 @@ class TcpServer(ServerTransport):
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
     ) -> None:
-        """
-        Handle a new incoming client connection.
-
-        :param reader: Asyncio StreamReader for the client.
-        :param writer: Asyncio StreamWriter for the client.
-        """
         assert self._new_connection_callback is not None
         assert self._closed_connection_callback is not None
 
@@ -206,7 +158,6 @@ class TcpServer(ServerTransport):
         # Register the connection
         async with self._lock:
             self._connections[conn.connection_id] = conn
-            log.info(f"New connection registered: {conn.connection_id}")
             await self._new_connection_callback(self, conn.connection_id)
 
         # handle all incoming...
@@ -215,7 +166,6 @@ class TcpServer(ServerTransport):
         # Remove the connection from the list of connections
         async with self._lock:
             self._connections.pop(conn.connection_id, None)
-            log.info(f"Connection closed and removed: {conn.connection_id}")
             await self._closed_connection_callback(conn.connection_id)
 
         # Close the writer cleanly
@@ -223,11 +173,6 @@ class TcpServer(ServerTransport):
         await writer.wait_closed()
 
     async def _client_loop(self, conn: ClientConnection) -> None:
-        """
-        Main loop to handle reading, writing and termination signal for a client connection.
-
-        :param conn: The client connection to process.
-        """
         assert self._read_callback is not None
 
         t_die = asyncio.create_task(conn.death_signal.wait())
@@ -256,9 +201,6 @@ class TcpServer(ServerTransport):
                             t_write.cancel()
                         if t_die:
                             conn.death_signal.set()
-                        log.info(
-                            f"Connection {conn.connection_id} closed by client."
-                        )
 
                     else:
                         await self._read_callback(conn.connection_id, packet)
@@ -293,9 +235,6 @@ class TcpServer(ServerTransport):
                 assert t_die and t_die.done()
                 wl.remove(t_die)
                 conn.death_signal.set()
-                log.info(
-                    f"Death signal triggered for connection {conn.connection_id}"
-                )
 
                 if t_read:
                     t_read.cancel()

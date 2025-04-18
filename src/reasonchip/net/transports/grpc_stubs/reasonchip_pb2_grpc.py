@@ -7,9 +7,6 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 import warnings
-import logging
-
-log = logging.getLogger(__name__)
 
 from . import reasonchip_pb2 as reasonchip__pb2
 
@@ -27,13 +24,6 @@ except ImportError:
     _version_not_supported = True
 
 if _version_not_supported:
-    log.error(
-        f"The grpc package installed is at version {GRPC_VERSION},"
-        + f" but the generated code in reasonchip_pb2_grpc.py depends on"
-        + f" grpcio>={GRPC_GENERATED_VERSION}."
-        + f" Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}"
-        + f" or downgrade your generated code using grpcio-tools<={GRPC_VERSION}."
-    )
     raise RuntimeError(
         f"The grpc package installed is at version {GRPC_VERSION},"
         + f" but the generated code in reasonchip_pb2_grpc.py depends on"
@@ -47,12 +37,11 @@ class ReasonChipServiceStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
-        """
-        Constructor.
+        """Constructor.
 
-        :param channel: A grpc.Channel.
+        Args:
+            channel: A grpc.Channel.
         """
-        log.debug("Initializing ReasonChipServiceStub with channel %s", channel)
         self.EstablishConnection = channel.stream_stream(
             "/reasonchip.ReasonChipService/EstablishConnection",
             request_serializer=reasonchip__pb2.ReasonChipPacket.SerializeToString,
@@ -65,28 +54,13 @@ class ReasonChipServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def EstablishConnection(self, request_iterator, context):
-        """
-        Bidirectional streaming RPC
-
-        :param request_iterator: An iterator over request messages.
-        :param context: RPC context.
-
-        :raises NotImplementedError: Always raised to indicate method is not implemented.
-        """
-        log.warning("EstablishConnection method not implemented called.")
+        """Bidirectional streaming RPC"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
 
 def add_ReasonChipServiceServicer_to_server(servicer, server):
-    """
-    Adds the servicer to the grpc server.
-
-    :param servicer: The servicer instance to add.
-    :param server: The grpc server instance.
-    """
-    log.debug("Adding ReasonChipServiceServicer to server %s", server)
     rpc_method_handlers = {
         "EstablishConnection": grpc.stream_stream_rpc_method_handler(
             servicer.EstablishConnection,
@@ -120,26 +94,6 @@ class ReasonChipService(object):
         timeout=None,
         metadata=None,
     ):
-        """
-        Experimental API method to establish a bidirectional stream connection.
-
-        :param request_iterator: An iterator over request messages.
-        :param target: The server address.
-        :param options: Channel options.
-        :param channel_credentials: Credentials for channel.
-        :param call_credentials: Credentials for calls.
-        :param insecure: Use insecure channel if True.
-        :param compression: Compression algorithm.
-        :param wait_for_ready: Wait for ready flag.
-        :param timeout: Timeout for the RPC call.
-        :param metadata: Metadata associated with the call.
-
-        :return: A grpc stream-stream call object.
-        """
-        log.debug(
-            "Calling experimental EstablishConnection method to target %s",
-            target,
-        )
         return grpc.experimental.stream_stream(
             request_iterator,
             target,

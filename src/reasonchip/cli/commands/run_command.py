@@ -7,7 +7,6 @@ import typing
 import argparse
 import re
 import json
-import logging
 
 from reasonchip.core.engine.context import Variables
 
@@ -18,36 +17,19 @@ from reasonchip.net.transports import client_to_broker, SSLClientOptions
 from .exit_code import ExitCode
 from .command import AsyncCommand
 
-log = logging.getLogger(__name__)
-
 
 class RunCommand(AsyncCommand):
 
     @classmethod
     def command(cls) -> str:
-        """
-        Return the command string.
-
-        :return: The run command string
-        """
         return "run"
 
     @classmethod
     def help(cls) -> str:
-        """
-        Return a brief help string describing the command.
-
-        :return: Help string
-        """
         return "Run a pipeline"
 
     @classmethod
     def description(cls) -> str:
-        """
-        Return a detailed description of the command.
-
-        :return: Description string
-        """
         return """
 This command connects to a remote ReasonChip broker and runs a single
 pipeline. You may specify variables on the command line.
@@ -55,11 +37,6 @@ pipeline. You may specify variables on the command line.
 
     @classmethod
     def build_parser(cls, parser: argparse.ArgumentParser):
-        """
-        Build the command line argument parser for this command.
-
-        :param parser: The argparse parser object
-        """
         parser.add_argument(
             "pipeline",
             metavar="<name>",
@@ -100,57 +77,42 @@ pipeline. You may specify variables on the command line.
     ) -> ExitCode:
         """
         Main entry point for the application.
-
-        Connects to the broker and runs the specified pipeline with provided variables.
-
-        :param args: Parsed command line arguments
-        :param rem: Remaining arguments (unused)
-
-        :return: ExitCode.OK on success
         """
         # Populate the default variables to be sent through
         variables = Variables()
 
-        # Load variables from files provided
+        # Load variables
         for x in args.vars:
-            log.info(f"Loading variable file: {x}")
             variables.load_file(x)
 
-        # Parse and set key=value overrides
         for x in args.set:
             m = re.match(r"^(.*?)=(.*)$", x)
             if not m:
-                log.error(f"Invalid key value pair: {x}")
                 raise ValueError(f"Invalid key value pair: {x}")
 
             key, value = m[1], m[2]
-            log.info(f"Setting variable: {key}={value}")
             variables.set(key, value)
 
-        # Create the SSL options and SSL context for the client if given
+        # Create the connection
         ssl_options = SSLClientOptions.from_args(args)
         ssl_context = ssl_options.create_ssl_context() if ssl_options else None
 
-        # Establish the transport connection to the broker
         transport = client_to_broker(
             args.broker,
             ssl_client_options=ssl_options,
             ssl_context=ssl_context,
         )
 
-        # Create the Multiplexor to manage multiplexed connections
+        # Create the Multiplexor
         multiplexor = Multiplexor(transport)
 
         rc = await multiplexor.start()
         if rc is False:
-            log.error("Could not connect to broker")
             raise ConnectionError("Could not connect to broker")
-        log.info("Connected to broker successfully")
 
         # Get the API helper class
         api = Api(multiplexor)
 
-        log.info(f"Running pipeline: {args.pipeline}")
         resp = await api.run_pipeline(
             pipeline=args.pipeline,
             variables=variables.vdict,
@@ -158,11 +120,7 @@ pipeline. You may specify variables on the command line.
 
         if resp:
             print(json.dumps(resp))
-            log.info("Pipeline run completed with response")
-        else:
-            log.info("Pipeline run completed with no response")
 
         await multiplexor.stop()
-        log.info("Disconnected from broker")
 
         return ExitCode.OK

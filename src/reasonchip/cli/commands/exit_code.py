@@ -4,18 +4,9 @@
 # See <https://www.gnu.org/licenses/> for details.
 
 import enum
-import logging
-
-log = logging.getLogger(__name__)
 
 
 class ExitCode(enum.IntEnum):
-    """
-    Enumeration of exit codes used by the application.
-
-    Each member represents a specific type of termination status.
-    """
-
     OK = 0
     COMMAND_LINE_ERROR = 1
     CONFIGURATION_PROBLEM = 2

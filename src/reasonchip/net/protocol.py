@@ -12,8 +12,6 @@ import logging
 
 from pydantic import BaseModel
 
-log = logging.getLogger(__name__)
-
 
 DEFAULT_LISTENERS = [
     "socket:///tmp/reasonchip-broker-worker.sock",
@@ -107,28 +105,25 @@ async def receive_packet(
     :return: The packet received, or None if an error occurred.
     """
     try:
-        log.debug("Waiting to receive packet from stream")
+        logging.debug("Waiting to receive packet from stream")
 
-        # Read the 4-byte length prefix
         length_bytes = await reader.readexactly(4)
         length = struct.unpack("!I", length_bytes)[0]
 
-        log.debug(f"Been told to expect {length} octets")
+        logging.debug(f"Been told to expect {length} octets")
 
-        # Read the exact number of bytes for the packet
         msg_bytes = await reader.readexactly(length)
         msg_str = struct.unpack(f"!{length}s", msg_bytes)[0]
 
-        log.debug(f"Read {length} octets")
+        logging.debug(f"Read {length} octets")
 
-        # Parse the JSON packet into a SocketPacket instance
         req = SocketPacket.model_validate_json(msg_str.decode("utf-8"))
 
-        log.debug("Packet received and parsed from stream")
+        logging.debug("Packet received and parsed from stream")
 
         return req
     except:
-        log.debug("Failed to read packet from stream", exc_info=True)
+        logging.debug("Failed to read packet from stream", exc_info=True)
         return None
 
 
@@ -148,24 +143,21 @@ async def send_packet(
     :return: True if the packet was sent successfully, False otherwise.
     """
     try:
-        log.debug("Sending packet to stream")
+        logging.debug("Sending packet to stream")
 
-        # Convert packet to JSON bytes
         msg_str = request.model_dump_json().encode("utf-8")
         length = len(msg_str)
 
-        # Pack the JSON bytes and its length prefix
         msg_bytes = struct.pack(f"!{length}s", msg_str)
         length_bytes = struct.pack("!I", length)
 
-        log.debug(f"Sending {length} octects")
+        logging.debug(f"Sending {length} octects")
 
-        # Write the length prefix and packet data
         writer.write(length_bytes + msg_bytes)
         await writer.drain()
 
-        log.debug("Packet written to stream")
+        logging.debug("Packet written to stream")
         return True
     except:
-        log.debug("Failed to write packet to stream", exc_info=True)
+        logging.debug("Failed to write packet to stream", exc_info=True)
         return False

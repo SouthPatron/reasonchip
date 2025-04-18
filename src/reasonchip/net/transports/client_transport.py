@@ -5,13 +5,10 @@
 
 import typing
 import uuid
-import logging
 
 from abc import ABC, abstractmethod
 
 from ..protocol import SocketPacket
-
-log = logging.getLogger(__name__)
 
 ReadCallbackType = typing.Callable[
     [uuid.UUID, typing.Optional[SocketPacket]], typing.Awaitable[None]
@@ -25,28 +22,10 @@ class ClientTransport(ABC):
         self,
         callback: ReadCallbackType,
         cookie: typing.Optional[uuid.UUID] = None,
-    ) -> bool:
-        """
-        Connect to the client transport and set the read callback.
-
-        :param callback: The callback to invoke on read events.
-        :param cookie: Optional UUID for tracking the connection.
-
-        :return: True if connection succeeds, False otherwise.
-        """
+    ) -> bool: ...
 
     @abstractmethod
-    async def disconnect(self):
-        """
-        Disconnect the client transport.
-        """
+    async def disconnect(self): ...
 
     @abstractmethod
-    async def send_packet(self, packet: SocketPacket) -> bool:
-        """
-        Send a packet through the client transport.
-
-        :param packet: The SocketPacket to send.
-
-        :return: True if send succeeds, False otherwise.
-        """
+    async def send_packet(self, packet: SocketPacket) -> bool: ...

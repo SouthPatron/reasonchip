@@ -14,8 +14,6 @@ import httpx
 from ..protocol import SocketPacket
 from .client_transport import ClientTransport, ReadCallbackType
 
-log = logging.getLogger(__name__)
-
 
 class HttpClient(ClientTransport):
 
@@ -25,13 +23,6 @@ class HttpClient(ClientTransport):
         num_workers: int = 4,
         ssl_context: typing.Optional[ssl.SSLContext] = None,
     ):
-        """
-        Initialize the HTTP client with target, number of workers, and optional SSL context.
-
-        :param target: The target host address.
-        :param num_workers: Number of concurrent worker tasks.
-        :param ssl_context: Optional SSL context for HTTPS connections.
-        """
         super().__init__()
 
         # Params and information
@@ -58,14 +49,6 @@ class HttpClient(ClientTransport):
         callback: ReadCallbackType,
         cookie: typing.Optional[uuid.UUID] = None,
     ) -> bool:
-        """
-        Establish connection by setting callback, initializing cookie, and starting worker tasks.
-
-        :param callback: Function to call when a packet is read.
-        :param cookie: Optional UUID token; if None, a new UUID will be generated.
-
-        :return: True if connection process initiated successfully.
-        """
         assert not self._worker_tasks
 
         # Set some params
@@ -79,16 +62,9 @@ class HttpClient(ClientTransport):
             for i in range(self._num_workers)
         ]
 
-        log.info(
-            f"Connected with cookie: {self._cookie} and {self._num_workers} workers."
-        )
-
         return True
 
     async def disconnect(self):
-        """
-        Disconnect by stopping workers, closing HTTP client and clearing callback and cookie.
-        """
         if not self._worker_tasks:
             return
 
@@ -119,29 +95,14 @@ class HttpClient(ClientTransport):
         self._callback = None
         self._cookie = None
 
-        log.info("Disconnected and cleaned up resources.")
-
     async def send_packet(self, packet: SocketPacket) -> bool:
-        """
-        Enqueue a packet to be sent by the worker tasks.
-
-        :param packet: The SocketPacket to send.
-
-        :return: True if packet was successfully enqueued else False.
-        """
         if not self._worker_tasks:
             return False
 
         await self._queue.put(packet)
-        log.debug(f"Packet enqueued: {packet}")
         return True
 
     async def _worker(self, worker_id: int):
-        """
-        Worker task to process packets from the queue, send them via HTTP POST, and handle responses.
-
-        :param worker_id: Worker identifier.
-        """
         assert self._callback
         assert self._cookie
 
@@ -163,7 +124,7 @@ class HttpClient(ClientTransport):
                     )
 
                     if response.status_code != 200:
-                        log.error(
+                        logging.error(
                             f"[Worker {worker_id}] HTTP error: {response.status_code}"
                         )
                         continue
@@ -176,17 +137,17 @@ class HttpClient(ClientTransport):
                             pkt = SocketPacket.model_validate_json(line)
                             await self._callback(self._cookie, pkt)
                         except Exception:
-                            log.exception(
+                            logging.exception(
                                 f"[Worker {worker_id}] Failed to parse line: {line}"
                             )
 
                 except Exception:
-                    log.exception(
+                    logging.exception(
                         f"[Worker {worker_id}] failed to process packet"
                     )
 
         except asyncio.CancelledError:
-            log.info(f"[Worker {worker_id}] cancelled")
+            logging.info(f"[Worker {worker_id}] cancelled")
 
         except Exception:
-            log.exception(f"[Worker {worker_id}] unexpected error")
+            logging.exception(f"[Worker {worker_id}] unexpected error")

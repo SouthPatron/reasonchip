@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import os
 import typing
-import logging
 
 from pydantic import (
     BaseModel,
@@ -17,68 +16,52 @@ from pydantic import (
     field_validator,
 )
 
+import typing
+
 from ruamel.yaml import YAML
 from ruamel.yaml.parser import ParserError
 
+
 from .. import exceptions as rex
 
-log = logging.getLogger(__name__)
 
 # -------------------------- PARSING ----------------------------------------
 
 
 def parse_task(t: typing.Union[Task, typing.Dict], task_no: int) -> Task:
-    """
-    Parse the task definition into a specific task model.
-
-    :param t: Task or dictionary representing the task.
-    :param task_no: The index number of the task in a list.
-
-    :return: Parsed Task object.
-    """
     # Already parsed?
     if isinstance(t, Task):
-        log.debug(f"Task {task_no} already parsed.")
         return t
 
     try:
         if "tasks" in t:
-            log.debug(f"Parsing TaskSet at task {task_no}.")
             return TaskSet.model_validate(t)
 
         if "dispatch" in t:
-            log.debug(f"Parsing DispatchPipelineTask at task {task_no}.")
             return DispatchPipelineTask.model_validate(t)
 
         if "return" in t:
-            log.debug(f"Parsing ReturnTask at task {task_no}.")
             return ReturnTask.model_validate(t)
 
         if "declare" in t:
-            log.debug(f"Parsing DeclareTask at task {task_no}.")
             return DeclareTask.model_validate(t)
 
         if "comment" in t:
-            log.debug(f"Parsing CommentTask at task {task_no}.")
             return CommentTask.model_validate(t)
 
         if "terminate" in t:
-            log.debug(f"Parsing TerminateTask at task {task_no}.")
             return TerminateTask.model_validate(t)
 
         if "chip" in t:
-            log.debug(f"Parsing ChipTask at task {task_no}.")
             return ChipTask.model_validate(t)
 
     except ValidationError as ve:
-        log.error(f"Validation error parsing task {task_no}: {ve}")
         raise rex.TaskParseException(
             message="Task failed to parse",
             task_no=task_no,
             errors=ve.errors(),
         )
 
-    log.error(f"Unknown task type at task {task_no}.")
     raise rex.TaskParseException(
         message="Unknown task type",
         task_no=task_no,
@@ -110,13 +93,6 @@ class TaskSet(BaseModel):
     def validate_tasks(
         cls, tasks: typing.List[typing.Any]
     ) -> typing.List[Task]:
-        """
-        Validate and parse the list of tasks.
-
-        :param tasks: List of tasks or dictionaries to parse.
-
-        :return: List of parsed Task objects.
-        """
         return [parse_task(t, i) for i, t in enumerate(tasks)]
 
 
@@ -168,13 +144,6 @@ class ReturnTask(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def map_return_value(cls, data: typing.Any) -> typing.Any:
-        """
-        Map the return value field.
-
-        :param data: Input dictionary or data.
-
-        :return: Mapped dictionary with 'result' field.
-        """
         if not isinstance(data, dict):
             return data
 
@@ -259,13 +228,6 @@ class Pipeline(BaseModel):
     def validate_tasks(
         cls, tasks: typing.List[typing.Any]
     ) -> typing.List[Task]:
-        """
-        Validate and parse the list of tasks for the pipeline.
-
-        :param tasks: List of raw tasks or dictionaries.
-
-        :return: List of parsed Task objects.
-        """
         return [parse_task(t, i) for i, t in enumerate(tasks)]
 
 
@@ -308,14 +270,12 @@ class PipelineLoader:
                     # We store by route
                     name = t.replace(".yml", "").replace("/", ".")
                     pips[name] = pip
-                    log.info(f"Loaded pipeline '{name}' from {t}")
 
             # Return all collections
             return pips
 
         except rex.ParsingException as ex:
             ex.source = f"{path}/{ex.source}"
-            log.error(f"ParsingException while loading from tree: {ex}")
             raise
 
     def load_from_file(self, filename: str) -> typing.Optional[Pipeline]:
@@ -328,26 +288,21 @@ class PipelineLoader:
         """
         # Load the file into the collection
         try:
-            log.info(f"Loading pipeline from file: {filename}")
             with open(filename, "r") as f:
                 contents = f.read()
 
             return self.load_from_string(contents)
 
         except FileNotFoundError:
-            log.error(f"File not found: {filename}")
             raise rex.ParsingException(source=f"{filename} (not found)")
 
         except PermissionError:
-            log.error(f"Permission denied for file: {filename}")
             raise rex.ParsingException(source=f"{filename} (permission denied)")
 
         except IsADirectoryError:
-            log.error(f"Is a directory, not a file: {filename}")
             raise rex.ParsingException(source=f"{filename} (is a directory)")
 
         except rex.PipelineFormatException as ex:
-            log.error(f"Pipeline format exception in file: {filename} - {ex}")
             raise rex.ParsingException(source=filename) from ex
 
     def load_from_string(
@@ -365,12 +320,10 @@ class PipelineLoader:
             tasks = self._yaml.load(content)
             if not tasks:
                 # Pipeline file is empty
-                log.info("Pipeline content is empty.")
                 return
 
             if not isinstance(tasks, list):
                 # Pipeline file is not a list of tasks
-                log.error("Pipeline file must be a list of tasks")
                 raise rex.PipelineFormatException(
                     message="Pipeline file must be a list of tasks"
                 )
@@ -378,16 +331,13 @@ class PipelineLoader:
             pipeline = Pipeline.model_validate(
                 {"tasks": [parse_task(t, i) for i, t in enumerate(tasks)]}
             )
-            log.info("Pipeline parsed successfully from string content.")
             return pipeline
 
         except ParserError as ex:
             resp = f"Error parsing YAML\n\n{ex}"
-            log.error(f"YAML parsing error: {resp}")
             raise rex.PipelineFormatException(message=resp)
 
         except rex.TaskParseException as ex:
-            log.error("There were issues parsing the tasks")
             raise rex.PipelineFormatException(
                 message="There were issues parsing the tasks"
             ) from ex
