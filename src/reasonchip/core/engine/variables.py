@@ -11,8 +11,6 @@ import typing
 import re
 import munch
 
-from pydantic import BaseModel
-
 from ruamel.yaml import YAML
 
 try:
@@ -64,22 +62,12 @@ class Variables:
 
     def get(self, key: str) -> typing.Tuple[bool, typing.Any]:
         try:
-            print(f"Evaluating: {key}")
-            rc = eval(
-                key,
-                {
-                    "__builtins__": None,
-                },
-                self._vmap,
-            )
-            print(f"Evaluated: {key} -> {rc}")
+            rc = eval(key, {"__builtins__": None}, self._vmap)
             return (True, rc)
         except Exception as e:
-            print(f"Oopsie: {e}")
             return (False, None)
 
     def set(self, key: str, value: typing.Any) -> Variables:
-        print(f"Setting {key} to {value}")
         path = self._parse_key(key)
         self._set_path(self._vmap, path, munch.munchify(value))
         return self
@@ -135,8 +123,6 @@ class Variables:
                 current = current[part]
 
     def update(self, vmap: VariableMapType) -> Variables:
-        print(f"Updating vmap: {self._vmap} with {vmap}")
-
         def _deep_update(
             path: str,
             myd: dict,
@@ -156,8 +142,6 @@ class Variables:
                     self.set(new_path, value)
 
         _deep_update("", self._vmap, vmap)
-
-        print(f"NOW ---------> {repr(self._vmap)}")
         return self
 
     def interpolate(
@@ -314,7 +298,6 @@ A class renders as: [{{ myclass.nesting.test }}]
 This = [{{ this }}]
 """
     string1 = v.interpolate(crazy_string)
-
     print(string1)
 
     str1 = "{{ snoot }} {{ snoot }} {{ f'\\{snoot\\}' + '\\{\\}' }}"
