@@ -145,7 +145,9 @@ class Variables:
         return self
 
     def interpolate(
-        self, value: typing.Any, _seen: typing.Optional[set] = None
+        self,
+        value: typing.Any,
+        _seen: typing.Optional[set] = None,
     ) -> typing.Any:
         """
         Populate all variables in a value.
@@ -172,31 +174,30 @@ class Variables:
             return tuple(self.interpolate(v, _seen) for v in value)
 
         if isinstance(value, str):
-            found, obj = self.get(value)
-            if found:
-                # This is a pure variable
-                return self.interpolate(obj, _seen)
+            new_val = self._render(value, _seen)
+            if new_val != value:
+                return self.interpolate(new_val, _seen)
 
-            # We need to deep-dive the double-brace interpolations.
-            new_value = self._render_double(value)
-            if new_value != value:
-                new_value = self.interpolate(new_value, _seen)
-
-            if isinstance(new_value, str):
-                # We don't deep-dive the triple-brace interpolations.
-                new_value = self._render_triple(new_value)
-
-            return new_value
+            return new_val
 
         return value
 
     def _render(
         self,
-        text: str,
-        pattern: str,
+        value: str,
+        _seen: typing.Optional[set] = None,
     ) -> typing.Any:
+
+        # Check if this is a pure variable name.
+        found, obj = self.get(value)
+        if found:
+            return self.interpolate(obj, _seen)
+
+        # This is the pattern
+        pattern = r"(?<!\\){{\s*((?:[^\{\}]|\\\{|\\\})*?)\s*}}"
+
         # If the entire text is a single placeholder, return evaluation.
-        full_match = re.fullmatch(pattern, text)
+        full_match = re.fullmatch(pattern, value)
         if full_match:
             expr = full_match.group(1)
             return self._evaluate(expr)
@@ -206,17 +207,7 @@ class Variables:
             expr = match.group(1)
             return str(self._evaluate(expr))
 
-        return re.sub(pattern, replacer, text)
-
-    def _render_double(self, text: str) -> typing.Any:
-        return self._render(
-            text, r"(?<!\{){{\s*((?:[^\{\}]|\\\{|\\\})*?)\s*}}(?!\})"
-        )
-
-    def _render_triple(self, text: str) -> typing.Any:
-        return self._render(
-            text, r"(?<!\{){{{\s*((?:[^\{\}]|\\\{|\\\})*?)\s*}}}(?!\})"
-        )
+        return re.sub(pattern, replacer, value)
 
     def _evaluate(self, expr: str) -> typing.Any:
         """Evaluate the expression safely, allowing only the vobj context."""
@@ -272,6 +263,8 @@ if __name__ == "__main__":
         assert False
     except:
         pass
+
+    assert v.interpolate('{{ \\{ "elvis": 5 \\}["elvis"] + 5  }}') == 10
 
     class Test:
         def __init__(self):
