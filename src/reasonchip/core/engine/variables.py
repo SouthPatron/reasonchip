@@ -5,17 +5,13 @@
 # This file is part of ReasonChip and licensed under the GPLv3+.
 # See <https://www.gnu.org/licenses/> for details.
 
-
 from __future__ import annotations
 
 import typing
 import re
-
 import munch
 
 from pydantic import BaseModel
-
-from dotty_dict import dotty, Dotty
 
 from ruamel.yaml import YAML
 
@@ -31,29 +27,17 @@ VariableMapType = typing.Dict[str, typing.Any]
 class Variables:
 
     def __init__(self, vmap: VariableMapType = {}) -> None:
-        self._vmap: Dotty = dotty(vmap)
+        vm = munch.munchify(vmap)
+        assert isinstance(vm, munch.Munch)
+        self._vmap: munch.Munch = vm
 
     @property
-    def vmap(self) -> Dotty:
+    def vmap(self) -> munch.Munch:
         return self._vmap
-
-    @property
-    def vdict(self) -> typing.Dict[str, typing.Any]:
-        tmp = self.vmap
-
-        flat_dict = {}
-        for key, value in tmp.items():
-            flat_dict[key] = value
-
-        return flat_dict
-
-    @property
-    def vobj(self):
-        return munch.munchify(self.vdict)
 
     def copy(self) -> Variables:
         v = Variables()
-        v._vmap = self._vmap.copy()
+        v._vmap = self._vmap.copy()  # type: ignore
         return v
 
     def load_file(self, filename: str):
@@ -76,86 +60,104 @@ class Variables:
             self.update(v)
 
     def has(self, key: str) -> bool:
+        return self.get(key)[0]
+
+    def get(self, key: str) -> typing.Tuple[bool, typing.Any]:
         try:
-            return key in self.vmap
-        except:
-            return False
-
-    def get(self, key: str) -> typing.Any:
-        return self.vmap.get(key, None)
-
-    def set(self, key: str, value: typing.Any) -> Variables:
-        self.vmap[key] = value
-        return self
-
-    def deep_has(self, key: str) -> typing.Tuple[bool, typing.Any]:
-        new_key, rem = self._hunt(key)
-
-        # No key to hunt.
-        if not new_key:
+            print(f"Evaluating: {key}")
+            rc = eval(
+                key,
+                {
+                    "__builtins__": None,
+                },
+                self._vmap,
+            )
+            print(f"Evaluated: {key} -> {rc}")
+            return (True, rc)
+        except Exception as e:
+            print(f"Oopsie: {e}")
             return (False, None)
 
-        # There is something.
-        obj = self.get(new_key)
+    def set(self, key: str, value: typing.Any) -> Variables:
+        print(f"Setting {key} to {value}")
+        path = self._parse_key(key)
+        self._set_path(self._vmap, path, munch.munchify(value))
+        return self
 
-        # Perfect match.
-        if not rem:
-            return (True, obj)
-
-        # Now deep dive into the object.
-        parts = rem.split(".")
-        while parts:
-            part = parts.pop(0)
-
-            if hasattr(obj, part):
-                obj = getattr(obj, part)
-
-            elif isinstance(obj, dict):
-                if part not in obj:
-                    return (False, None)
-                obj = obj.get(part, None)
-
-            elif isinstance(obj, list) or isinstance(obj, tuple):
+    def _parse_key(self, key: str) -> list:
+        pattern = r"""
+            (?:^|\.)([a-zA-Z_][a-zA-Z0-9_]*)       # dot notation: foo.bar
+            | \[\s*(['"]?)([^\[\]'"]+)\2\s*\]      # brackets: ["key"], [0]
+        """
+        parts = []
+        for match in re.finditer(pattern, key, re.VERBOSE):
+            if match.group(1):  # dot notation
+                parts.append(match.group(1))
+            elif match.group(3):  # bracket access
+                part = match.group(3)
                 try:
-                    idx = int(part)
-                    obj = obj[idx]
-                except:
-                    return (False, None)
+                    part = int(part)  # try as integer index
+                except ValueError:
+                    pass
+                parts.append(part)
+        return parts
 
-            elif isinstance(obj, BaseModel):
-                if part not in obj.model_fields:
-                    return (False, None)
-                obj = getattr(obj, part)
+    def _set_path(self, root: typing.Any, path: list, value: typing.Any):
+        current = root
+        for i, part in enumerate(path):
+            is_last = i == len(path) - 1
 
+            if is_last:
+                current[part] = value
+                return
+
+            if isinstance(part, int):
+                # Ensure current is a list
+                if not isinstance(current, list):
+                    raise TypeError(
+                        f"Expected list at {path[:i]}, got {type(current).__name__}"
+                    )
+                while len(current) <= part:
+                    current.append({})
+                if not isinstance(current[part], (dict, list)):
+                    current[part] = munch.munchify({})
+                current = current[part]
             else:
-                print(f"************************************")
-                print(f"We were looking for {key}")
-                print(f"New key: {new_key}")
-                print(f"Remaining: {rem}")
-                print(f"Part: {part}")
-                print(f"Parts: {parts}")
-                print(f"Obj: {obj}")
-                assert False, f"Unhandled type: {type(obj)}"
-
-        return (True, obj)
-
-    def deep_get(self, key: str) -> typing.Tuple[bool, typing.Any]:
-        return self.deep_has(key)
+                # Ensure current is a dict
+                if not isinstance(current, dict):
+                    raise TypeError(
+                        f"Expected dict at {path[:i]}, got {type(current).__name__}"
+                    )
+                if part not in current or not isinstance(
+                    current[part], (dict, list)
+                ):
+                    current[part] = munch.munchify({})
+                current = current[part]
 
     def update(self, vmap: VariableMapType) -> Variables:
-        def _deep_update(dotty: Dotty, updates: dict) -> None:
-            for key, value in updates.items():
-                if (
-                    isinstance(value, dict)
-                    and key in dotty
-                    and isinstance(dotty[key], dict)
-                ):
-                    # Recursively merge nested dicts
-                    _deep_update(dotty[key], value)
-                else:
-                    dotty[key] = value
+        print(f"Updating vmap: {self._vmap} with {vmap}")
 
-        _deep_update(self.vmap, vmap)
+        def _deep_update(
+            path: str,
+            myd: dict,
+            updates: dict,
+        ) -> None:
+
+            for key, value in updates.items():
+                new_path = f"{path}.{key}" if path else key
+
+                if (
+                    key in myd
+                    and isinstance(value, dict)
+                    and isinstance(myd[key], dict)
+                ):
+                    _deep_update(new_path, myd[key], value)
+                else:
+                    self.set(new_path, value)
+
+        _deep_update("", self._vmap, vmap)
+
+        print(f"NOW ---------> {repr(self._vmap)}")
         return self
 
     def interpolate(
@@ -186,7 +188,7 @@ class Variables:
             return tuple(self.interpolate(v, _seen) for v in value)
 
         if isinstance(value, str):
-            found, obj = self.deep_get(value)
+            found, obj = self.get(value)
             if found:
                 # This is a pure variable
                 return self.interpolate(obj, _seen)
@@ -236,24 +238,7 @@ class Variables:
         """Evaluate the expression safely, allowing only the vobj context."""
         # Replace escaped braces
         expr = expr.replace(r"\{", "{").replace(r"\}", "}")
-        return evaluator(expr, self.vobj)
-
-    def _hunt(self, key: str) -> typing.Tuple[str, str]:
-        if self.has(key):
-            return (key, "")
-
-        # Hunt backwards through the key to find the first key that exists.
-        parts = key.split(".")
-
-        remaining = []
-        while parts:
-            fname = ".".join(parts)
-            if self.has(fname):
-                break
-
-            remaining.insert(0, parts.pop())
-
-        return (".".join(parts), ".".join(remaining))
+        return evaluator(expr, self.vmap)
 
 
 if __name__ == "__main__":
@@ -314,12 +299,9 @@ if __name__ == "__main__":
     print(v.vmap)
 
     assert v.has("myclass.nesting.test") == True
-    assert v.has("myclass.nesting.test.name") == False
-    assert v.has("myclass.nesting.test.profile.age") == False
-
-    assert v.deep_has("myclass.nesting.test.name")[0] == True
-    assert v.deep_has("myclass.nesting.test.profile.age")[0] == True
-    assert v.deep_has("myclass.nesting.test.profile.amber")[0] == False
+    assert v.has("myclass.nesting.test.name") == True
+    assert v.has("myclass.nesting.test.profile['age']") == True
+    assert v.has("myclass.nesting.test.profile['amber']") == False
 
     v.set("this", "this")
 
