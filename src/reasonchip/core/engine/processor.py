@@ -127,7 +127,7 @@ class Processor:
 
         # The rest of the tasks have a when condition.
         if task.when:
-            proceed = evaluator(task.when, variables.vobj)
+            proceed = evaluator(task.when, variables.vmap)
             if not proceed:
                 return (RunResult.SKIPPED, None)
 

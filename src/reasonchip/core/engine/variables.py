@@ -207,7 +207,7 @@ class Variables:
         return re.sub(pattern, replacer, value)
 
     def _evaluate(self, expr: str) -> typing.Any:
-        """Evaluate the expression safely, allowing only the vobj context."""
+        """Evaluate the expression safely, allowing only the vmap context."""
         # Replace escaped braces
         expr = expr.replace(r"\{", "{").replace(r"\}", "}")
         return evaluator(expr, self.vmap)
