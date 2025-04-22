@@ -11,13 +11,14 @@ from collections.abc import Iterable, Sized
 
 from pydantic import ValidationError
 
-from ... import exceptions as rex
+from .. import exceptions as rex
 
-from ..context import Variables, FlowControl
+from .variables import Variables
+from .flow_control import FlowControl
 
-from ..registry import Registry
-from ..parsers.conditional import evaluate
-from ..pipelines import (
+from .registry import Registry
+from .parsers import evaluator
+from .pipelines import (
     TaskSet,
     ChipTask,
     DispatchPipelineTask,
@@ -126,7 +127,7 @@ class Processor:
 
         # The rest of the tasks have a when condition.
         if task.when:
-            proceed = evaluate(task.when, variables)
+            proceed = evaluator(task.when, variables.vmap)
             if not proceed:
                 return (RunResult.SKIPPED, None)
 

@@ -5,14 +5,12 @@
 
 import typing
 import argparse
-import uuid
 import re
 import json
 
 from reasonchip.core import exceptions as rex
-
-from reasonchip.core.engine.engine import Engine
-from reasonchip.core.engine.context import Variables
+from reasonchip.core.engine.variables import Variables
+from reasonchip.utils.local_runner import LocalRunner
 
 from .exit_code import ExitCode
 from .command import AsyncCommand
@@ -63,7 +61,7 @@ class RunLocalCommand(AsyncCommand):
             default=[],
             metavar="<variable file>",
             type=str,
-            help="Variable file to load into context",
+            help="Variable file to load",
         )
 
         cls.add_default_options(parser)
@@ -81,9 +79,6 @@ class RunLocalCommand(AsyncCommand):
             args.collections = ["."]
 
         try:
-            engine: Engine = Engine()
-            engine.initialize(pipelines=args.collections)
-
             # Load variables
             variables = Variables()
             for x in args.vars:
@@ -97,17 +92,20 @@ class RunLocalCommand(AsyncCommand):
                 key, value = m[1], m[2]
                 variables.set(key, value)
 
-            # Assign a job id
-            variables.set("job_id", uuid.uuid4())
+            # Create the local runner
+            runner = LocalRunner(
+                collections=args.collections,
+                default_variables=variables.vdict,
+            )
 
             # Run the engine
-            rc = await engine.run(args.pipeline, variables)
+            rc = await runner.run(args.pipeline)
 
             if rc:
                 print(json.dumps(rc))
 
             # Shutdown the engine
-            engine.shutdown()
+            runner.shutdown()
 
             return ExitCode.OK
 

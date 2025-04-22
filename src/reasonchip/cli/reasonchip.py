@@ -20,7 +20,7 @@ def main() -> ExitCode:
     # Build the argument tree
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="Agentic workflow tools",
+        description="Open source agentic workflow automation software",
         add_help=False,
     )
 
@@ -65,8 +65,3 @@ def main() -> ExitCode:
 
     # ... and return it.
     return rc
-
-
-if __name__ == "__main__":
-    rc = main()
-    sys.exit(rc)

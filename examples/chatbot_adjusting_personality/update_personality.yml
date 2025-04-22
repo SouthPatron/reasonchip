@@ -69,8 +69,8 @@
                 type: "boolean"
                 description: "Whether there is a significant change in mood or personality which needs to be acknowleged and updated."
               reason:
-                  type: "string"
-                  description: "Reason for updating or not updating the bot's personality."
+                type: "string"
+                description: "Reason for updating or not updating the bot's personality."
             additionalProperties: false
             required:
               - "mood"

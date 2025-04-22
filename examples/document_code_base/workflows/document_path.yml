@@ -1,0 +1,161 @@
+
+- declare:
+    prompt: |
+      You are a senior developer who has been tasked with documenting and
+      adding a `README.md` to the code base.
+
+      For the `README.md` structure, please use the following approach,
+      approximately. You can adjust as is necessary.
+
+      - (#) First title: A brief title relevant to the directory purpose
+      - (##) Overview: Literal "Overview" title with a brief overview
+        from a high-level of what purpose the directory and the subdirectories
+        serve.
+      - (##) Filesystem Overview: Literal "Filesystem Overview" and then
+        a table of the subdirectories and what their purposes are, if
+        there are subdirectories or files. For example:
+
+        | Location | Description |
+        | -------- | ----------- |
+        | [Cool name](./subdir1/) | The pluggable components |
+
+
+        DO NOT INCLUDE `__init__.py` in this unless it does something
+        that's functional.
+
+      - (##) Onboarding Approach: Literal "Onboarding Approach" and then
+        a detailed and instructive approach for a new developer to start
+        reading the code for understanding. Include in this additional
+        knowledge which the developer should know and understand to fully
+        grasp the code.
+
+      - (##) ... free form from here on out. If there is something of
+        interest that you feel you need to document, then add it here.
+
+      Please keep your language short, technical, and explicit. The code
+      will be read by other developers so it doesn't need to be flowery
+      or explanatory.
+
+      Prefer to use the name of computer science and software development
+      concepts and patterns directly instead of describing the concept of
+      pattern. So we're talking that kind of level.
+
+      Please keep an empty line between a header and the paragraph beneath.
+
+      Do not document the `__init__.py` if it does nothing apart from
+      exporting, declaring, or is empty.
+
+      Do not document on a per-file bases. Rather document on a per-concept
+      basis and preferably tersely, describing how the concepts fit together
+      and their responsibilities. Use a short story approach, but obviously
+      without lyrical language. For example:
+
+        "A ClassA is the core component of this structure. Several ClassBs
+        are instantiated and provided to ClassA for management of the
+        things. The management consists of something, something. Once
+        added, there is no way to unadd a ClassB. It will be cleaned up
+        by ClassA."
+
+      Remove documentation which appears to be stale or no longer relevant
+      to the directory.
+
+      Preferred line length is 80 characters.
+
+      Now you will be provided with, if they exist:
+        - The source code files within this directory.
+        - The `README.md` files within the subdirectories for reference.
+        - The existing `README.md` within this directory.
+
+      Create, update, or correct the documentation requested.
+      Respond in JSON.
+
+      If the existing `README.md` file is deemed sufficient, then
+      do not update the file and return an empty content response.
+
+- declare:
+    prompt: |
+      {{ escape(prompt) }}
+
+      This is the content of a file within the current directory:
+      [-------- START: {{ item[0] }} ---------]
+      {{ escape(item[1]) }}
+      [---------- END: {{ item[0] }} ---------]
+
+  loop: params.files.items()
+
+
+- declare:
+    prompt: |
+      {{ escape(prompt) }}
+
+      This is the content of a `README.md` from a subdirectory:
+      [-------- START: {{ item[0] }} ---------]
+      {{ escape(item[1]) }}
+      [---------- END: {{ item[0] }} ---------]
+
+  loop: params.readmes.items()
+
+- declare:
+    prompt: |
+      {{ escape(prompt) }}
+
+      This is the content of the original `README.md` from this directory:
+      [-------- START: README.md ---------]
+      {{ escape(params.original_readme) }}
+      [---------- END: README.md ---------]
+
+
+- chip: reasoning.openai.chat.chat_completion
+  params:
+    client_settings:
+      api_key: "{{ secrets.openai.api_key }}"
+      organization: "{{ secrets.openai.org_id }}"
+    create_params:
+      model: "gpt-4.1"
+      messages:
+        - role: system
+          content: prompt
+
+      response_format:
+        type: "json_schema"
+        json_schema:
+          name: "myobj"
+          strict: true
+          schema:
+            type: "object"
+            properties:
+              changed:
+                type: "string"
+                description: "YES or NO depending on whether you performed changes"
+              contents:
+                type: "string"
+                description: "A blank string or the full content of the file with your changes"
+            additionalProperties: false
+            required:
+              - changed
+              - contents
+  store_result_as: response
+
+- when: "response.status != 'OK'"
+  terminate:
+    status: 'ERROR'
+    error_message: 'Response from OpenAI: {{ response }}'
+
+- chip: utils.json.loads
+  params:
+    string: "{{ response.completion.choices[0].message.content }}"
+  store_result_as: rc
+
+- when: "rc.status != 'OK'"
+  terminate:
+    status: 'ERROR'
+    error_message: 'Unable to parse response: {{ response }}'
+
+- when: "rc.result['changed'] == 'NO'"
+  return:
+    status: 'UNCHANGED'
+
+- return:
+    status: 'CHANGED'
+    content: "{{ rc.result['contents'] }}"
+

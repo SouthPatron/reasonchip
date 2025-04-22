@@ -8,7 +8,7 @@ import argparse
 import re
 import json
 
-from reasonchip.core.engine.context import Variables
+from reasonchip.core.engine.variables import Variables
 
 from reasonchip.net.client import Multiplexor, Api
 from reasonchip.net.protocol import DEFAULT_SERVERS
@@ -64,7 +64,7 @@ pipeline. You may specify variables on the command line.
             default=[],
             metavar="<variable file>",
             type=str,
-            help="Variable file to load into context",
+            help="Variable file to load",
         )
 
         cls.add_default_options(parser)

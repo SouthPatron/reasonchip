@@ -8,16 +8,11 @@ import typing
 from .command import Command, AsyncCommand
 from .exit_code import ExitCode
 
-# Socket commands
+# Commands
 from .broker_command import BrokerCommand
 from .run_command import RunCommand
 from .run_local_command import RunLocalCommand
 from .worker_command import WorkerCommand
-
-# gRPC commands
-# from .grpc_gateway_command import GrpcGatewayCommand
-# from .grpc_run_command import GrpcRunCommand
-# from .grpc_stream_command import GrpcStreamCommand
 
 
 def get_commands() -> (
@@ -31,8 +26,6 @@ def get_commands() -> (
             RunCommand,
             RunLocalCommand,
             WorkerCommand,
-            # gRPC commands
-            # grpc_gateway_command,
         ]
     }
 

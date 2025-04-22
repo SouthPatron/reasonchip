@@ -13,14 +13,21 @@ from ..transports import ServerTransport
 
 from .switchboard import Switchboard
 
+log = logging.getLogger(__name__)
+
 
 class Broker:
-
     def __init__(
         self,
         client_transports: typing.List[ServerTransport],
         worker_transports: typing.List[ServerTransport],
     ) -> None:
+        """
+        Initializes the Broker with client and worker transports.
+
+        :param client_transports: List of transports for clients.
+        :param worker_transports: List of transports for workers.
+        """
         assert client_transports
         assert worker_transports
 
@@ -44,12 +51,15 @@ class Broker:
     # --------------------- LIFECYCLE -----------------------------------------
 
     async def start(self):
-        logging.info("Starting broker...")
+        """
+        Starts the broker by initializing worker and client managers.
+        """
+        log.info("Starting broker...")
 
         assert not self._connections
 
         # Make sure we have some workers ready
-        logging.info("Starting worker manager...")
+        log.info("Starting worker manager...")
         for t in self._worker_transports:
             rc = await t.start_server(
                 new_connection_callback=self._connected,
@@ -60,7 +70,7 @@ class Broker:
                 raise ConnectionError("Failed to start worker transport")
 
         # We are ready for some clients
-        logging.info("Starting client manager...")
+        log.info("Starting client manager...")
         for t in self._client_transports:
             rc = await t.start_server(
                 new_connection_callback=self._connected,
@@ -70,22 +80,27 @@ class Broker:
             if not rc:
                 raise ConnectionError("Failed to start client transport")
 
-        logging.info("Broker started.")
+        log.info("Broker started.")
 
     async def stop(self) -> bool:
-        logging.info("Stopping broker...")
+        """
+        Stops the broker by shutting down client and worker managers.
+
+        :return: True when the broker has been successfully stopped.
+        """
+        log.info("Stopping broker...")
 
         # First we stop all the incoming clients
-        logging.info("Stopping client manager...")
+        log.info("Stopping client manager...")
         for t in self._client_transports:
             await t.stop_server()
 
         # Then we stop all the workers
-        logging.info("Stopping worker manager...")
+        log.info("Stopping worker manager...")
         for t in self._worker_transports:
             await t.stop_server()
 
-        logging.info("Broker stopped.")
+        log.info("Broker stopped.")
         return True
 
     # --------------------- CONTROL -------------------------------------------
@@ -95,8 +110,14 @@ class Broker:
         transport: ServerTransport,
         connection_id: uuid.UUID,
     ):
+        """
+        Manages a new incoming connection.
+
+        :param transport: The transport instance for the connection.
+        :param connection_id: Unique identifier for the connection.
+        """
         async with self._lock:
-            logging.info(f"Client connected: id=[{connection_id}]")
+            log.info(f"Client connected: id=[{connection_id}]")
             assert connection_id not in self._connections
             self._connections[connection_id] = transport
 
@@ -105,13 +126,24 @@ class Broker:
     async def _client_read(
         self, connection_id: uuid.UUID, packet: SocketPacket
     ):
+        """
+        Handles incoming packets from client connections.
+
+        :param connection_id: Unique identifier for the connection.
+        :param packet: Incoming packet from the client.
+        """
         await self._switchboard.client_payload(
             connection_id=connection_id, packet=packet
         )
 
     async def _client_closed(self, connection_id: uuid.UUID):
+        """
+        Handles the closure of a client connection.
+
+        :param connection_id: Unique identifier for the connection to be closed.
+        """
         async with self._lock:
-            logging.info(f"Client closed: id=[{connection_id}]")
+            log.info(f"Client closed: id=[{connection_id}]")
             assert connection_id in self._connections
 
             self._connections.pop(connection_id)
@@ -124,13 +156,24 @@ class Broker:
     async def _worker_read(
         self, connection_id: uuid.UUID, packet: SocketPacket
     ):
+        """
+        Handles incoming packets from worker connections.
+
+        :param connection_id: Unique identifier for the connection.
+        :param packet: Incoming packet from the worker.
+        """
         await self._switchboard.worker_payload(
             connection_id=connection_id, packet=packet
         )
 
     async def _worker_closed(self, connection_id: uuid.UUID):
+        """
+        Handles the closure of a worker connection.
+
+        :param connection_id: Unique identifier for the connection to be closed.
+        """
         async with self._lock:
-            logging.info(f"Worker closed: id=[{connection_id}]")
+            log.info(f"Worker closed: id=[{connection_id}]")
             assert connection_id in self._connections
 
             self._connections.pop(connection_id)
@@ -145,7 +188,14 @@ class Broker:
         connection_id: uuid.UUID,
         packet: SocketPacket,
     ) -> bool:
+        """
+        Sends a packet to a specific connection if it exists.
 
+        :param connection_id: Unique identifier for the connection.
+        :param packet: Packet to be sent.
+
+        :return: True if the packet was sent successfully, False otherwise.
+        """
         async with self._lock:
             conn = self._connections.get(connection_id)
             if conn is None:

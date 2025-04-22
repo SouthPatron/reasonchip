@@ -8,7 +8,6 @@ import argparse
 import asyncio
 import signal
 import traceback
-import ssl
 
 from reasonchip.core import exceptions as rex
 from reasonchip.net.broker import Broker
