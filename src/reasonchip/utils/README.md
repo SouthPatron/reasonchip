@@ -1,35 +1,55 @@
-# Local Runner
+# LocalRunner Utility
 
 ## Overview
 
-This directory contains the `LocalRunner` component, which is a high-level
-interface for running pipelines locally by leveraging the underlying engine
-implementation. It initializes the engine with specified pipeline collections
-and manages variable contexts for pipeline execution.
+This directory contains the `LocalRunner` utility which provides a simple,
+local execution interface for the core pipeline engine. It initializes the
+engine with specified collections of pipelines and manages variable scopes
+for pipeline runs.
 
 ## Filesystem Overview
 
-| Location          | Description                                |
-| ----------------- | ------------------------------------------|
-| `local_runner.py` | Defines the LocalRunner class responsible for running pipelines locally |
+| Location           | Description                                         |
+| ------------------ | ------------------------------------------------- |
+| local_runner.py    | Implements the LocalRunner class for local pipeline execution |
 
-## LocalRunner Responsibilities
+## Onboarding Approach
 
-`LocalRunner` encapsulates the instantiation and management of the core engine
-for local pipeline executions. It handles initialization by loading the given
-pipeline collections and maintains a default set of variables that can be
-overridden during each run.
+A new developer should first understand the core pipeline engine concepts
+located in `core.engine.engine` and `core.engine.variables`. These provide
+API for pipeline executions and variable context management.
 
-- The constructor initializes the engine with specific collections and sets
-  default variables.
-- The `run` method executes a named pipeline asynchronously, merging default
-  variables with any overrides provided.
-- The `shutdown` method cleanly terminates the engine instance.
+The `LocalRunner` class composes an `Engine` instance and a `Variables` set
+of default variables. On creation, it initializes the engine with the given
+pipeline collections.
 
-Logging is included to track key events like initialization, pipeline execution,
-and shutdown for observability.
+To understand the code flow:
 
-The `Variables` abstraction is used internally to manage variable contexts.
+1. Review the `Engine` class and how it initializes with pipeline collections.
+2. Look into the `Variables` class that handles variable storage and merging.
+3. Study the `run` coroutine in `LocalRunner` which merges variables and triggers
+   the engine's async run method.
+4. Understand the `shutdown` method to cleanly terminate the engine.
 
-This module depends on the core engine and context modules from the parent
-package for actual pipeline handling and variable management.
+Familiarity with asynchronous Python and pipeline execution models is required.
+
+## Design and Responsibilities
+
+`LocalRunner` acts as a facade to the core engine, managing:
+
+- Engine lifecycle: initialization with pipeline collections and shutdown.
+- Default variables context, merged with runtime overrides per execution.
+- Asynchronous execution of pipelines by name with appropriate variables.
+
+This class simplifies local or test usage of the engine without needing to
+handle engine lifecycles externally.
+
+Variable management uses the `Variables` abstraction to create isolated,
+copyable contexts ensuring thread-safe operation.
+
+`LocalRunner` directly depends on core engine modules but isolates local
+execution details from higher-level application logic.
+
+No other significant modules or components exist in this directory.
+
+The directory acts as a utility layer for easy local pipeline interactions.
