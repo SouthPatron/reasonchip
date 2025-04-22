@@ -19,12 +19,22 @@
         | -------- | ----------- |
         | [Cool name](./subdir1/) | The pluggable components |
 
+      - (##) Onboarding Approach: Literal "Onboarding Approach" and then
+        a detailed and instructive approach for a new developer to start
+        reading the code for understanding. Include in this additional
+        knowledge which the developer should know and understand to fully
+        grasp the code.
+
       - (##) ... free form from here on out. If there is something of
         interest that you feel you need to document, then add it here.
 
       Please keep your language short, technical, and explicit. The code
       will be read by other developers so it doesn't need to be flowery
       or explanatory.
+
+      Prefer to use the name of computer science and software development
+      concepts and patterns directly instead of describing the concept of
+      pattern. So we're talking that kind of level.
 
       Please keep an empty line between a header and the paragraph beneath.
 
@@ -62,11 +72,11 @@
 
 - declare:
     prompt: |
-      {{{ prompt }}}
+      {{ prompt }}
 
       This is the content of a file within the current directory:
       [-------- START: {{ item[0] }} ---------]
-      {{{ item[1] }}}
+      {{ item[1] }}
       [---------- END: {{ item[0] }} ---------]
 
   loop: "{{ params.files.items() }}"
@@ -74,22 +84,22 @@
 
 - declare:
     prompt: |
-      {{{ prompt }}}
+      {{ prompt }}
 
       This is the content of a `README.md` from a subdirectory:
       [-------- START: {{ item[0] }} ---------]
-      {{{ item[1] }}}
+      {{ item[1] }}
       [---------- END: {{ item[0] }} ---------]
 
   loop: "{{ params.readmes.items() }}"
 
 - declare:
     prompt: |
-      {{{ prompt }}}
+      {{ prompt }}
 
       This is the content of the original `README.md` from this directory:
       [-------- START: README.md ---------]
-      {{{ params.original_readme }}}
+      {{ params.original_readme }}
       [---------- END: README.md ---------]
 
 

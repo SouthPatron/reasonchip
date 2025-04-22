@@ -120,7 +120,7 @@
             The filename is: `{{ params.filename }}`
 
             [--------------- FILE CONTENT: START ---------- ]
-            {{{ params.content }}}
+            {{ params.content }}
             [--------------- FILE CONTENT: END ------------ ]
 
       response_format:
