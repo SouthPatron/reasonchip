@@ -124,7 +124,10 @@ async def document_directory(
 async def process_files(dir_path: Path, depth: int):
     # Now process the files within this directory
     files = {}
-    for f in dir_path.glob("*.py"):
+
+    ally = list(dir_path.glob("*.py"))  # + list(dir_path.glob('*.yml'))
+
+    for f in ally:
         print(f"{'  ' * (depth+1)}{f}")
 
         content = f.read_text(encoding="utf-8")
