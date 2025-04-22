@@ -52,7 +52,7 @@
             Do not add a logger into the `__init__.py`. If one exists within
             there and it's not being used, remove it.
 
-            Do NOT add additional logging into the file. Just make sure any
+            Do NOT add additional logging into any file. Just make sure any
             existing logging uses the log and this approach.
 
 
