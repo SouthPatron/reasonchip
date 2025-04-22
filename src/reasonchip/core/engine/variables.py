@@ -175,9 +175,6 @@ class Variables:
 
         if isinstance(value, str):
             new_val = self._render(value, _seen)
-            if new_val != value:
-                return self.interpolate(new_val, _seen)
-
             return new_val
 
         return value
@@ -249,7 +246,8 @@ if __name__ == "__main__":
     assert v.has("chunks") == True
     assert v.has("elvis") == False
 
-    assert v.interpolate("{{ chunks }}") == 99
+    # Interpolate needs to be only one layer deep
+    assert v.interpolate("{{ chunks }}") == "{{ chicken }}"
     assert v.interpolate("{{ result.b }}") == 5
 
     try:
