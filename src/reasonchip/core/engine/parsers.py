@@ -4,10 +4,32 @@
 # See <https://www.gnu.org/licenses/> for details.
 
 import munch
+import re
 
 from reasonchip.core import exceptions as rex
 
 # ------------------------ LEXER -------------------------------------------
+
+
+def escape(text: str) -> str:
+    """
+    Escapes all {{ ... }} expressions that are not already escaped with a backslash.
+    It replaces them with \\{{ ... }} to prevent Jinja interpolation.
+    """
+    # This regex matches {{ ... }} not preceded by a backslash
+    pattern = r"(?<!\\){{(.*?)}}"
+
+    # Replace with escaped version
+    return re.sub(pattern, r"\\{{\1}}", text)
+
+
+def unescape(text: str) -> str:
+    """
+    Unescapes all expressions that were escaped with a backslash,
+    i.e., converts \\{{ ... }} back to {{ ... }}.
+    """
+    pattern = r"\\{{(.*?)}}"
+    return re.sub(pattern, r"{{\1}}", text)
 
 
 def evaluator(expr: str, variables: munch.Munch):
@@ -37,6 +59,9 @@ def evaluator(expr: str, variables: munch.Munch):
         "format": format,
         "type": type,
         "isinstance": isinstance,
+        # Add any other safe built-in functions you want to allow.
+        "escape": escape,
+        "unescape": unescape,
     }
 
     try:
@@ -48,6 +73,7 @@ def evaluator(expr: str, variables: munch.Munch):
             },
             variables,
         )
+
     except Exception as e:
         raise rex.EvaluationException(expr=expr) from e
 

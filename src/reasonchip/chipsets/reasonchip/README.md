@@ -2,61 +2,65 @@
 
 ## Overview
 
-This directory contains the ReasonChip core async, logging, and stream
-handling components. These modules provide asynchronous task handling,
-logging functionalities, and standard input/output byte stream access
-for ReasonChip pipelines.
+This directory contains the core ReasonChip chipset components
+providing asynchronous handling, logging, and standard byte streams
+support. These modules enable async task waiting with timeouts,
+structured logging, and reading/writing of stdin, stdout, and stderr
+as bytes within ReasonChip pipelines.
 
 ## Filesystem Overview
 
-| Location          | Description                                  |
-| ----------------- | --------------------------------------------|
-| [async.py](./async.py)           | Asynchronous task handling (wait for completion with optional timeout) |
-| [debug.py](./debug.py)           | Logging with multiple standard levels inside ReasonChip pipelines |
-| [streams.py](./streams.py)       | Standard input, output, and error streams handling in bytes |
+| Location          | Description                                                    |
+| ----------------- | --------------------------------------------------------------|
+| [async.py](./async.py)   | Async task waiting with optional timeouts using asyncio tasks |
+| [debug.py](./debug.py)   | Logging services supporting standard log levels              |
+| [streams.py](./streams.py) | Stdin/stdout/stderr byte streams read/write operations        |
 
 ## Onboarding Approach
 
-To understand the ReasonChip chipset components:
+To onboard in ReasonChip chipset components:
 
-1. Start with `async.py` to understand the async task waiting mechanism.
-   It introduces async/await patterns with timeout support using
-   `asyncio.wait_for`.
+1. Review `async.py` to understand asynchronous task waiting.
+   It uses Pydantic models to encapsulate asyncio.Tasks and waits
+   for completion or timeout, returning a status and response.
 
-2. Study `debug.py` which integrates logging at various levels into
-   ReasonChip services. Familiarity with Python's logging module
-   and Pydantic request/response modeling is essential.
+2. Examine `debug.py` for integrating standard logging levels.
+   Gain familiarity with Python's logging library and how requests
+   are modeled with Pydantic. This module synchronously logs messages
+   at specified levels.
 
-3. Review `streams.py` to grasp how ReasonChip wraps stdin/stdout/stderr
-   byte I/O within asynchronous request-response ReasonChip operations.
-   This file handles reading and writing, flushing buffers, and
-   provides both line-based and byte-based stdin reading.
+3. Study `streams.py` for byte-level I/O handling of stdin, stdout,
+   and stderr. It covers reading fixed-size byte chunks or lines
+   asynchronously, writing byte outputs, printing strings to stdout,
+   and flushing buffers.
 
-Developers should be proficient in async programming with asyncio,
-Pydantic for data validation/serialization, and the overall ReasonChip
-registry system that registers async handlers for service calls.
+Developers should understand asyncio for async concurrency, Pydantic
+for request/response modeling and validation, and the ReasonChip
+Registry pattern for registering async handlers.
 
 ## Component Details
 
-- **Async Handling**: Uses `asyncio.Task` instances wrapped in Pydantic models
-  to wait asynchronously with optional timeouts. Responses indicate
-  success or timeout.
+- **Async Handling**: Defines `WaitForRequest` for awaiting
+  asyncio.Tasks with optional timeouts. Returns completion status
+  and the awaited result or timeout indication.
 
-- **Logging**: Receives log requests with a level and message,
-  then dispatches them synchronously via Python's logging module.
-  Supports levels info, debug, warning, error, and critical.
+- **Logging**: Provides log requests with level and message fields.
+  Dispatches messages to Python's logging facility at the requested
+  level.
 
-- **Streams Handling**: Implements stdin read (fixed max bytes or lines),
-  and stdout/stderr write of bytes, including flushing.
-  Includes convenience print to stdout with success indication.
+- **Streams Handling**: Implements byte-based stdin reading (by max
+  bytes or line), writing to stdout and stderr with buffer flushing,
+  and printing string messages to stdout. Success flags signal
+  operation outcome.
 
-## Registry Mechanism
+## Registry Pattern
 
-All main functions are registered via `Registry.register`, making them
-available as callable ReasonChip services. Request and response schemas
-are defined using Pydantic BaseModel for validation and typing.
+All async handlers are registered with the ReasonChip `Registry`.
+Request and response data structures use Pydantic BaseModels to
+enforce type safety and validation, facilitating clear interface
+contracts for pipeline integration.
 
 ---
 
-This README outlines the core async, debug, and stream components
-fundamental for ReasonChip chipset operations.
+This README documents the essential async, debug, and stream modules
+that constitute the core ReasonChip chipset layer.

@@ -12,12 +12,16 @@
         from a high-level of what purpose the directory and the subdirectories
         serve.
       - (##) Filesystem Overview: Literal "Filesystem Overview" and then
-        a table of the subdirectories and what their purposes are. For
-        example:
+        a table of the subdirectories and what their purposes are, if
+        there are subdirectories or files. For example:
 
         | Location | Description |
         | -------- | ----------- |
         | [Cool name](./subdir1/) | The pluggable components |
+
+
+        DO NOT INCLUDE `__init__.py` in this unless it does something
+        that's functional.
 
       - (##) Onboarding Approach: Literal "Onboarding Approach" and then
         a detailed and instructive approach for a new developer to start
@@ -62,44 +66,42 @@
         - The `README.md` files within the subdirectories for reference.
         - The existing `README.md` within this directory.
 
+      Create, update, or correct the documentation requested.
       Respond in JSON.
 
-      If the existing `README.md` file:
-        - Is adequately compliant with these instructions;
-        - Appears to already meet the requirements;
-        - Only has trivial differences;
-      Then do not update the file and return an empty content response.
+      If the existing `README.md` file is deemed sufficient, then
+      do not update the file and return an empty content response.
 
 - declare:
     prompt: |
-      {{ prompt }}
+      {{ escape(prompt) }}
 
       This is the content of a file within the current directory:
       [-------- START: {{ item[0] }} ---------]
-      {{ item[1] }}
+      {{ escape(item[1]) }}
       [---------- END: {{ item[0] }} ---------]
 
-  loop: "{{ params.files.items() }}"
+  loop: params.files.items()
 
 
 - declare:
     prompt: |
-      {{ prompt }}
+      {{ escape(prompt) }}
 
       This is the content of a `README.md` from a subdirectory:
       [-------- START: {{ item[0] }} ---------]
-      {{ item[1] }}
+      {{ escape(item[1]) }}
       [---------- END: {{ item[0] }} ---------]
 
-  loop: "{{ params.readmes.items() }}"
+  loop: params.readmes.items()
 
 - declare:
     prompt: |
-      {{ prompt }}
+      {{ escape(prompt) }}
 
       This is the content of the original `README.md` from this directory:
       [-------- START: README.md ---------]
-      {{ params.original_readme }}
+      {{ escape(params.original_readme) }}
       [---------- END: README.md ---------]
 
 
@@ -109,7 +111,7 @@
       api_key: "{{ secrets.openai.api_key }}"
       organization: "{{ secrets.openai.org_id }}"
     create_params:
-      model: "gpt-4.1-mini"
+      model: "gpt-4.1"
       messages:
         - role: system
           content: prompt

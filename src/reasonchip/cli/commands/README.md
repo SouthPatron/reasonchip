@@ -1,102 +1,98 @@
-# CLI Commands
+# CLI Command Framework
 
 ## Overview
 
-This directory implements command-line interface commands for
-ReasonChip. Commands include starting brokers and worker engines,
-running pipelines remotely or locally, and managing shared
-command logic.
+This directory defines the extensible command-line interface (CLI)
+command infrastructure and built-in ReasonChip executable commands.
+Commands provide high-level entrypoints for: launching brokers,
+starting engine worker processes, running pipelines remotely,
+or executing them locally.
 
-Commands are classes derived from base Command or AsyncCommand.
-They parse arguments, run the main logic asynchronously,
-and define command metadata.
+Commands are implemented as subclasses of BaseCommand/AsyncCommand
+abstract base classes, encapsulating parsing, argument validation,
+and main operational logic. This decouples shared concerns (option
+handling, logging, SSL configuration, exit code policies) from
+command-specific orchestration logic.
 
 ## Filesystem Overview
 
-| Location                  | Description                                     |
-| ------------------------- | -----------------------------------------------|
-| [command.py](./command.py)         | BaseCommand and AsyncCommand abstract classes with common CLI argument groups |
-| [exit_code.py](./exit_code.py)         | ExitCode enum for consistent CLI exit status codes |
-| [broker_command.py](./broker_command.py)   | BrokerCommand runs the ReasonChip broker server for mediating engines and clients |
-| [worker_command.py](./worker_command.py)   | WorkerCommand runs an engine process providing worker tasks to the broker |
-| [run_command.py](./run_command.py)         | RunCommand runs a pipeline remotely via a broker connection |
-| [run_local_command.py](./run_local_command.py) | RunLocalCommand runs a pipeline locally without a broker connection |
-| [__init__.py](./__init__.py)                | Aggregates and exports available commands and utilities |
+| Location                        | Description                                                    |
+| ------------------------------- | -------------------------------------------------------------- |
+| [command.py](./command.py)      | BaseCommand/Command/AsyncCommand abstraction and common parser/option mixins |
+| [exit_code.py](./exit_code.py)  | Standardized ExitCode enum for CLI command outcomes             |
+| [broker_command.py](./broker_command.py)   | Implements BrokerCommand for running a ReasonChip broker server |
+| [worker_command.py](./worker_command.py)   | Implements WorkerCommand for launching an engine process        |
+| [run_command.py](./run_command.py)         | Implements RunCommand for running a pipeline remotely           |
+| [run_local_command.py](./run_local_command.py) | Implements RunLocalCommand for local execution of pipelines     |
 
 ## Onboarding Approach
 
-Start by understanding `BaseCommand` and `AsyncCommand` abstract
-base classes in `command.py`. They define:
+1. Start by reviewing `command.py` for the abstractions:
+   - `BaseCommand` exposes a class-based contract (e.g., `command()`,
+     `help()` and `description()`) for all CLI commands.
+   - `build_parser()` pattern provides unified and extendable option
+     schema including default logging flags and SSL/TLS argument groups.
+   - `Command` and `AsyncCommand` separate synchronous and asynchronous
+     execution flows via abstract `main()` methods.
+2. Study `exit_code.py` for familiarization with all explicit exit
+   codes used in error handling.
+3. Review command implementations, which all follow similar structure:
+   - Provide CLI argument group registration in `build_parser()` using
+     inherited helpers for logging and SSL options as required.
+   - Implement an async `main()` (except in `Command`, sync) for
+     command logic; typical pattern is to parse inputs, produce/consume
+     network transports if necessary, delegate core execution to engine/
+     runner/task/remote client objects, and handle error conditions.
+   - All commands consistently use ReasonChip exceptions for internal
+     errors and fall back to traceback for unhandled conditions.
+   - Shutdown procedures coordinate via asyncio events and signals.
+4. To extend, implement a subclass of Command/AsyncCommand, register
+   in `__init__.py`, and add to the output of `get_commands()`.
 
-- Command metadata (`command()`, `help()`, `description()`)
-- Argument parser construction (`build_parser()`)
-- Common CLI option groups for logging and SSL/TLS client/server
-  settings
-- Asynchronous or synchronous `main()` method signature
+Developers should be comfortable with: Python's argparse, asyncio,
+networking concepts, SSL/TLS settings, ReasonChip's core engine and
+transport abstractions, and error signaling idioms.
 
-Next, inspect `ExitCode` enum in `exit_code.py` for error code meanings.
+## Command Composition Model
 
-For specific commands, examine:
+- Each command serves as an invocable entrypoint, providing argument parsing,
+  execution, and error mapping. Command-specific logic is invoked in
+  `main(args: argparse.Namespace, rem: typing.List[str])`.
+- Network-related commands provide --log-level (for per-logger or global
+  adjustment), and SSL options for transport security (client/server side).
+- Commands are intended to be standalone, user-facing, and suitable for
+  orchestration or scripting via predictable exit codes defined in `ExitCode`.
 
-- `BrokerCommand`:
-  Sets up network listeners and server sockets to accept
-  engine workers and clients. Manages signal handling for
-  graceful shutdown.
+## SSL/TLS Configuration
 
-- `WorkerCommand`:
-  Instantiates an Engine object to load pipeline collections
-  and registers worker capacity with the broker. Manages tasks
-  asynchronously with signal-driven shutdown.
+- The abstract base class provides add_ssl_client_options and add_ssl_server_options.
+  These inject argument groups (client/server PEM, CA, ciphers, version, options)
+  into the CLI and are handled with ReasonChip's SSL context utilities.
+- Parsed options are passed to transport factories or network initializers.
+  Validation is deferred until transport instantiation.
 
-- `RunCommand`:
-  Connects as a client to a broker, sets variables from CLI,
-  then requests the execution of a pipeline remotely and outputs
-  JSON results.
+## Logging and Consistent Exit Codes
 
-- `RunLocalCommand`:
-  Runs pipelines locally without networking using the LocalRunner
-  helper and variable management.
+- All commands support a --log-level CLI flag supporting both global
+  and logger-specific granularity (DEBUG, INFO, etc.).
+- All command failures or recoverable errors should use ExitCode to
+  ensure shell scripts and callers can react to precise termination semantics.
 
-For networking, SSL option handling is integrated into parser
-builders and transport creation.
+## Signal-driven Shutdown (Broker/Worker)
 
-Become familiar with asyncio, argparse, SSL contexts, and
-ReasonChip engine abstractions (Engine, Variables, Multiplexor,
-Api) for complete understanding.
+- Broker and Worker command implementations use asyncio Events and
+  signal handling to coordinate controlled shutdown. On receipt of
+  SIGINT/SIGTERM/SIGHUP, async event is set to allow loops and network
+  objects (Broker, TasksManager) to clean up and return gracefully.
 
-## Command Structure
+## Command Registration
 
-Commands encapsulate the lifecycle of CLI execution:
-
-1. Declare CLI arguments including SSL and log options.
-2. Run asynchronous `main()` serving as command entrypoint.
-3. Establish networking via transports or local engine runner.
-4. Handle errors using ReasonChip exceptions and fallback
-   to logging unhandled exceptions.
-5. Use asyncio events and signal handling for safe termination.
-
-## SSL/TLS Integration
-
-Commands provide reusable client and server SSL option groups for
-certificate files, keys, CA bundles, cipher lists, TLS versions,
-and verification options. These options are parsed and converted
-into SSLContext objects by Command's helper methods and passed to
-network transport factories.
-
-## Logging and Exit Codes
-
-Commands support a `--log-level` flag for adjusting logger
-verbosity per logger namespace or globally. Exit codes are
-standardized through `ExitCode` enum for CLI consumers.
-
-## Signal Handling
-
-Broker and Worker commands install asyncio signal handlers for
-SIGINT, SIGTERM, SIGHUP that trigger internal events to coordinate
-shutdown sequences.
+- All exposed and supported commands must be imported into `__init__.py`.
+  They are made available via the `get_commands()` function for main CLI
+  entrypoints to enumerate and dispatch to.
 
 ---
 
-This README summarizes the core CLI commands, how they integrate
-with ReasonChip runtime, and provides a guide for developers to
-navigate and extend the CLI command set reliably.
+This CLI framework provides a consistent interface layer for ReasonChip's
+executable tools and can be extended by implementing additional
+Command/AsyncCommand subclasses following this contract.
