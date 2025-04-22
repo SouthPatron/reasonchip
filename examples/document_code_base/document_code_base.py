@@ -65,8 +65,6 @@ async def document_file(filename: str, content: str) -> typing.Optional[str]:
         },
     )
 
-    print(f"Received response: {rc}")
-
     status = rc["status"]
 
     if status == "ERROR":
@@ -105,8 +103,6 @@ async def document_directory(
         },
     )
 
-    print(f"Received response: {rc}")
-
     status = rc["status"]
 
     if status == "ERROR":
@@ -132,6 +128,8 @@ async def process_files(dir_path: Path, depth: int):
         print(f"{'  ' * (depth+1)}{f}")
 
         content = f.read_text(encoding="utf-8")
+        files[f] = content
+        continue
 
         new_content = await document_file(f.name, content)
         if new_content:
