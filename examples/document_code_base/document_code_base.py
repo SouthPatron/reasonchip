@@ -25,20 +25,55 @@ if not OPENAI_API_KEY or not OPENAI_ORG_ID:
 
 
 # Directories to ignore during traversal
-IGNORED_DIRS = {
-    "__pycache__",
-    ".git",
-    ".venv",
-    "venv",
-    "env",
-    ".idea",
-    ".mypy_cache",
-    ".pytest_cache",
+LANGUAGE = {
+    "py": {
+        "ignored_dirs": {
+            "__pycache__",
+            ".git",
+            ".venv",
+            "venv",
+            "env",
+            ".idea",
+            ".mypy_cache",
+            ".pytest_cache",
+        },
+        "globs": {
+            "*.py",
+        },
+    },
+    "cpp": {
+        "ignored_dirs": {
+            "__pycache__",
+            ".git",
+            ".venv",
+            "venv",
+            "env",
+            ".idea",
+            ".mypy_cache",
+            ".pytest_cache",
+        },
+        "globs": {
+            "*.cpp",
+            "*.hpp",
+            "*.c",
+            "*.h",
+            "Makefile",
+            "*.cmake",
+            "*.sh",
+            "*.mod",
+            "*.example",
+        },
+    },
 }
 
 
-def should_ignore_dir(dir_name):
-    return dir_name in IGNORED_DIRS or dir_name.startswith(".")
+def should_ignore_dir(dirp: Path):
+    if dirp.is_symlink():
+        return True
+
+    return dirp.name in LANGUAGE["py"]["ignored_dirs"] or dirp.name.startswith(
+        "."
+    )
 
 
 # --------- REASONING --------------------------------------------------------
@@ -125,7 +160,9 @@ async def process_files(dir_path: Path, depth: int):
     # Now process the files within this directory
     files = {}
 
-    ally = list(dir_path.glob("*.py"))  # + list(dir_path.glob('*.yml'))
+    ally = []
+    for glob in LANGUAGE["py"]["globs"]:
+        ally += list(dir_path.glob(glob))
 
     for f in ally:
         print(f"{'  ' * (depth+1)}{f}")
@@ -150,9 +187,7 @@ async def traverse_and_document(dir_path: Path, depth: int):
 
     # Discover all the subdirectories
     subdirs = [
-        d
-        for d in dir_path.iterdir()
-        if d.is_dir() and not should_ignore_dir(d.name)
+        d for d in dir_path.iterdir() if d.is_dir() and not should_ignore_dir(d)
     ]
 
     # Deep dive subdirectories first so they are documented
@@ -161,6 +196,10 @@ async def traverse_and_document(dir_path: Path, depth: int):
 
     # Now process the files within this directory
     files = await process_files(dir_path, depth)
+
+    # Skip pointless directories
+    if not files and not subdirs:
+        return
 
     # Now load all the README.md files in the subdirectories
     readmes = {}
@@ -173,6 +212,7 @@ async def traverse_and_document(dir_path: Path, depth: int):
     f = dir_path / "README.md"
     if f.exists():
         original_readme = f.read_text(encoding="utf-8")
+        return
     else:
         original_readme = None
 
