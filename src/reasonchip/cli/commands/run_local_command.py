@@ -95,7 +95,7 @@ class RunLocalCommand(AsyncCommand):
             # Create the local runner
             runner = LocalRunner(
                 collections=args.collections,
-                default_variables=variables.vdict,
+                default_variables=variables.vmap,
             )
 
             # Run the engine

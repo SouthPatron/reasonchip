@@ -115,7 +115,7 @@ pipeline. You may specify variables on the command line.
 
         resp = await api.run_pipeline(
             pipeline=args.pipeline,
-            variables=variables.vdict,
+            variables=variables.vmap,
         )
 
         if resp:
