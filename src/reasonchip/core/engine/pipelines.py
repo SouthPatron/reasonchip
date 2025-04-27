@@ -71,9 +71,13 @@ def parse_task(t: typing.Union[Task, typing.Dict], task_no: int) -> Task:
 # -------------------------- DIFFERENT TASKS --------------------------------
 
 
+TaskLogLevel = typing.Literal["info", "debug", "trace"]
+
+
 class TaskSet(BaseModel):
     name: typing.Optional[str] = None
     when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     run_async: bool = False
@@ -99,6 +103,7 @@ class TaskSet(BaseModel):
 class DispatchPipelineTask(BaseModel):
     name: typing.Optional[str] = None
     when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     run_async: bool = False
@@ -117,6 +122,7 @@ class DispatchPipelineTask(BaseModel):
 class ChipTask(BaseModel):
     name: typing.Optional[str] = None
     when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     run_async: bool = False
@@ -136,6 +142,7 @@ class ChipTask(BaseModel):
 class ReturnTask(BaseModel):
     name: typing.Optional[str] = None
     when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
     result: typing.Any
 
     class Config:
@@ -166,6 +173,7 @@ class ReturnTask(BaseModel):
 class DeclareTask(BaseModel):
     name: typing.Optional[str] = None
     when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     declare: typing.Dict[str, typing.Any]
@@ -190,6 +198,7 @@ class CommentTask(BaseModel):
 class TerminateTask(BaseModel):
     name: typing.Optional[str] = None
     when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
 
     terminate: typing.Any
 

@@ -6,6 +6,7 @@
 import typing
 import enum
 import asyncio
+import logging
 
 from collections.abc import Iterable, Sized
 
@@ -36,6 +37,9 @@ from .pipelines import (
 ResolverType = typing.Callable[
     [str], typing.Coroutine[None, None, typing.Optional[Pipeline]]
 ]
+
+
+log = logging.getLogger("reasonchip.core.engine.processor")
 
 
 class RunResult(enum.IntEnum):
@@ -112,7 +116,7 @@ class Processor:
 
             assert False, "Programmer Error. Unreachable code was reached."
 
-        # Successfull completion. No specific return value
+        # Successful completion. No specific return value
         return (RunResult.OK, None)
 
     async def run_task(
@@ -235,6 +239,17 @@ class Processor:
     ) -> typing.Tuple[RunResult, typing.Any]:
 
         fixed_rc = variables.interpolate(task.result)
+
+        if task.log:
+            if task.log == "info":
+                log.info("Returning from pipeline")
+            elif task.log == "debug":
+                log.info(f"Returning from pipeline: {task.result}")
+            elif task.log == "trace":
+                log.info(
+                    f"Returning from pipeline: {task.result} -> {fixed_rc}"
+                )
+
         return (RunResult.RETURN_REQUEST, fixed_rc)
 
     async def _run_declaretask(
@@ -247,6 +262,17 @@ class Processor:
             raise rex.InvalidChipParametersException(task.name or "unnamed")
 
         fixed_rc = variables.interpolate(task.declare)
+
+        if task.log:
+            if task.log == "info":
+                log.info("Declaring new variables")
+            elif task.log == "debug":
+                log.info(f"Declaring new variables: {task.declare}")
+            elif task.log == "trace":
+                log.info(
+                    f"Declaring new variables: {task.declare} -> {fixed_rc}"
+                )
+
         return (RunResult.OK, fixed_rc)
 
     async def _run_taskset(
