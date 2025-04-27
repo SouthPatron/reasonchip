@@ -357,6 +357,14 @@ class Processor:
                 errors=ve.errors(),
             )
 
+        if task.log:
+            if task.log == "info":
+                log.info(f"Calling chip: [{task.chip}]")
+            elif task.log == "debug":
+                log.info(f"Calling chip: [{task.chip}] : [{req}]")
+            elif task.log == "trace":
+                log.info(f"Calling chip: [{task.chip}] : [{req}]")
+
         # Call the chip ---------------------
         if task.run_async:
             resp = asyncio.create_task(chip.func(req))
@@ -364,6 +372,17 @@ class Processor:
 
         try:
             resp = await chip.func(req)
+
+            if task.log:
+                if task.log == "info":
+                    log.info(f"Chip complete: [{task.chip}]")
+                elif task.log == "debug":
+                    log.info(f"Chip complete: [{task.chip}] : [{req}]")
+                elif task.log == "trace":
+                    log.info(
+                        f"Chip complete: [{task.chip}] : [{req}] -> [{resp}]"
+                    )
+
         except Exception as ex:
             raise rex.ChipException(chip=task.chip) from ex
 

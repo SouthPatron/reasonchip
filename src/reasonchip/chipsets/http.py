@@ -28,7 +28,7 @@ import httpx
 
 from pydantic import BaseModel, Field, HttpUrl
 
-from reasonchip.core.engine.registry import Registry
+from reasonchip import Registry
 
 
 class HttpRequestRequest(BaseModel):
