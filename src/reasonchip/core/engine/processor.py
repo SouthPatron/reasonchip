@@ -75,9 +75,6 @@ class Processor:
         except rex.TerminateRequestException as ex:
             return ex.result
 
-        except rex.ProcessorException as ex:
-            raise rex.ProcessorException() from ex
-
         return None
 
     async def _sub_run(
@@ -86,8 +83,6 @@ class Processor:
         flow: FlowControl,
     ) -> typing.Tuple[RunResult, typing.Any]:
 
-        i = 0
-
         # Run the flow
         while flow.has_next():
 
@@ -95,13 +90,10 @@ class Processor:
             task = flow.peek()
 
             # Run the task
-            try:
-                rc, result = await self.run_task(
-                    task=task,
-                    variables=variables,
-                )
-            except rex.ProcessorException as ex:
-                raise rex.NestedProcessorException(task_no=i) from ex
+            rc, result = await self.run_task(
+                task=task,
+                variables=variables,
+            )
 
             # The task completed successfully, so remove it.
             flow.pop()
@@ -141,7 +133,7 @@ class Processor:
         # Terminate is requested
         if isinstance(task, TerminateTask):
             fixed_results = variables.interpolate(task.terminate)
-            raise rex.TerminateRequestException(fixed_results)
+            raise rex.TerminateRequestException(result=fixed_results)
 
         # Return tasks are easy
         if isinstance(task, ReturnTask):
@@ -161,8 +153,15 @@ class Processor:
 
         # A task has its own variable scope.
         new_vars = variables.copy()
+
+        # Variables are not interpolated
         if task.variables:
             new_vars.update(task.variables)
+
+        # Parameters are interpolated
+        if task.params:
+            fixed_results = new_vars.interpolate(task.params)
+            new_vars.update(fixed_results)
 
         # Handle the task if we're looping
         async for rc in self._loop(task, new_vars, handler):
@@ -324,15 +323,10 @@ class Processor:
             )
             return (RunResult.OK, resp)
 
-        try:
-            _, resp = await self._sub_run(
-                variables=variables,
-                flow=flow,
-            )
-        except rex.ProcessorException as ex:
-            raise rex.NestedProcessorException(
-                pipeline_name=task.dispatch
-            ) from ex
+        _, resp = await self._sub_run(
+            variables=variables,
+            flow=flow,
+        )
 
         return (RunResult.OK, resp)
 
@@ -347,7 +341,7 @@ class Processor:
         if not chip:
             raise rex.NoSuchChipException(task.chip)
 
-        # Validate and interpolate the chip parameters
+        # Validate the chip parameters
         try:
             fixed_params = variables.interpolate(task.params)
             req = chip.request_type.model_validate(fixed_params)

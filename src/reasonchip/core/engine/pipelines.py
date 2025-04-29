@@ -83,6 +83,7 @@ class TaskSet(BaseModel):
     run_async: bool = False
 
     tasks: typing.List[Task]
+    params: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
@@ -109,6 +110,7 @@ class DispatchPipelineTask(BaseModel):
     run_async: bool = False
 
     dispatch: str
+    params: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
@@ -128,7 +130,7 @@ class ChipTask(BaseModel):
     run_async: bool = False
 
     chip: str
-    params: typing.Any
+    params: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
@@ -177,6 +179,7 @@ class DeclareTask(BaseModel):
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     declare: typing.Dict[str, typing.Any]
+    params: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None

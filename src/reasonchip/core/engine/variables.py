@@ -15,11 +15,23 @@ from ruamel.yaml import YAML
 
 try:
     from .parsers import evaluator
+    from .. import exceptions as rex
 except ImportError:
     from parsers import evaluator
+    from reasonchip.core import exceptions as rex
 
 
 VariableMapType = typing.Dict[str, typing.Any]
+
+
+PATTERN_KEY = r"""
+(?:^|\.)([a-zA-Z_][a-zA-Z0-9_]*)       # dot notation: foo.bar
+| \[\s*(['"]?)([^\[\]'"]+)\2\s*\]      # brackets: ["key"], [0]
+"""
+
+PATTERN_VAR = r"""^var\((.*?)\)$"""
+
+PATTERN_TEMPLATE = r"""(?<!\\){{\s*((?:[^\{\}]|\\\{|\\\})*?)\s*}}"""
 
 
 class Variables:
@@ -28,6 +40,10 @@ class Variables:
         vm = munch.munchify(vmap)
         assert isinstance(vm, munch.Munch)
         self._vmap: munch.Munch = vm
+
+        self._regex_key = re.compile(PATTERN_KEY, re.VERBOSE)
+        self._regex_var = re.compile(PATTERN_VAR, re.VERBOSE)
+        self._regex_template = re.compile(PATTERN_TEMPLATE, re.VERBOSE)
 
     @property
     def vmap(self) -> munch.Munch:
@@ -73,12 +89,8 @@ class Variables:
         return self
 
     def _parse_key(self, key: str) -> list:
-        pattern = r"""
-            (?:^|\.)([a-zA-Z_][a-zA-Z0-9_]*)       # dot notation: foo.bar
-            | \[\s*(['"]?)([^\[\]'"]+)\2\s*\]      # brackets: ["key"], [0]
-        """
         parts = []
-        for match in re.finditer(pattern, key, re.VERBOSE):
+        for match in self._regex_key.finditer(key):
             if match.group(1):  # dot notation
                 parts.append(match.group(1))
             elif match.group(3):  # bracket access
@@ -185,16 +197,18 @@ class Variables:
         _seen: typing.Optional[set] = None,
     ) -> typing.Any:
 
-        # Check if this is a pure variable name.
-        found, obj = self.get(value)
-        if found:
-            return self.interpolate(obj, _seen)
+        # Check if this is a pure variable representation
+        match = self._regex_var.match(value)
+        if match:
+            varname = match.group(1)
+            found, obj = self.get(varname)
+            if found:
+                return self.interpolate(obj, _seen)
 
-        # This is the pattern
-        pattern = r"(?<!\\){{\s*((?:[^\{\}]|\\\{|\\\})*?)\s*}}"
+            raise rex.VariableNotFoundException(variable=varname)
 
         # If the entire text is a single placeholder, return evaluation.
-        full_match = re.fullmatch(pattern, value)
+        full_match = self._regex_template.fullmatch(value)
         if full_match:
             expr = full_match.group(1)
             return self._evaluate(expr)
@@ -204,7 +218,7 @@ class Variables:
             expr = match.group(1)
             return str(self._evaluate(expr))
 
-        return re.sub(pattern, replacer, value)
+        return self._regex_template.sub(replacer, value)
 
     def _evaluate(self, expr: str) -> typing.Any:
         """Evaluate the expression safely, allowing only the vmap context."""
@@ -236,7 +250,19 @@ if __name__ == "__main__":
     assert v.has("result.b.surname") == True
     assert v.has("result.b.steve") == False
 
+    # Test var being honoured
+
+    assert v.interpolate("result.b.name") == "result.b.name"
+    assert v.interpolate("var(result.b.name)") == "bob"
+
+    # Testing update
+
     v.update({"result": {"b": 5}})
+
+    assert v.interpolate("result.b.name") == "result.b.name"
+    assert v.interpolate("var(result.b)") == 5
+    assert v.interpolate("{{ result.b }}") == 5
+    assert v.interpolate("[{{ result.b }}]") == "[5]"
 
     print(v.vmap)
 
