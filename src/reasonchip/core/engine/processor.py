@@ -452,19 +452,17 @@ class Processor:
         if task.append_result_into:
             name = task.append_result_into
 
-            if not variables.has(name):
-                variables.set(name, [value])
-                if dest:
-                    dest.set(name, [result])
+            found, obj = variables.get(name)
+            if not found:
+                obj = []
+                variables.set(name, obj)
 
             else:
-                val = variables.get(name)
-                if not isinstance(val, list):
+                if not isinstance(obj, list):
                     raise rex.InvalidChipParametersException(
                         f"Variable '{name}' is not a list."
                     )
-                val.append(result)
+                obj.append(result)
 
-                variables.set(name, val)
-                if dest:
-                    dest.set(name, val)
+            if dest:
+                dest.set(name, obj)
