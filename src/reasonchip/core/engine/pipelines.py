@@ -90,6 +90,7 @@ class TaskSet(BaseModel):
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
+    return_result: bool = False
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
 
@@ -117,6 +118,7 @@ class DispatchPipelineTask(BaseModel):
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
+    return_result: bool = False
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
 
@@ -137,6 +139,7 @@ class ChipTask(BaseModel):
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
+    return_result: bool = False
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
 
@@ -148,6 +151,7 @@ class ReturnTask(BaseModel):
     name: typing.Optional[str] = None
     when: typing.Optional[str] = None
     log: typing.Optional[TaskLogLevel] = None
+
     result: typing.Any
 
     class Config:
@@ -179,13 +183,8 @@ class DeclareTask(BaseModel):
     name: typing.Optional[str] = None
     when: typing.Optional[str] = None
     log: typing.Optional[TaskLogLevel] = None
-    variables: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     declare: typing.Dict[str, typing.Any]
-    params: typing.Optional[typing.Dict[str, typing.Any]] = None
-
-    store_result_as: typing.Optional[str] = None
-    append_result_into: typing.Optional[str] = None
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
 
@@ -225,6 +224,7 @@ class CodeTask(BaseModel):
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
+    return_result: bool = False
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
 
@@ -248,7 +248,6 @@ Task = typing.Union[
 SaveableTask = typing.Union[
     TaskSet,
     DispatchPipelineTask,
-    DeclareTask,
     ChipTask,
     CodeTask,
 ]

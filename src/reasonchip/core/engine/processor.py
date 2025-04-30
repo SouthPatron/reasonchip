@@ -140,12 +140,19 @@ class Processor:
         if isinstance(task, ReturnTask):
             return await self._run_returntask(task, variables)
 
+        # DeclareTasks are kinda easy but can loop.
+        if isinstance(task, DeclareTask):
+            async for rc in self._loop(task, variables, self._run_declaretask):
+                assert rc[0] == RunResult.OK
+                variables.update(rc[1])
+
+            return rc
+
         # Figure out what kind of chip this is
         handlers = {
             TaskSet: self._run_taskset,
             DispatchPipelineTask: self._run_dispatchpipelinetask,
             ChipTask: self._run_chiptask,
-            DeclareTask: self._run_declaretask,
             CodeTask: self._run_codetask,
         }
 
@@ -167,13 +174,13 @@ class Processor:
 
         # Handle the task if we're looping
         async for rc in self._loop(task, new_vars, handler):
-            self._handle_task_save(task, new_vars, rc[1], variables)
+            assert rc[0] == RunResult.OK
+            self._handle_task_save(task, rc[1], new_vars, variables)
 
-            # Declarations go into the current context
-            if isinstance(task, DeclareTask):
-                assert rc[0] == RunResult.OK
-                new_vars.update(rc[1])
-                variables.update(rc[1])
+        assert rc[0] == RunResult.OK
+
+        if task.return_result:
+            return (RunResult.RETURN_REQUEST, rc[1])
 
         return rc
 
@@ -293,12 +300,12 @@ class Processor:
                     flow=flow,
                 )
             )
-            return (RunResult.OK, resp)
+        else:
+            _, resp = await self._sub_run(
+                variables=variables,
+                flow=flow,
+            )
 
-        _, resp = await self._sub_run(
-            variables=variables,
-            flow=flow,
-        )
         return (RunResult.OK, resp)
 
     async def _run_dispatchpipelinetask(
@@ -323,12 +330,11 @@ class Processor:
                     flow=flow,
                 )
             )
-            return (RunResult.OK, resp)
-
-        _, resp = await self._sub_run(
-            variables=variables,
-            flow=flow,
-        )
+        else:
+            _, resp = await self._sub_run(
+                variables=variables,
+                flow=flow,
+            )
 
         return (RunResult.OK, resp)
 
@@ -424,45 +430,32 @@ class Processor:
     def _handle_task_save(
         self,
         task: SaveableTask,
-        variables: Variables,
         value: typing.Any,
-        dest: typing.Optional[Variables] = None,
+        local_variables: Variables,
+        global_variables: Variables,
     ):
-        """
-        NOTE: This saves to both the variables and the dest.
-
-        Variables is not interpolated.
-        Dest is interpolated.
-
-        NOTE: Not a great method.
-        """
-
         if not task.store_result_as and not task.append_result_into:
             return
 
         # Prepare the result for elevation
-        result = variables.interpolate(value) if dest else None
-
         if task.store_result_as:
             name = task.store_result_as
-            variables.set(name, value)
-            if dest:
-                dest.set(name, result)
+            local_variables.set(name, value)
+            global_variables.set(name, value)
 
         if task.append_result_into:
             name = task.append_result_into
 
-            found, obj = variables.get(name)
+            found, obj = local_variables.get(name)
             if not found:
-                obj = []
-                variables.set(name, obj)
+                obj = [value]
+                local_variables.set(name, obj)
 
             else:
                 if not isinstance(obj, list):
                     raise rex.InvalidChipParametersException(
                         f"Variable '{name}' is not a list."
                     )
-                obj.append(result)
+                obj.append(value)
 
-            if dest:
-                dest.set(name, obj)
+            global_variables.set(name, obj)
