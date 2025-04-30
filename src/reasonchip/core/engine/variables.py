@@ -43,7 +43,9 @@ class Variables:
 
         self._regex_key = re.compile(PATTERN_KEY, re.VERBOSE)
         self._regex_var = re.compile(PATTERN_VAR, re.VERBOSE)
-        self._regex_template = re.compile(PATTERN_TEMPLATE, re.VERBOSE)
+        self._regex_template = re.compile(
+            PATTERN_TEMPLATE, re.VERBOSE | re.DOTALL
+        )
 
     @property
     def vmap(self) -> munch.Munch:
@@ -275,6 +277,24 @@ if __name__ == "__main__":
     # Interpolate needs to be only one layer deep
     assert v.interpolate("{{ chunks }}") == "{{ chicken }}"
     assert v.interpolate("{{ result.b }}") == 5
+
+    # Multiline support
+    assert (
+        v.interpolate(
+            """{{
+        chunks
+    }}"""
+        )
+        == "{{ chicken }}"
+    )
+    assert (
+        v.interpolate(
+            """{{
+    result.b + 1
+}}"""
+        )
+        == 6
+    )
 
     try:
         v.interpolate("{{ result.b.name }}")
