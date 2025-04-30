@@ -218,6 +218,8 @@ class CodeTask(BaseModel):
     log: typing.Optional[TaskLogLevel] = None
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
 
+    run_async: bool = False
+
     code: str
     params: typing.Optional[typing.Dict[str, typing.Any]] = None
 

@@ -399,6 +399,10 @@ class Processor:
                 log.info(f"Executing code")
 
         # Run the code ----------------------
+        if task.run_async:
+            resp = asyncio.create_task(executor(task.code, variables.vmap))
+            return (RunResult.OK, resp)
+
         try:
             resp = await executor(task.code, variables.vmap)
 
