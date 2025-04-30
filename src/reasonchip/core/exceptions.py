@@ -323,6 +323,12 @@ class VariableNotFoundException(ProcessorException):
         return resp
 
 
+class CodeExecutionException(ProcessorException):
+    """Raised when code execution fails."""
+
+    pass
+
+
 class EvaluationException(ProcessorException):
     """Raised when an evaluation fails."""
 

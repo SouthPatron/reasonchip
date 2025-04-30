@@ -55,6 +55,9 @@ def parse_task(t: typing.Union[Task, typing.Dict], task_no: int) -> Task:
         if "chip" in t:
             return ChipTask.model_validate(t)
 
+        if "code" in t:
+            return CodeTask.model_validate(t)
+
     except ValidationError as ve:
         raise rex.TaskParseException(
             message="Task failed to parse",
@@ -209,6 +212,24 @@ class TerminateTask(BaseModel):
         extra = "forbid"
 
 
+class CodeTask(BaseModel):
+    name: typing.Optional[str] = None
+    when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
+    variables: typing.Optional[typing.Dict[str, typing.Any]] = None
+
+    code: str
+    params: typing.Optional[typing.Dict[str, typing.Any]] = None
+
+    store_result_as: typing.Optional[str] = None
+    append_result_into: typing.Optional[str] = None
+
+    loop: typing.Optional[typing.Union[str, typing.List]] = None
+
+    class Config:
+        extra = "forbid"
+
+
 # -------------------------- TYPES AND THE PIPELINE -------------------------
 
 Task = typing.Union[
@@ -219,13 +240,22 @@ Task = typing.Union[
     DeclareTask,
     CommentTask,
     TerminateTask,
+    CodeTask,
 ]
 
 SaveableTask = typing.Union[
-    TaskSet, DispatchPipelineTask, DeclareTask, ChipTask
+    TaskSet,
+    DispatchPipelineTask,
+    DeclareTask,
+    ChipTask,
+    CodeTask,
 ]
 LoopableTask = typing.Union[
-    TaskSet, DispatchPipelineTask, DeclareTask, ChipTask
+    TaskSet,
+    DispatchPipelineTask,
+    DeclareTask,
+    ChipTask,
+    CodeTask,
 ]
 
 

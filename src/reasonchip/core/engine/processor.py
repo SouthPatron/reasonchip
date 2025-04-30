@@ -18,7 +18,7 @@ from .variables import Variables
 from .flow_control import FlowControl
 
 from .registry import Registry
-from .parsers import evaluator
+from .parsers import evaluator, executor
 from .pipelines import (
     TaskSet,
     ChipTask,
@@ -27,6 +27,7 @@ from .pipelines import (
     DeclareTask,
     CommentTask,
     TerminateTask,
+    CodeTask,
     Task,
     SaveableTask,
     LoopableTask,
@@ -145,6 +146,7 @@ class Processor:
             DispatchPipelineTask: self._run_dispatchpipelinetask,
             ChipTask: self._run_chiptask,
             DeclareTask: self._run_declaretask,
+            CodeTask: self._run_codetask,
         }
 
         # Run the task
@@ -379,6 +381,37 @@ class Processor:
 
         except Exception as ex:
             raise rex.ChipException(chip=task.chip) from ex
+
+        return (RunResult.OK, resp)
+
+    async def _run_codetask(
+        self,
+        task: CodeTask,
+        variables: Variables,
+    ) -> typing.Tuple[RunResult, typing.Any]:
+
+        if task.log:
+            if task.log == "info":
+                log.info(f"Executing code")
+            elif task.log == "debug":
+                log.info(f"Executing code")
+            elif task.log == "trace":
+                log.info(f"Executing code")
+
+        # Run the code ----------------------
+        try:
+            resp = await executor(task.code, variables.vmap)
+
+            if task.log:
+                if task.log == "info":
+                    log.info(f"Code complete")
+                elif task.log == "debug":
+                    log.info(f"Code complete")
+                elif task.log == "trace":
+                    log.info(f"Code complete: [{resp}]")
+
+        except Exception as ex:
+            raise rex.CodeExecutionException() from ex
 
         return (RunResult.OK, resp)
 
