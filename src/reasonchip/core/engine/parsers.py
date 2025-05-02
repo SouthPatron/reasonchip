@@ -113,7 +113,13 @@ async def executor(code: str, variables: munch.Munch) -> typing.Any:
     exec(
         code,
         {
-            "__builtins__": SAFE_BUILTINS,
+            "__builtins__": {
+                **SAFE_BUILTINS,
+                **{
+                    "__import__": __import__,
+                    "print": print,
+                },
+            },
         },
         variables,
     )

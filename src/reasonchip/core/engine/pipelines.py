@@ -79,6 +79,8 @@ TaskLogLevel = typing.Literal["info", "debug", "trace"]
 
 class TaskSet(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
     log: typing.Optional[TaskLogLevel] = None
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
@@ -107,6 +109,8 @@ class TaskSet(BaseModel):
 
 class DispatchPipelineTask(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
     log: typing.Optional[TaskLogLevel] = None
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
@@ -128,6 +132,8 @@ class DispatchPipelineTask(BaseModel):
 
 class ChipTask(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
     log: typing.Optional[TaskLogLevel] = None
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
@@ -149,6 +155,8 @@ class ChipTask(BaseModel):
 
 class ReturnTask(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
     log: typing.Optional[TaskLogLevel] = None
 
@@ -181,6 +189,8 @@ class ReturnTask(BaseModel):
 
 class DeclareTask(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
     log: typing.Optional[TaskLogLevel] = None
 
@@ -194,7 +204,7 @@ class DeclareTask(BaseModel):
 
 class CommentTask(BaseModel):
     name: typing.Optional[str] = None
-    comment: typing.Any
+    comment: str
 
     class Config:
         extra = "forbid"
@@ -202,6 +212,8 @@ class CommentTask(BaseModel):
 
 class TerminateTask(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
     log: typing.Optional[TaskLogLevel] = None
 
@@ -213,6 +225,8 @@ class TerminateTask(BaseModel):
 
 class CodeTask(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
     log: typing.Optional[TaskLogLevel] = None
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
