@@ -434,7 +434,15 @@ class Processor:
         local_variables: Variables,
         global_variables: Variables,
     ):
-        if not task.store_result_as and not task.append_result_into:
+        # Always save results as '_'
+        local_variables.set("_", value)
+        global_variables.set("_", value)
+
+        if (
+            not task.store_result_as
+            and not task.append_result_into
+            and not task.key_result_into
+        ):
             return
 
         # Prepare the result for elevation
@@ -457,5 +465,26 @@ class Processor:
                         f"Variable '{name}' is not a list."
                     )
                 obj.append(value)
+
+            global_variables.set(name, obj)
+
+        if task.key_result_into:
+            name = task.key_result_into.name
+            key_name = task.key_result_into.key
+
+            # Keys are interpolated
+            key_name = local_variables.interpolate(key_name)
+
+            found, obj = local_variables.get(name)
+            if not found:
+                obj = {key_name: value}
+                local_variables.set(name, obj)
+
+            else:
+                if not isinstance(obj, dict):
+                    raise rex.InvalidChipParametersException(
+                        f"Variable '{name}' is not a dictionary."
+                    )
+                obj.update({key_name: value})
 
             global_variables.set(name, obj)

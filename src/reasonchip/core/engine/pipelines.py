@@ -71,6 +71,17 @@ def parse_task(t: typing.Union[Task, typing.Dict], task_no: int) -> Task:
     )
 
 
+# -------------------------- SUPPORT STRUCTURES -----------------------------
+
+
+class KeyValuePair(BaseModel):
+    name: str
+    key: str
+
+    class Config:
+        extra = "forbid"
+
+
 # -------------------------- DIFFERENT TASKS --------------------------------
 
 
@@ -92,6 +103,7 @@ class TaskSet(BaseModel):
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
+    key_result_into: typing.Optional[KeyValuePair] = None
     return_result: bool = False
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
@@ -122,6 +134,7 @@ class DispatchPipelineTask(BaseModel):
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
+    key_result_into: typing.Optional[KeyValuePair] = None
     return_result: bool = False
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
@@ -145,6 +158,7 @@ class ChipTask(BaseModel):
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
+    key_result_into: typing.Optional[KeyValuePair] = None
     return_result: bool = False
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
@@ -238,6 +252,7 @@ class CodeTask(BaseModel):
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
+    key_result_into: typing.Optional[KeyValuePair] = None
     return_result: bool = False
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None

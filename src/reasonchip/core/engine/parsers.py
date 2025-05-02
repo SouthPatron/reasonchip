@@ -62,6 +62,8 @@ SAFE_BUILTINS = {
     "format": format,
     "type": type,
     "isinstance": isinstance,
+    "iter": iter,
+    "next": next,
     # Add any other safe built-in functions you want to allow.
     "escape": escape,
     "unescape": unescape,
@@ -105,7 +107,13 @@ async def executor(code: str, variables: munch.Munch) -> typing.Any:
         return eval(
             code,
             {
-                "__builtins__": SAFE_BUILTINS,
+                "__builtins__": {
+                    **SAFE_BUILTINS,
+                    **{
+                        "__import__": __import__,
+                        "print": print,
+                    },
+                },
             },
             variables,
         )
