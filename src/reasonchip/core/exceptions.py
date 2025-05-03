@@ -326,7 +326,9 @@ class VariableNotFoundException(ProcessorException):
 class CodeExecutionException(ProcessorException):
     """Raised when code execution fails."""
 
-    pass
+    def __str__(self) -> str:
+        resp = f"Code execution exception"
+        return resp
 
 
 class EvaluationException(ProcessorException):
@@ -350,7 +352,12 @@ class LoopVariableNotIterable(ProcessorException):
 class AssertException(ProcessorException):
     "" "Raised when an assert fails." ""
 
-    pass
+    def __init__(self, check: str, *args, **kwargs):
+        self._check: str = check
+
+    def __str__(self) -> str:
+        resp = f"Assert exception: {self._check}"
+        return resp
 
 
 # --------- Flow Exceptions --------------------------------------------------
