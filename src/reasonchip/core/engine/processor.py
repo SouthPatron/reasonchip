@@ -28,6 +28,7 @@ from .pipelines import (
     CommentTask,
     TerminateTask,
     CodeTask,
+    AssertTask,
     Task,
     SaveableTask,
     LoopableTask,
@@ -131,6 +132,8 @@ class Processor:
         # Bind the variable
         rc = (RunResult.OK, None)
 
+        # ------------- EASY TASKS ------------------------------------------
+
         # Terminate is requested
         if isinstance(task, TerminateTask):
             fixed_results = variables.interpolate(task.terminate)
@@ -147,6 +150,15 @@ class Processor:
                 variables.update(rc[1])
 
             return rc
+
+        # AssertTasks are easy too
+        if isinstance(task, AssertTask):
+            async for rc in self._loop(task, variables, self._run_asserttask):
+                assert rc[0] == RunResult.OK
+
+            return rc
+
+        # ------------- LESS EASY TASKS -------------------------------------
 
         # Figure out what kind of chip this is
         handlers = {
@@ -282,6 +294,35 @@ class Processor:
                 )
 
         return (RunResult.OK, fixed_rc)
+
+    async def _run_asserttask(
+        self,
+        task: AssertTask,
+        variables: Variables,
+    ) -> typing.Tuple[RunResult, typing.Any]:
+
+        if isinstance(task.checks, str):
+            checks = [task.checks]
+        else:
+            checks = task.checks
+
+        for c in checks:
+            rc = evaluator(c, variables.vmap)
+            if rc:
+                continue
+
+            if task.log:
+                log.info(f"Assertation failed: {c}")
+
+            raise rex.AssertException(c)
+
+        if task.log:
+            if task.log == "info":
+                log.info("Asserts have passed")
+            else:
+                log.info(f"Asserts have passed: {task.checks}")
+
+        return (RunResult.OK, None)
 
     async def _run_taskset(
         self,

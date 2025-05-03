@@ -347,6 +347,12 @@ class LoopVariableNotIterable(ProcessorException):
     pass
 
 
+class AssertException(ProcessorException):
+    "" "Raised when an assert fails." ""
+
+    pass
+
+
 # --------- Flow Exceptions --------------------------------------------------
 
 
