@@ -37,8 +37,8 @@ def parse_task(t: typing.Union[Task, typing.Dict], task_no: int) -> Task:
         if "tasks" in t:
             return TaskSet.model_validate(t)
 
-        if "dispatch" in t:
-            return DispatchPipelineTask.model_validate(t)
+        if "sidequest" in t:
+            return SidequestTask.model_validate(t)
 
         if "return" in t:
             return ReturnTask.model_validate(t)
@@ -122,7 +122,7 @@ class TaskSet(BaseModel):
         return [parse_task(t, i) for i, t in enumerate(tasks)]
 
 
-class DispatchPipelineTask(BaseModel):
+class SidequestTask(BaseModel):
     name: typing.Optional[str] = None
     comment: typing.Optional[str] = None
 
@@ -132,7 +132,7 @@ class DispatchPipelineTask(BaseModel):
 
     run_async: bool = False
 
-    dispatch: str
+    sidequest: str
     params: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     store_result_as: typing.Optional[str] = None
@@ -309,7 +309,7 @@ class AssertTask(BaseModel):
 
 Task = typing.Union[
     TaskSet,
-    DispatchPipelineTask,
+    SidequestTask,
     ChipTask,
     ReturnTask,
     DeclareTask,
@@ -321,13 +321,13 @@ Task = typing.Union[
 
 SaveableTask = typing.Union[
     TaskSet,
-    DispatchPipelineTask,
+    SidequestTask,
     ChipTask,
     CodeTask,
 ]
 LoopableTask = typing.Union[
     TaskSet,
-    DispatchPipelineTask,
+    SidequestTask,
     DeclareTask,
     ChipTask,
     CodeTask,
