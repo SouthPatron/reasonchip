@@ -360,22 +360,6 @@ class AssertException(ProcessorException):
         return resp
 
 
-# --------- Flow Exceptions --------------------------------------------------
-
-
-class FlowException(ProcessorException):
-    """A flow exception raised from the chip."""
-
-    pass
-
-
-class TerminateRequestException(FlowException):
-    """Raised when everything should terminate."""
-
-    def __init__(self, result: typing.Any):
-        self.result = result
-
-
 # -------------------------- PRETTY PRINTER ---------------------------------
 
 

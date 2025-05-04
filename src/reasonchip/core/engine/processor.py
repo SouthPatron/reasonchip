@@ -23,6 +23,7 @@ from .pipelines import (
     TaskSet,
     ChipTask,
     DispatchTask,
+    BranchTask,
     ReturnTask,
     DeclareTask,
     CommentTask,
@@ -48,6 +49,38 @@ class RunResult(enum.IntEnum):
     OK = 0
     SKIPPED = 10
     RETURN_REQUEST = 20
+    BRANCH_REQUEST = 30
+
+
+# --------- Exceptions -------------------------------------------------------
+
+
+class FlowException(rex.ProcessorException):
+    """A flow exception raised from the chip."""
+
+    pass
+
+
+class TerminateRequestException(FlowException):
+    """Raised when everything should terminate."""
+
+    def __init__(self, result: typing.Any):
+        self.result = result
+
+
+class BranchRequestException(FlowException):
+    """Raised when a branch request is made."""
+
+    def __init__(
+        self,
+        entry: str,
+        variables: Variables,
+    ):
+        self.entry = entry
+        self.variables = variables
+
+
+# -------- Processor ---------------------------------------------------------
 
 
 class Processor:
@@ -65,19 +98,35 @@ class Processor:
     async def run(
         self,
         variables: Variables,
-        flow: FlowControl,
+        entry: str,
     ) -> typing.Any:
 
-        try:
-            rc, result = await self._sub_run(variables, flow)
+        pipeline_name = entry
+        new_vars = variables.copy()
 
-            if rc == RunResult.RETURN_REQUEST:
-                return result
+        while True:
+            # Fetch the pipeline
+            pipeline = await self.resolver(pipeline_name)
+            if not pipeline:
+                raise rex.NoSuchPipelineException(pipeline_name)
 
-        except rex.TerminateRequestException as ex:
-            return ex.result
+            # Load the flow control
+            flow = FlowControl(flow=pipeline.tasks)
 
-        return None
+            try:
+                rc, result = await self._sub_run(new_vars, flow)
+                if rc == RunResult.RETURN_REQUEST:
+                    return result
+
+            except TerminateRequestException as ex:
+                return ex.result
+
+            except BranchRequestException as ex:
+                pipeline_name = ex.entry
+                new_vars = ex.variables
+                continue
+
+            return None
 
     async def _sub_run(
         self,
@@ -157,6 +206,22 @@ class Processor:
                 assert rc[0] == RunResult.OK
 
             return rc
+
+        # Branch has been requested
+        if isinstance(task, BranchTask):
+            # No need to make variable copies as we're not going back.
+            if task.variables:
+                variables.update(task.variables)
+
+            # Parameters are interpolated
+            if task.params:
+                fixed_results = variables.interpolate(task.params)
+                variables.update(fixed_results)
+
+            raise BranchRequestException(
+                entry=task.branch,
+                variables=variables,
+            )
 
         # ------------- LESS EASY TASKS -------------------------------------
 

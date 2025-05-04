@@ -40,6 +40,9 @@ def parse_task(t: typing.Union[Task, typing.Dict], task_no: int) -> Task:
         if "dispatch" in t:
             return DispatchTask.model_validate(t)
 
+        if "branch" in t:
+            return BranchTask.model_validate(t)
+
         if "return" in t:
             return ReturnTask.model_validate(t)
 
@@ -141,6 +144,21 @@ class DispatchTask(BaseModel):
     return_result: bool = False
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
+
+    class Config:
+        extra = "forbid"
+
+
+class BranchTask(BaseModel):
+    name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
+    when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
+    variables: typing.Optional[typing.Dict[str, typing.Any]] = None
+
+    branch: str
+    params: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     class Config:
         extra = "forbid"
@@ -310,6 +328,7 @@ class AssertTask(BaseModel):
 Task = typing.Union[
     TaskSet,
     DispatchTask,
+    BranchTask,
     ChipTask,
     ReturnTask,
     DeclareTask,
