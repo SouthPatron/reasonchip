@@ -10,7 +10,7 @@ from .pipelines import (
     Pipeline,
     Task,
     TaskSet,
-    SidequestTask,
+    DispatchTask,
     ChipTask,
 )
 from .processor import Processor
@@ -87,9 +87,9 @@ class Engine:
 
             def check_tasks(tasks: typing.List[Task]):
                 for i, t in enumerate(tasks):
-                    if isinstance(t, SidequestTask):
+                    if isinstance(t, DispatchTask):
                         # Check for the pipeline existence
-                        pipeline_name = t.sidequest
+                        pipeline_name = t.dispatch
                         if pipeline_name not in self._pipelines:
                             raise rex.NoSuchPipelineDuringValidationException(
                                 task_no=i,

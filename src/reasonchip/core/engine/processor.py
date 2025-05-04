@@ -22,7 +22,7 @@ from .parsers import evaluator, executor
 from .pipelines import (
     TaskSet,
     ChipTask,
-    SidequestTask,
+    DispatchTask,
     ReturnTask,
     DeclareTask,
     CommentTask,
@@ -163,7 +163,7 @@ class Processor:
         # Figure out what kind of chip this is
         handlers = {
             TaskSet: self._run_taskset,
-            SidequestTask: self._run_sidequesttask,
+            DispatchTask: self._run_dispatchtask,
             ChipTask: self._run_chiptask,
             CodeTask: self._run_codetask,
         }
@@ -349,16 +349,16 @@ class Processor:
 
         return (RunResult.OK, resp)
 
-    async def _run_sidequesttask(
+    async def _run_dispatchtask(
         self,
-        task: SidequestTask,
+        task: DispatchTask,
         variables: Variables,
     ) -> typing.Tuple[RunResult, typing.Any]:
 
         # Load the pipeline
-        pipeline = await self.resolver(task.sidequest)
+        pipeline = await self.resolver(task.dispatch)
         if pipeline is None:
-            raise rex.NoSuchPipelineException(task.sidequest)
+            raise rex.NoSuchPipelineException(task.dispatch)
 
         # We have loaded the lists of tasks to run.
         flow = FlowControl(pipeline.tasks)
