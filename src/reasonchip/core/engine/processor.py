@@ -21,19 +21,23 @@ from .registry import Registry
 from .parsers import evaluator, executor
 
 from .pipelines import (
-    TaskSet,
-    ChipTask,
-    DispatchTask,
-    BranchTask,
-    ReturnTask,
-    DeclareTask,
-    CommentTask,
-    TerminateTask,
-    CodeTask,
-    AssertTask,
+    # Generic Task
     Task,
-    SaveableTask,
+    # Specific Tasks
+    AssertTask,
+    BranchTask,
+    ChipTask,
+    CodeTask,
+    CommentTask,
+    DeclareTask,
+    DispatchTask,
+    ReturnTask,
+    TaskSet,
+    TerminateTask,
+    # Task Types
     LoopableTask,
+    SaveableTask,
+    # Pipeline
     Pipeline,
 )
 
@@ -50,7 +54,6 @@ class RunResult(enum.IntEnum):
     OK = 0
     SKIPPED = 10
     RETURN_REQUEST = 20
-    BRANCH_REQUEST = 30
 
 
 # --------- Exceptions -------------------------------------------------------
@@ -116,9 +119,16 @@ class Processor:
             flow = FlowControl(flow=pipeline.tasks)
 
             try:
-                rc, result = await self._sub_run(new_vars, flow)
+                rc, result = await self._sub_run(
+                    frame_name=pipeline_name,
+                    variables=new_vars,
+                    flow=flow,
+                )
+
                 if rc == RunResult.RETURN_REQUEST:
                     return result
+
+                return None
 
             except TerminateRequestException as ex:
                 return ex.result
@@ -128,41 +138,57 @@ class Processor:
                 new_vars = ex.variables
                 continue
 
-            return None
-
     async def _sub_run(
         self,
+        frame_name: str,
         variables: Variables,
         flow: FlowControl,
     ) -> typing.Tuple[RunResult, typing.Any]:
 
-        # Run the flow
-        while flow.has_next():
+        try:
+            # New stack frame
+            self._stack.push(pipeline=frame_name)
 
-            # Retrieve the first task in the flow
-            task = flow.peek()
+            # Run the flow
+            while flow.has_next():
 
-            # Run the task
-            rc, result = await self.run_task(
-                task=task,
-                variables=variables,
-            )
+                # Increment the task number
+                self._stack.tick()
 
-            # The task completed successfully, so remove it.
-            flow.pop()
+                # Retrieve the first task in the flow
+                task = flow.peek()
 
-            # Handle normal behaviour
-            if rc in [RunResult.OK, RunResult.SKIPPED]:
-                continue
+                # Run the task
+                rc, result = await self.run_task(
+                    task=task,
+                    variables=variables,
+                )
 
-            # This is the end of the pipeline
-            if rc in [RunResult.RETURN_REQUEST]:
-                return (rc, result)
+                # The task completed successfully, so remove it.
+                flow.pop()
 
-            assert False, "Programmer Error. Unreachable code was reached."
+                # Handle normal behaviour
+                if rc in [RunResult.OK, RunResult.SKIPPED]:
+                    continue
 
-        # Successful completion. No specific return value
-        return (RunResult.OK, None)
+                # This is the end of the pipeline
+                if rc in [RunResult.RETURN_REQUEST]:
+                    self._stack.pop()
+                    return (rc, result)
+
+                assert False, "Programmer Error. Unreachable code was reached."
+
+            self._stack.pop()
+
+            # Successful completion. No specific return value
+            return (RunResult.OK, None)
+
+        except TerminateRequestException:
+            raise
+
+        except BranchRequestException:
+            self._stack.pop()
+            raise
 
     async def run_task(
         self,
@@ -404,12 +430,14 @@ class Processor:
         if task.run_async:
             resp = asyncio.create_task(
                 self._sub_run(
+                    frame_name="<taskset>",
                     variables=variables,
                     flow=flow,
                 )
             )
         else:
             _, resp = await self._sub_run(
+                frame_name="<taskset>",
                 variables=variables,
                 flow=flow,
             )
@@ -434,12 +462,14 @@ class Processor:
         if task.run_async:
             resp = asyncio.create_task(
                 self._sub_run(
+                    frame_name=task.dispatch,
                     variables=variables,
                     flow=flow,
                 )
             )
         else:
             _, resp = await self._sub_run(
+                frame_name=task.dispatch,
                 variables=variables,
                 flow=flow,
             )
