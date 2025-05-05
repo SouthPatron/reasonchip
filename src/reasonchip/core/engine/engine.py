@@ -20,6 +20,8 @@ from .registry import Registry
 
 from .. import exceptions as rex
 
+from .stack import Stack
+
 
 class Engine:
     """
@@ -31,10 +33,15 @@ class Engine:
         Constructor.
         """
         self._pipelines: typing.Dict[str, Pipeline] = {}
+        self._stack: typing.Optional[Stack] = None
 
     @property
     def pipelines(self) -> typing.Dict[str, Pipeline]:
         return self._pipelines
+
+    @property
+    def stack(self) -> typing.Optional[Stack]:
+        return self._stack
 
     def initialize(
         self,
@@ -67,10 +74,14 @@ class Engine:
 
         processor = Processor(resolver=get_pipeline)
 
-        return await processor.run(
-            variables=variables,
-            entry=entry,
-        )
+        try:
+            return await processor.run(
+                variables=variables,
+                entry=entry,
+            )
+        except Exception:
+            self._stack = processor.stack
+            raise
 
     # -------------- VALIDATION --------------------------------------------
 

@@ -222,32 +222,6 @@ class ProcessorException(ReasonChipException):
         return resp
 
 
-class NestedProcessorException(ProcessorException):
-    """A nested path processor exception."""
-
-    def __init__(
-        self,
-        pipeline_name: typing.Optional[str] = None,
-        task_no: typing.Optional[int] = None,
-        *args,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.pipeline_name = pipeline_name
-        self.task_no = task_no
-
-    def __str__(self) -> str:
-        resp = ""
-
-        if self.pipeline_name:
-            resp += f"Pipeline: {self.pipeline_name} "
-
-        if self.task_no:
-            resp += "Task#: {self.task_no + 1}"
-
-        return resp
-
-
 class NoSuchPipelineException(ProcessorException):
     """Raised when a pipeline is not found."""
 

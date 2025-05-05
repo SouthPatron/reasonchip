@@ -100,6 +100,10 @@ class Processor:
     def resolver(self) -> ResolverType:
         return self._resolver
 
+    @property
+    def stack(self) -> Stack:
+        return self._stack
+
     async def run(
         self,
         variables: Variables,
