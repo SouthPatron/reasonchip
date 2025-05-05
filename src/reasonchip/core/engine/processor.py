@@ -156,11 +156,11 @@ class Processor:
             # Run the flow
             while flow.has_next():
 
-                # Increment the task number
-                self._stack.tick()
-
                 # Retrieve the first task in the flow
                 task = flow.peek()
+
+                # Increment the task number
+                self._stack.tick(task=task)
 
                 # Run the task
                 rc, result = await self.run_task(

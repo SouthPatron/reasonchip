@@ -78,6 +78,8 @@ class RunLocalCommand(AsyncCommand):
         if not args.collections:
             args.collections = ["."]
 
+        runner = None
+
         try:
             # Load variables
             variables = Variables()
@@ -111,5 +113,17 @@ class RunLocalCommand(AsyncCommand):
 
         except Exception as ex:
             print(f"************** UNHANDLED EXCEPTION **************")
-            traceback.print_exc()
+
+            if runner:
+                stack = runner.engine.stack
+                if stack:
+                    stack.print()
+
+                print("\n")
+                print(f"ERROR: {str(ex)}")
+                print("\n")
+
+            else:
+                traceback.print_exc()
+
             return ExitCode.ERROR
