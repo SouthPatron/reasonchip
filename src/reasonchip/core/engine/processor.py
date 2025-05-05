@@ -16,9 +16,10 @@ from .. import exceptions as rex
 
 from .variables import Variables
 from .flow_control import FlowControl
-
+from .stack import Stack
 from .registry import Registry
 from .parsers import evaluator, executor
+
 from .pipelines import (
     TaskSet,
     ChipTask,
@@ -90,6 +91,7 @@ class Processor:
         resolver: ResolverType,
     ):
         self._resolver: ResolverType = resolver
+        self._stack: Stack = Stack()
 
     @property
     def resolver(self) -> ResolverType:
@@ -186,7 +188,7 @@ class Processor:
         # Terminate is requested
         if isinstance(task, TerminateTask):
             fixed_results = variables.interpolate(task.terminate)
-            raise rex.TerminateRequestException(result=fixed_results)
+            raise TerminateRequestException(result=fixed_results)
 
         # Return tasks are easy
         if isinstance(task, ReturnTask):
