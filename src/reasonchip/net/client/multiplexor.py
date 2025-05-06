@@ -126,7 +126,9 @@ class Multiplexor:
             return await self._transport.send_packet(packet)
 
     async def _incoming_callback(
-        self, transport_cookie: uuid.UUID, packet: typing.Optional[SocketPacket]
+        self,
+        transport_cookie: uuid.UUID,
+        packet: typing.Optional[SocketPacket],
     ):
         # Transport is disconnected. Kill everything.
         if packet is None:

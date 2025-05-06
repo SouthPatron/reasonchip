@@ -17,6 +17,8 @@ from ..protocol import (
 from .multiplexor import Multiplexor
 from .client import Client
 
+from . import exceptions as rex
+
 
 class Api:
 
@@ -28,6 +30,7 @@ class Api:
         pipeline: str,
         variables: typing.Any = None,
         cookie: typing.Optional[uuid.UUID] = None,
+        detached: bool = False,
     ) -> typing.Any:
 
         async with Client(
@@ -45,42 +48,59 @@ class Api:
                 packet_type=PacketType.RUN,
                 pipeline=pipeline,
                 variables=json_variables,
+                detach=detached,
             )
 
+            # Send the request to the broker
             logging.debug("Dispatching request")
             rc = await client.send_packet(req)
             if not rc:
                 logging.debug("Failed to dispatch request")
-                raise ConnectionError("Lost connection to engine client")
+                raise rex.ConnectionException("Failed to send packet to broker")
 
-            logging.debug("Waiting for all the responses")
+            if detached:
+                logging.debug("Detached job, no response expected")
+                return None
+
+            # Wait for the all the response packets
+            logging.debug("Waiting for responses")
             while resp := await client.receive_packet():
-                if not resp:
-                    logging.debug("Lost connection to engine client")
-                    raise ConnectionError("Lost connection to engine client")
+
+                # No timeout, means we will always get a response
+                assert resp != None
 
                 logging.debug(f"Received packet: {resp.packet_type}")
 
-                # This is in response to a cancel
-                if resp.packet_type == PacketType.CANCEL:
-                    logging.debug("Job was confirmed as cancelled")
-                    if resp.result != ResultCode.CANCELLED:
-                        logging.warning(f"Job cancellation failed. [{resp.rc}]")
-                    break
+                # The only thing left is a RESULT
+                assert resp.packet_type == PacketType.RESULT
 
-                # This is the end of the job
-                if resp.packet_type == PacketType.RESULT:
-                    print(f"Received response: {resp}")
-                    break
+                if resp.rc == ResultCode.BAD_PACKET:
+                    raise rex.BadPacketException(resp.error)
 
-                # If the callback returns False, then we need to cancel the running job
-                if rc == False:
-                    req = SocketPacket(packet_type=PacketType.CANCEL)
+                elif resp.rc == ResultCode.UNSUPPORTED_PACKET_TYPE:
+                    raise rex.UnsupportedPacketTypeException(resp.error)
 
-                    logging.debug("Dispatching request")
-                    rc = await client.send_packet(req)
-                    if not rc:
-                        logging.debug("Failed to dispatch request")
-                        raise ConnectionError(
-                            "Lost connection to engine client"
-                        )
+                elif resp.rc == ResultCode.NO_CAPACITY:
+                    raise rex.NoCapacityException(resp.error)
+
+                elif resp.rc == ResultCode.COOKIE_NOT_FOUND:
+                    raise rex.CookieNotFoundException(resp.error)
+
+                elif resp.rc == ResultCode.COOKIE_COLLISION:
+                    raise rex.CookieCollisionException(resp.error)
+
+                elif resp.rc == ResultCode.WORKER_WENT_AWAY:
+                    raise rex.WorkerWentAwayException(resp.error)
+
+                elif resp.rc == ResultCode.BROKER_WENT_AWAY:
+                    raise rex.BrokerWentAwayException(resp.error)
+
+                elif resp.rc == ResultCode.EXCEPTION:
+                    raise rex.RemoteException(resp.error)
+
+                assert resp.rc == ResultCode.OK
+
+                if resp.result is None:
+                    return None
+
+                return json.loads(resp.result)

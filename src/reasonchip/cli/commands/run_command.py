@@ -7,6 +7,7 @@ import typing
 import argparse
 import re
 import json
+import uuid
 
 from reasonchip.core.engine.variables import Variables
 
@@ -66,6 +67,20 @@ pipeline. You may specify variables on the command line.
             type=str,
             help="Variable file to load",
         )
+        parser.add_argument(
+            "--detach",
+            action="store_true",
+            default=False,
+            help="Detach from the broker after starting",
+        )
+        parser.add_argument(
+            "--cookie",
+            action="store",
+            metavar="<UUID>",
+            default=None,
+            type=uuid.UUID,
+            help="Cookie to use (defaults to a random UUID)",
+        )
 
         cls.add_default_options(parser)
         cls.add_ssl_client_options(parser)
@@ -116,6 +131,8 @@ pipeline. You may specify variables on the command line.
         resp = await api.run_pipeline(
             pipeline=args.pipeline,
             variables=variables.vmap,
+            detached=args.detach,
+            cookie=args.cookie,
         )
 
         if resp:
