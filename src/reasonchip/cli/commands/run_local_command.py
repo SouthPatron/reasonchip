@@ -126,5 +126,7 @@ class RunLocalCommand(AsyncCommand):
 
         except Exception as ex:
             print(f"************** UNHANDLED EXCEPTION **************")
+
             traceback.print_exc()
+
             return ExitCode.ERROR
