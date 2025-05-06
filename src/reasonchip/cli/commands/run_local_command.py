@@ -9,6 +9,7 @@ import re
 import json
 import traceback
 
+from reasonchip.core import exceptions as rex
 from reasonchip.core.engine.variables import Variables
 from reasonchip.utils.local_runner import LocalRunner
 
@@ -78,8 +79,6 @@ class RunLocalCommand(AsyncCommand):
         if not args.collections:
             args.collections = ["."]
 
-        runner = None
-
         try:
             # Load variables
             variables = Variables()
@@ -102,28 +101,30 @@ class RunLocalCommand(AsyncCommand):
 
             # Run the engine
             rc = await runner.run(args.pipeline)
-
             if rc:
                 print(json.dumps(rc))
 
             # Shutdown the engine
             runner.shutdown()
-
             return ExitCode.OK
 
-        except Exception as ex:
-            print(f"************** UNHANDLED EXCEPTION **************")
+        except rex.ProcessorException as ex:
+            print(f"************** PROCESSOR EXCEPTION **************")
 
-            if runner:
-                stack = runner.engine.stack
+            if ex.stack:
+                stack = ex.stack
                 if stack:
                     stack.print()
 
-                print("\n")
-                print(f"ERROR: {str(ex)}")
-                print("\n")
+            exc_type = ex.__class__.__name__
 
-            else:
-                traceback.print_exc()
+            print("\n")
+            print(f"{exc_type}: {str(ex)}")
+            print("\n")
 
+            return ExitCode.ERROR
+
+        except Exception as ex:
+            print(f"************** UNHANDLED EXCEPTION **************")
+            traceback.print_exc()
             return ExitCode.ERROR

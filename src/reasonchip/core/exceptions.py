@@ -5,6 +5,8 @@
 
 import typing
 
+from .stack import Stack
+
 
 class ReasonChipException(Exception):
     """Base class for exceptions in this module."""
@@ -199,33 +201,21 @@ class NestedValidationException(ValidationException):
 class ProcessorException(ReasonChipException):
     """An exception raised from the processor."""
 
-    def __str__(self) -> str:
-        resp = "PROCESSOR EXCEPTION\n"
-        return resp
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.stack: typing.Optional[Stack] = None
 
 
 class NoSuchPipelineException(ProcessorException):
     """Raised when a pipeline is not found."""
 
-    def __init__(self, pipeline: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.pipeline: str = pipeline
-
-    def __str__(self) -> str:
-        resp = f"Pipeline not found: {self.pipeline}\n"
-        return resp
+    pass
 
 
 class NoSuchChipException(ProcessorException):
     """Raised when a chip is not found."""
 
-    def __init__(self, chip: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.chip: str = chip
-
-    def __str__(self) -> str:
-        resp = f"Chip not found: {self.chip}"
-        return resp
+    pass
 
 
 class InvalidChipParametersException(ProcessorException):
@@ -258,45 +248,25 @@ class InvalidChipParametersException(ProcessorException):
 class ChipException(ProcessorException):
     """Raised when a chip call fails."""
 
-    def __init__(self, chip: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.chip: str = chip
-
-    def __str__(self) -> str:
-        resp = f"Chip failed: {self.chip}"
-        return resp
+    pass
 
 
 class VariableNotFoundException(ProcessorException):
     """Raised when a variable is not found."""
 
-    def __init__(self, variable: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.variable: str = variable
-
-    def __str__(self) -> str:
-        resp = f"Variable not found: {self.variable}"
-        return resp
+    pass
 
 
 class CodeExecutionException(ProcessorException):
     """Raised when code execution fails."""
 
-    def __str__(self) -> str:
-        resp = f"Code execution exception"
-        return resp
+    pass
 
 
 class EvaluationException(ProcessorException):
     """Raised when an evaluation fails."""
 
-    def __init__(self, expr: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.expr = expr
-
-    def __str__(self) -> str:
-        resp = f"Expression failed: {self.expr}"
-        return resp
+    pass
 
 
 class LoopVariableNotIterableException(ProcessorException):
@@ -307,10 +277,4 @@ class LoopVariableNotIterableException(ProcessorException):
 
 class AssertException(ProcessorException):
     "" "Raised when an assert fails." ""
-
-    def __init__(self, check: str, *args, **kwargs):
-        self._check: str = check
-
-    def __str__(self) -> str:
-        resp = f"Assert exception: {self._check}"
-        return resp
+    pass

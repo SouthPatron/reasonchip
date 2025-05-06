@@ -207,7 +207,7 @@ class Variables:
             if found:
                 return self.interpolate(obj, _seen)
 
-            raise rex.VariableNotFoundException(variable=varname)
+            raise rex.VariableNotFoundException(varname)
 
         # If the entire text is a single placeholder, return evaluation.
         full_match = self._regex_template.fullmatch(value)

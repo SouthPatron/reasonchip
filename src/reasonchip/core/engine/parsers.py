@@ -86,7 +86,7 @@ def evaluator(expr: str, variables: munch.Munch) -> typing.Any:
         )
 
     except Exception as e:
-        raise rex.EvaluationException(expr=expr) from e
+        raise rex.EvaluationException(expr) from e
 
     return result
 

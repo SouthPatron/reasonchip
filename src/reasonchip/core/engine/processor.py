@@ -14,9 +14,10 @@ from pydantic import ValidationError
 
 from .. import exceptions as rex
 
+from ..stack import Stack
+
 from .variables import Variables
 from .flow_control import FlowControl
-from .stack import Stack
 from .registry import Registry
 from .parsers import evaluator, executor
 
@@ -114,15 +115,15 @@ class Processor:
         new_vars = variables.copy()
 
         while True:
-            # Fetch the pipeline
-            pipeline = await self.resolver(pipeline_name)
-            if not pipeline:
-                raise rex.NoSuchPipelineException(pipeline_name)
-
-            # Load the flow control
-            flow = FlowControl(flow=pipeline.tasks)
-
             try:
+                # Fetch the pipeline
+                pipeline = await self.resolver(pipeline_name)
+                if not pipeline:
+                    raise rex.NoSuchPipelineException(pipeline_name)
+
+                # Load the flow control
+                flow = FlowControl(flow=pipeline.tasks)
+
                 rc, result = await self._sub_run(
                     frame_name=pipeline_name,
                     variables=new_vars,
@@ -141,6 +142,10 @@ class Processor:
                 pipeline_name = ex.entry
                 new_vars = ex.variables
                 continue
+
+            except rex.ProcessorException as ex:
+                ex.stack = self._stack
+                raise
 
     async def _sub_run(
         self,
@@ -186,9 +191,6 @@ class Processor:
 
             # Successful completion. No specific return value
             return (RunResult.OK, None)
-
-        except TerminateRequestException:
-            raise
 
         except BranchRequestException:
             self._stack.pop()
@@ -313,15 +315,15 @@ class Processor:
 
         # If it's still a string, then it's not a valid loop variable.
         if isinstance(loop_vars, str):
-            raise rex.LoopVariableNotIterableException()
+            raise rex.LoopVariableNotIterableException(task.loop)
 
         # If it's not iterable, then it's also not a good loop variable.
         if not isinstance(loop_vars, Iterable):
-            raise rex.LoopVariableNotIterableException()
+            raise rex.LoopVariableNotIterableException(task.loop)
 
         # If it's not sized, then we can't determine the length of the loop.
         if not isinstance(loop_vars, Sized):
-            raise rex.LoopVariableNotIterableException()
+            raise rex.LoopVariableNotIterableException(task.loop)
 
         # Assume success
         rc = (RunResult.OK, None)
@@ -528,7 +530,7 @@ class Processor:
                     )
 
         except Exception as ex:
-            raise rex.ChipException(chip=task.chip) from ex
+            raise rex.ChipException(task.chip) from ex
 
         return (RunResult.OK, resp)
 
