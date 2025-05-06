@@ -77,23 +77,29 @@ class Stack:
         self._frames.clear()
 
     def print(self):
+        lines = self.as_list()
+        for l in lines:
+            print(l)
+
+    def as_list(self) -> typing.List[str]:
+        rc = []
 
         if not self._frames:
-            return
+            return rc
 
         yaml = YAML()
         yaml.indent(sequence=2, offset=2)
 
-        print("Processor Stack Trace:")
+        rc.append("Processor Stack Trace:")
 
         for t in self._frames:
-            print(f"  Task ID: {t}")
+            rc.append(f"  Task ID: {t}")
 
             max_tasks = len(self._frames[t])
 
             for i, frame in enumerate(self._frames[t]):
                 indent = " " * ((i + 2) * 2)
-                print(f"{indent}{frame.pipeline} - {frame.task_no}")
+                rc.append(f"{indent}{frame.pipeline} - {frame.task_no}")
 
                 if i < max_tasks - 1:
                     continue
@@ -113,6 +119,8 @@ class Stack:
                     indented_yaml = "\n".join(
                         indent + line for line in yaml_str.splitlines()
                     )
-                    print(f"\n{indent}--- TASK ---")
-                    print(indented_yaml)
-                    print(f"{indent}------------")
+                    rc.append(f"\n{indent}--- TASK ---")
+                    rc.append(indented_yaml)
+                    rc.append(f"{indent}------------")
+
+        return rc

@@ -13,6 +13,7 @@ import time
 
 from dataclasses import dataclass
 
+from reasonchip.core import exceptions as rex
 from reasonchip.core.engine.engine import Engine
 from reasonchip.core.engine.variables import Variables
 
@@ -357,6 +358,27 @@ class TaskManager:
                     cookie=task_info.cookie,
                     rc=ResultCode.OK,
                     result=rc_str,
+                )
+            )
+
+        except rex.ProcessorException as ex:
+            logging.exception(
+                f"Processor exception occurred during engine run: [{task_info.cookie}] [{pipeline}]"
+            )
+
+            stack = ex.stack
+            assert stack is not None
+
+            st = stack.as_list()
+
+            await self._transport.send_packet(
+                SocketPacket(
+                    packet_type=PacketType.RESULT,
+                    cookie=task_info.cookie,
+                    rc=ResultCode.PROCESSOR_EXCEPTION,
+                    error=str(ex),
+                    stacktrace=st,
+                    result=None,
                 )
             )
 

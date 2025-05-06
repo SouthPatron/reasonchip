@@ -74,30 +74,48 @@ class Api:
                 # The only thing left is a RESULT
                 assert resp.packet_type == PacketType.RESULT
 
-                if resp.rc == ResultCode.BAD_PACKET:
-                    raise rex.BadPacketException(resp.error)
+                # Raise any exception cleanly.
+                if resp.rc != ResultCode.OK:
 
-                elif resp.rc == ResultCode.UNSUPPORTED_PACKET_TYPE:
-                    raise rex.UnsupportedPacketTypeException(resp.error)
+                    exc_class = None
 
-                elif resp.rc == ResultCode.NO_CAPACITY:
-                    raise rex.NoCapacityException(resp.error)
+                    if resp.rc == ResultCode.BAD_PACKET:
+                        exc_class = rex.BadPacketException
 
-                elif resp.rc == ResultCode.COOKIE_NOT_FOUND:
-                    raise rex.CookieNotFoundException(resp.error)
+                    elif resp.rc == ResultCode.UNSUPPORTED_PACKET_TYPE:
+                        exc_class = rex.UnsupportedPacketTypeException
 
-                elif resp.rc == ResultCode.COOKIE_COLLISION:
-                    raise rex.CookieCollisionException(resp.error)
+                    elif resp.rc == ResultCode.NO_CAPACITY:
+                        exc_class = rex.NoCapacityException
 
-                elif resp.rc == ResultCode.WORKER_WENT_AWAY:
-                    raise rex.WorkerWentAwayException(resp.error)
+                    elif resp.rc == ResultCode.COOKIE_NOT_FOUND:
+                        exc_class = rex.CookieNotFoundException
 
-                elif resp.rc == ResultCode.BROKER_WENT_AWAY:
-                    raise rex.BrokerWentAwayException(resp.error)
+                    elif resp.rc == ResultCode.COOKIE_COLLISION:
+                        exc_class = rex.CookieCollisionException
 
-                elif resp.rc == ResultCode.EXCEPTION:
-                    raise rex.RemoteException(resp.error)
+                    elif resp.rc == ResultCode.WORKER_WENT_AWAY:
+                        exc_class = rex.WorkerWentAwayException
 
+                    elif resp.rc == ResultCode.BROKER_WENT_AWAY:
+                        exc_class = rex.BrokerWentAwayException
+
+                    elif resp.rc == ResultCode.PROCESSOR_EXCEPTION:
+                        exc_class = rex.ProcessorException
+
+                    elif resp.rc == ResultCode.EXCEPTION:
+                        exc_class = rex.GeneralException
+
+                    assert exc_class is not None
+
+                    raise exc_class(
+                        cookie=resp.cookie,
+                        rc=resp.rc,
+                        error=resp.error,
+                        stacktrace=resp.stacktrace,
+                    )
+
+                # Return the response
                 assert resp.rc == ResultCode.OK
 
                 if resp.result is None:
