@@ -12,28 +12,10 @@ class ReasonChipException(Exception):
     pass
 
 
-# --------- Client-side Exceptions ------------------------------------------
-
-
-class ClientSideException(ReasonChipException):
-    pass
-
-
-# --------- Server-side Exceptions ------------------------------------------
-
-
-class ServerSideException(ReasonChipException):
-    pass
-
-
 # --------- General Exceptions ----------------------------------------------
 
 
 class ConfigurationException(ReasonChipException):
-    pass
-
-
-class TooBusyException(ReasonChipException):
     pass
 
 
@@ -317,7 +299,7 @@ class EvaluationException(ProcessorException):
         return resp
 
 
-class LoopVariableNotIterable(ProcessorException):
+class LoopVariableNotIterableException(ProcessorException):
     """Raised when a loop variable is not iterable."""
 
     pass
@@ -332,34 +314,3 @@ class AssertException(ProcessorException):
     def __str__(self) -> str:
         resp = f"Assert exception: {self._check}"
         return resp
-
-
-# -------------------------- PRETTY PRINTER ---------------------------------
-
-
-def print_reasonchip_exception(ex: ReasonChipException) -> str:
-
-    resp = f"************** ReasonChip Exception *************\n"
-
-    if len(ex.args) > 0:
-        resp += f"\n{ex.args[0]}\n"
-
-    tmp = ex
-
-    while tmp is not None:
-        if isinstance(tmp, ReasonChipException):
-            resp += f"\n{tmp}\n"
-        else:
-            raise RuntimeError(
-                "\n*********************************************************\n"
-                "All ReasonChip exception causes must be ReasonChip exceptions too.\n"
-                "Anything else indicates an unhandled exception.\n"
-                "*********************************************************\n"
-            ) from tmp
-
-        if tmp.__cause__:
-            tmp = tmp.__cause__
-        else:
-            tmp = None
-
-    return resp

@@ -313,15 +313,15 @@ class Processor:
 
         # If it's still a string, then it's not a valid loop variable.
         if isinstance(loop_vars, str):
-            raise rex.LoopVariableNotIterable()
+            raise rex.LoopVariableNotIterableException()
 
         # If it's not iterable, then it's also not a good loop variable.
         if not isinstance(loop_vars, Iterable):
-            raise rex.LoopVariableNotIterable()
+            raise rex.LoopVariableNotIterableException()
 
         # If it's not sized, then we can't determine the length of the loop.
         if not isinstance(loop_vars, Sized):
-            raise rex.LoopVariableNotIterable()
+            raise rex.LoopVariableNotIterableException()
 
         # Assume success
         rc = (RunResult.OK, None)
