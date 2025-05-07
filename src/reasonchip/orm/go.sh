@@ -2,6 +2,6 @@
 
 
 
-python ./inspector.py
+python ./main.py
 
 

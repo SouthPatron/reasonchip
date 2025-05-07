@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 import typing
 import re
@@ -19,9 +21,16 @@ class RoxModelMeta:
     ]
 
 
+class RoxRegistry:
+    _registry: typing.Dict[str, typing.Type[RoxModel]] = {}
+
+
 class RoxModel(BaseModel):
+
+    # Common field for all Rox models
     id: uuid.UUID = Field(default_factory=uuid.uuid4, alias="_id")
 
+    # Registry management for RoxModel
     def __init_subclass__(cls):
         super().__init_subclass__()
 
@@ -39,3 +48,12 @@ class RoxModel(BaseModel):
 
         if not hasattr(meta, "table_name"):
             meta.table_name = classname
+
+        # Register into the factory
+        class_uuid = meta.class_uuid
+        if class_uuid in RoxRegistry._registry:
+            raise TypeError(
+                f"UUID {class_uuid} already registered for {RoxRegistry._registry[class_uuid]}"
+            )
+
+        RoxRegistry._registry[class_uuid] = cls
