@@ -51,9 +51,9 @@ bash$ pip install reasonchip
 	content:</p>
 	<pre class="rounded p-3 bg-secondary-subtle"><code>
 - name: 'Say Hello'
-  reasonchip.debug.log:
-    level: info
-    msg: 'Hello, World!'
+  chip: reasonchip.streams.write_stdout
+  params:
+  	data: 'Hello, World!'
 </code></pre>
 </div>
 
@@ -64,7 +64,7 @@ bash$ pip install reasonchip
 <div class="p-3">
 	<p>Run the pipeline locally:</p>
 	<pre class="rounded p-3 bg-secondary-subtle"><code>
-bash$ reasonchip run-local -e hello_world
+bash$ reasonchip run-local hello_world
 </code></pre>
 </div>
 
@@ -73,10 +73,14 @@ bash$ reasonchip run-local -e hello_world
 ><i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Look at the examples</h3>
 
 <div class="p-3">
-	<p>Run the pipeline locally:</p>
-	<pre class="rounded p-3 bg-secondary-subtle"><code>
-bash$ reasonchip run-local -e hello_world
-</code></pre>
+	<p>The best way to get an idea of functionality is to have a look at the
+	examples. This should give you a nice and straight-forward way to
+	get to grips with the system:
+	<a
+		href="https://github.com/SouthPatron/reasonchip/tree/main/examples"
+		target="_blank">Examples</a>
+	</p>
+
 </div>
 
 
