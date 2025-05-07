@@ -26,6 +26,7 @@ class Route:
     route_id: uuid.UUID
     client_id: uuid.UUID
     connection_id: uuid.UUID
+    detached: bool = False
     client_gone: bool = False
 
 
@@ -280,6 +281,7 @@ class Switchboard:
                 route_id=cookie,
                 client_id=payload.connection_id,
                 connection_id=conn,
+                detached=pkt.detach if pkt.detach else False,
             )
             self._routes[cookie] = route
             self._routes_by_client[payload.connection_id].append(route)
@@ -382,11 +384,12 @@ class Switchboard:
             if not self._routes_by_worker[route.connection_id]:
                 self._routes_by_worker.pop(route.connection_id)
 
-            # Send through to the worker
+            # Send through to the client, perhaps
             if route.client_gone:
                 log.warning(f"Client gone [{route.client_id}]")
             else:
-                await self._writer_callback(route.client_id, pkt)
+                if not route.detached:
+                    await self._writer_callback(route.client_id, pkt)
 
             # Log what happened
             log.info(

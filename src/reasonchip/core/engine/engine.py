@@ -10,12 +10,12 @@ from .pipelines import (
     Pipeline,
     Task,
     TaskSet,
-    DispatchPipelineTask,
+    DispatchTask,
+    BranchTask,
     ChipTask,
 )
 from .processor import Processor
 from .variables import Variables
-from .flow_control import FlowControl
 from .registry import Registry
 
 from .. import exceptions as rex
@@ -65,17 +65,10 @@ class Engine:
         async def get_pipeline(name: str) -> typing.Optional[Pipeline]:
             return self._pipelines.get(name, None)
 
-        pipeline = await get_pipeline(entry)
-        if not pipeline:
-            raise rex.NoSuchPipelineException(entry)
-
-        flow = FlowControl(flow=pipeline.tasks)
-
         processor = Processor(resolver=get_pipeline)
-
         return await processor.run(
             variables=variables,
-            flow=flow,
+            entry=entry,
         )
 
     # -------------- VALIDATION --------------------------------------------
@@ -87,7 +80,16 @@ class Engine:
 
             def check_tasks(tasks: typing.List[Task]):
                 for i, t in enumerate(tasks):
-                    if isinstance(t, DispatchPipelineTask):
+                    if isinstance(t, BranchTask):
+                        # Check for the pipeline existence
+                        pipeline_name = t.branch
+                        if pipeline_name not in self._pipelines:
+                            raise rex.NoSuchPipelineDuringValidationException(
+                                task_no=i,
+                                pipeline=pipeline_name,
+                            )
+
+                    if isinstance(t, DispatchTask):
                         # Check for the pipeline existence
                         pipeline_name = t.dispatch
                         if pipeline_name not in self._pipelines:

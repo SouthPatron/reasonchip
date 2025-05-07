@@ -6,6 +6,7 @@
 import typing
 import enum
 import asyncio
+import logging
 
 from collections.abc import Iterable, Sized
 
@@ -13,22 +14,31 @@ from pydantic import ValidationError
 
 from .. import exceptions as rex
 
+from ..stack import Stack
+
 from .variables import Variables
 from .flow_control import FlowControl
-
 from .registry import Registry
-from .parsers import evaluator
+from .parsers import evaluator, executor
+
 from .pipelines import (
-    TaskSet,
-    ChipTask,
-    DispatchPipelineTask,
-    ReturnTask,
-    DeclareTask,
-    CommentTask,
-    TerminateTask,
+    # Generic Task
     Task,
-    SaveableTask,
+    # Specific Tasks
+    AssertTask,
+    BranchTask,
+    ChipTask,
+    CodeTask,
+    CommentTask,
+    DeclareTask,
+    DispatchTask,
+    ReturnTask,
+    TaskSet,
+    TerminateTask,
+    # Task Types
     LoopableTask,
+    SaveableTask,
+    # Pipeline
     Pipeline,
 )
 
@@ -38,10 +48,44 @@ ResolverType = typing.Callable[
 ]
 
 
+log = logging.getLogger("reasonchip.core.engine.processor")
+
+
 class RunResult(enum.IntEnum):
     OK = 0
     SKIPPED = 10
     RETURN_REQUEST = 20
+
+
+# --------- Exceptions -------------------------------------------------------
+
+
+class FlowException(rex.ProcessorException):
+    """A flow exception raised from the chip."""
+
+    pass
+
+
+class TerminateRequestException(FlowException):
+    """Raised when everything should terminate."""
+
+    def __init__(self, result: typing.Any):
+        self.result = result
+
+
+class BranchRequestException(FlowException):
+    """Raised when a branch request is made."""
+
+    def __init__(
+        self,
+        entry: str,
+        variables: Variables,
+    ):
+        self.entry = entry
+        self.variables = variables
+
+
+# -------- Processor ---------------------------------------------------------
 
 
 class Processor:
@@ -51,69 +95,106 @@ class Processor:
         resolver: ResolverType,
     ):
         self._resolver: ResolverType = resolver
+        self._stack: Stack = Stack()
 
     @property
     def resolver(self) -> ResolverType:
         return self._resolver
 
+    @property
+    def stack(self) -> Stack:
+        return self._stack
+
     async def run(
         self,
         variables: Variables,
-        flow: FlowControl,
+        entry: str,
     ) -> typing.Any:
 
-        try:
-            rc, result = await self._sub_run(variables, flow)
+        pipeline_name = entry
+        new_vars = variables.copy()
 
-            if rc == RunResult.RETURN_REQUEST:
-                return result
+        while True:
+            try:
+                # Fetch the pipeline
+                pipeline = await self.resolver(pipeline_name)
+                if not pipeline:
+                    raise rex.NoSuchPipelineException(pipeline_name)
 
-        except rex.TerminateRequestException as ex:
-            return ex.result
+                # Load the flow control
+                flow = FlowControl(flow=pipeline.tasks)
 
-        except rex.ProcessorException as ex:
-            raise rex.ProcessorException() from ex
+                rc, result = await self._sub_run(
+                    frame_name=pipeline_name,
+                    variables=new_vars,
+                    flow=flow,
+                )
 
-        return None
+                if rc == RunResult.RETURN_REQUEST:
+                    return result
+
+                return None
+
+            except TerminateRequestException as ex:
+                return ex.result
+
+            except BranchRequestException as ex:
+                pipeline_name = ex.entry
+                new_vars = ex.variables
+                continue
+
+            except rex.ProcessorException as ex:
+                ex.stack = self._stack
+                raise
 
     async def _sub_run(
         self,
+        frame_name: str,
         variables: Variables,
         flow: FlowControl,
     ) -> typing.Tuple[RunResult, typing.Any]:
 
-        i = 0
+        try:
+            # New stack frame
+            self._stack.push(pipeline=frame_name)
 
-        # Run the flow
-        while flow.has_next():
+            # Run the flow
+            while flow.has_next():
 
-            # Retrieve the first task in the flow
-            task = flow.peek()
+                # Retrieve the first task in the flow
+                task = flow.peek()
 
-            # Run the task
-            try:
+                # Increment the task number
+                self._stack.tick(task=task)
+
+                # Run the task
                 rc, result = await self.run_task(
                     task=task,
                     variables=variables,
                 )
-            except rex.ProcessorException as ex:
-                raise rex.NestedProcessorException(task_no=i) from ex
 
-            # The task completed successfully, so remove it.
-            flow.pop()
+                # The task completed successfully, so remove it.
+                flow.pop()
 
-            # Handle normal behaviour
-            if rc in [RunResult.OK, RunResult.SKIPPED]:
-                continue
+                # Handle normal behaviour
+                if rc in [RunResult.OK, RunResult.SKIPPED]:
+                    continue
 
-            # This is the end of the pipeline
-            if rc in [RunResult.RETURN_REQUEST]:
-                return (rc, result)
+                # This is the end of the pipeline
+                if rc in [RunResult.RETURN_REQUEST]:
+                    self._stack.pop()
+                    return (rc, result)
 
-            assert False, "Programmer Error. Unreachable code was reached."
+                assert False, "Programmer Error. Unreachable code was reached."
 
-        # Successfull completion. No specific return value
-        return (RunResult.OK, None)
+            self._stack.pop()
+
+            # Successful completion. No specific return value
+            return (RunResult.OK, None)
+
+        except BranchRequestException:
+            self._stack.pop()
+            raise
 
     async def run_task(
         self,
@@ -134,21 +215,56 @@ class Processor:
         # Bind the variable
         rc = (RunResult.OK, None)
 
+        # ------------- EASY TASKS ------------------------------------------
+
         # Terminate is requested
         if isinstance(task, TerminateTask):
             fixed_results = variables.interpolate(task.terminate)
-            raise rex.TerminateRequestException(fixed_results)
+            raise TerminateRequestException(result=fixed_results)
 
         # Return tasks are easy
         if isinstance(task, ReturnTask):
             return await self._run_returntask(task, variables)
 
+        # DeclareTasks are kinda easy but can loop.
+        if isinstance(task, DeclareTask):
+            async for rc in self._loop(task, variables, self._run_declaretask):
+                assert rc[0] == RunResult.OK
+                variables.update(rc[1])
+
+            return rc
+
+        # AssertTasks are easy too
+        if isinstance(task, AssertTask):
+            async for rc in self._loop(task, variables, self._run_asserttask):
+                assert rc[0] == RunResult.OK
+
+            return rc
+
+        # Branch has been requested
+        if isinstance(task, BranchTask):
+            # No need to make variable copies as we're not going back.
+            if task.variables:
+                variables.update(task.variables)
+
+            # Parameters are interpolated
+            if task.params:
+                fixed_results = variables.interpolate(task.params)
+                variables.update(fixed_results)
+
+            raise BranchRequestException(
+                entry=task.branch,
+                variables=variables,
+            )
+
+        # ------------- LESS EASY TASKS -------------------------------------
+
         # Figure out what kind of chip this is
         handlers = {
             TaskSet: self._run_taskset,
-            DispatchPipelineTask: self._run_dispatchpipelinetask,
+            DispatchTask: self._run_dispatchtask,
             ChipTask: self._run_chiptask,
-            DeclareTask: self._run_declaretask,
+            CodeTask: self._run_codetask,
         }
 
         # Run the task
@@ -157,18 +273,25 @@ class Processor:
 
         # A task has its own variable scope.
         new_vars = variables.copy()
+
+        # Variables are not interpolated
         if task.variables:
             new_vars.update(task.variables)
 
+        # Parameters are interpolated
+        if task.params:
+            fixed_results = new_vars.interpolate(task.params)
+            new_vars.update(fixed_results)
+
         # Handle the task if we're looping
         async for rc in self._loop(task, new_vars, handler):
-            self._handle_task_save(task, new_vars, rc[1], variables)
+            assert rc[0] == RunResult.OK
+            self._handle_task_save(task, rc[1], new_vars, variables)
 
-            # Declarations go into the current context
-            if isinstance(task, DeclareTask):
-                assert rc[0] == RunResult.OK
-                new_vars.update(rc[1])
-                variables.update(rc[1])
+        assert rc[0] == RunResult.OK
+
+        if task.return_result:
+            return (RunResult.RETURN_REQUEST, rc[1])
 
         return rc
 
@@ -192,15 +315,15 @@ class Processor:
 
         # If it's still a string, then it's not a valid loop variable.
         if isinstance(loop_vars, str):
-            raise rex.LoopVariableNotIterable()
+            raise rex.LoopVariableNotIterableException(task.loop)
 
         # If it's not iterable, then it's also not a good loop variable.
         if not isinstance(loop_vars, Iterable):
-            raise rex.LoopVariableNotIterable()
+            raise rex.LoopVariableNotIterableException(task.loop)
 
         # If it's not sized, then we can't determine the length of the loop.
         if not isinstance(loop_vars, Sized):
-            raise rex.LoopVariableNotIterable()
+            raise rex.LoopVariableNotIterableException(task.loop)
 
         # Assume success
         rc = (RunResult.OK, None)
@@ -235,6 +358,17 @@ class Processor:
     ) -> typing.Tuple[RunResult, typing.Any]:
 
         fixed_rc = variables.interpolate(task.result)
+
+        if task.log:
+            if task.log == "info":
+                log.info("Returning from pipeline")
+            elif task.log == "debug":
+                log.info(f"Returning from pipeline: {task.result}")
+            elif task.log == "trace":
+                log.info(
+                    f"Returning from pipeline: {task.result} -> {fixed_rc}"
+                )
+
         return (RunResult.RETURN_REQUEST, fixed_rc)
 
     async def _run_declaretask(
@@ -247,7 +381,47 @@ class Processor:
             raise rex.InvalidChipParametersException(task.name or "unnamed")
 
         fixed_rc = variables.interpolate(task.declare)
+
+        if task.log:
+            if task.log == "info":
+                log.info("Declaring new variables")
+            elif task.log == "debug":
+                log.info(f"Declaring new variables: {task.declare}")
+            elif task.log == "trace":
+                log.info(
+                    f"Declaring new variables: {task.declare} -> {fixed_rc}"
+                )
+
         return (RunResult.OK, fixed_rc)
+
+    async def _run_asserttask(
+        self,
+        task: AssertTask,
+        variables: Variables,
+    ) -> typing.Tuple[RunResult, typing.Any]:
+
+        if isinstance(task.checks, str):
+            checks = [task.checks]
+        else:
+            checks = task.checks
+
+        for c in checks:
+            rc = evaluator(c, variables.vmap)
+            if rc:
+                continue
+
+            if task.log:
+                log.info(f"Assertation failed: {c}")
+
+            raise rex.AssertException(c)
+
+        if task.log:
+            if task.log == "info":
+                log.info("Asserts have passed")
+            else:
+                log.info(f"Asserts have passed: {task.checks}")
+
+        return (RunResult.OK, None)
 
     async def _run_taskset(
         self,
@@ -262,21 +436,23 @@ class Processor:
         if task.run_async:
             resp = asyncio.create_task(
                 self._sub_run(
+                    frame_name="<taskset>",
                     variables=variables,
                     flow=flow,
                 )
             )
-            return (RunResult.OK, resp)
+        else:
+            _, resp = await self._sub_run(
+                frame_name="<taskset>",
+                variables=variables,
+                flow=flow,
+            )
 
-        _, resp = await self._sub_run(
-            variables=variables,
-            flow=flow,
-        )
         return (RunResult.OK, resp)
 
-    async def _run_dispatchpipelinetask(
+    async def _run_dispatchtask(
         self,
-        task: DispatchPipelineTask,
+        task: DispatchTask,
         variables: Variables,
     ) -> typing.Tuple[RunResult, typing.Any]:
 
@@ -292,21 +468,17 @@ class Processor:
         if task.run_async:
             resp = asyncio.create_task(
                 self._sub_run(
+                    frame_name=task.dispatch,
                     variables=variables,
                     flow=flow,
                 )
             )
-            return (RunResult.OK, resp)
-
-        try:
+        else:
             _, resp = await self._sub_run(
+                frame_name=task.dispatch,
                 variables=variables,
                 flow=flow,
             )
-        except rex.ProcessorException as ex:
-            raise rex.NestedProcessorException(
-                pipeline_name=task.dispatch
-            ) from ex
 
         return (RunResult.OK, resp)
 
@@ -321,7 +493,7 @@ class Processor:
         if not chip:
             raise rex.NoSuchChipException(task.chip)
 
-        # Validate and interpolate the chip parameters
+        # Validate the chip parameters
         try:
             fixed_params = variables.interpolate(task.params)
             req = chip.request_type.model_validate(fixed_params)
@@ -331,6 +503,14 @@ class Processor:
                 errors=ve.errors(),
             )
 
+        if task.log:
+            if task.log == "info":
+                log.info(f"Calling chip: [{task.chip}]")
+            elif task.log == "debug":
+                log.info(f"Calling chip: [{task.chip}] : [{req}]")
+            elif task.log == "trace":
+                log.info(f"Calling chip: [{task.chip}] : [{req}]")
+
         # Call the chip ---------------------
         if task.run_async:
             resp = asyncio.create_task(chip.func(req))
@@ -338,8 +518,54 @@ class Processor:
 
         try:
             resp = await chip.func(req)
+
+            if task.log:
+                if task.log == "info":
+                    log.info(f"Chip complete: [{task.chip}]")
+                elif task.log == "debug":
+                    log.info(f"Chip complete: [{task.chip}] : [{req}]")
+                elif task.log == "trace":
+                    log.info(
+                        f"Chip complete: [{task.chip}] : [{req}] -> [{resp}]"
+                    )
+
         except Exception as ex:
-            raise rex.ChipException(chip=task.chip) from ex
+            raise rex.ChipException(task.chip) from ex
+
+        return (RunResult.OK, resp)
+
+    async def _run_codetask(
+        self,
+        task: CodeTask,
+        variables: Variables,
+    ) -> typing.Tuple[RunResult, typing.Any]:
+
+        if task.log:
+            if task.log == "info":
+                log.info(f"Executing code")
+            elif task.log == "debug":
+                log.info(f"Executing code")
+            elif task.log == "trace":
+                log.info(f"Executing code")
+
+        # Run the code ----------------------
+        if task.run_async:
+            resp = asyncio.create_task(executor(task.code, variables.vmap))
+            return (RunResult.OK, resp)
+
+        try:
+            resp = await executor(task.code, variables.vmap)
+
+            if task.log:
+                if task.log == "info":
+                    log.info(f"Code complete")
+                elif task.log == "debug":
+                    log.info(f"Code complete")
+                elif task.log == "trace":
+                    log.info(f"Code complete: [{resp}]")
+
+        except Exception as ex:
+            raise rex.CodeExecutionException() from ex
 
         return (RunResult.OK, resp)
 
@@ -348,47 +574,61 @@ class Processor:
     def _handle_task_save(
         self,
         task: SaveableTask,
-        variables: Variables,
         value: typing.Any,
-        dest: typing.Optional[Variables] = None,
+        local_variables: Variables,
+        global_variables: Variables,
     ):
-        """
-        NOTE: This saves to both the variables and the dest.
+        # Always save results as '_'
+        local_variables.set("_", value)
+        global_variables.set("_", value)
 
-        Variables is not interpolated.
-        Dest is interpolated.
-
-        NOTE: Not a great method.
-        """
-
-        if not task.store_result_as and not task.append_result_into:
+        if (
+            not task.store_result_as
+            and not task.append_result_into
+            and not task.key_result_into
+        ):
             return
 
         # Prepare the result for elevation
-        result = variables.interpolate(value) if dest else None
-
         if task.store_result_as:
             name = task.store_result_as
-            variables.set(name, value)
-            if dest:
-                dest.set(name, result)
+            local_variables.set(name, value)
+            global_variables.set(name, value)
 
         if task.append_result_into:
             name = task.append_result_into
 
-            if not variables.has(name):
-                variables.set(name, [value])
-                if dest:
-                    dest.set(name, [result])
+            found, obj = local_variables.get(name)
+            if not found:
+                obj = [value]
+                local_variables.set(name, obj)
 
             else:
-                val = variables.get(name)
-                if not isinstance(val, list):
+                if not isinstance(obj, list):
                     raise rex.InvalidChipParametersException(
                         f"Variable '{name}' is not a list."
                     )
-                val.append(result)
+                obj.append(value)
 
-                variables.set(name, val)
-                if dest:
-                    dest.set(name, val)
+            global_variables.set(name, obj)
+
+        if task.key_result_into:
+            name = task.key_result_into.name
+            key_name = task.key_result_into.key
+
+            # Keys are interpolated
+            key_name = local_variables.interpolate(key_name)
+
+            found, obj = local_variables.get(name)
+            if not found:
+                obj = {key_name: value}
+                local_variables.set(name, obj)
+
+            else:
+                if not isinstance(obj, dict):
+                    raise rex.InvalidChipParametersException(
+                        f"Variable '{name}' is not a dictionary."
+                    )
+                obj.update({key_name: value})
+
+            global_variables.set(name, obj)

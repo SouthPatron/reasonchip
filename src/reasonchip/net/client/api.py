@@ -17,6 +17,8 @@ from ..protocol import (
 from .multiplexor import Multiplexor
 from .client import Client
 
+from . import exceptions as rex
+
 
 class Api:
 
@@ -28,6 +30,7 @@ class Api:
         pipeline: str,
         variables: typing.Any = None,
         cookie: typing.Optional[uuid.UUID] = None,
+        detached: bool = False,
     ) -> typing.Any:
 
         async with Client(
@@ -45,42 +48,77 @@ class Api:
                 packet_type=PacketType.RUN,
                 pipeline=pipeline,
                 variables=json_variables,
+                detach=detached,
             )
 
+            # Send the request to the broker
             logging.debug("Dispatching request")
             rc = await client.send_packet(req)
             if not rc:
                 logging.debug("Failed to dispatch request")
-                raise ConnectionError("Lost connection to engine client")
+                raise rex.ConnectionException("Failed to send packet to broker")
 
-            logging.debug("Waiting for all the responses")
+            if detached:
+                logging.debug("Detached job, no response expected")
+                return None
+
+            # Wait for the all the response packets
+            logging.debug("Waiting for responses")
             while resp := await client.receive_packet():
-                if not resp:
-                    logging.debug("Lost connection to engine client")
-                    raise ConnectionError("Lost connection to engine client")
+
+                # No timeout, means we will always get a response
+                assert resp != None
 
                 logging.debug(f"Received packet: {resp.packet_type}")
 
-                # This is in response to a cancel
-                if resp.packet_type == PacketType.CANCEL:
-                    logging.debug("Job was confirmed as cancelled")
-                    if resp.result != ResultCode.CANCELLED:
-                        logging.warning(f"Job cancellation failed. [{resp.rc}]")
-                    break
+                # The only thing left is a RESULT
+                assert resp.packet_type == PacketType.RESULT
 
-                # This is the end of the job
-                if resp.packet_type == PacketType.RESULT:
-                    print(f"Received response: {resp}")
-                    break
+                # Raise any exception cleanly.
+                if resp.rc != ResultCode.OK:
 
-                # If the callback returns False, then we need to cancel the running job
-                if rc == False:
-                    req = SocketPacket(packet_type=PacketType.CANCEL)
+                    exc_class = None
 
-                    logging.debug("Dispatching request")
-                    rc = await client.send_packet(req)
-                    if not rc:
-                        logging.debug("Failed to dispatch request")
-                        raise ConnectionError(
-                            "Lost connection to engine client"
-                        )
+                    if resp.rc == ResultCode.BAD_PACKET:
+                        exc_class = rex.BadPacketException
+
+                    elif resp.rc == ResultCode.UNSUPPORTED_PACKET_TYPE:
+                        exc_class = rex.UnsupportedPacketTypeException
+
+                    elif resp.rc == ResultCode.NO_CAPACITY:
+                        exc_class = rex.NoCapacityException
+
+                    elif resp.rc == ResultCode.COOKIE_NOT_FOUND:
+                        exc_class = rex.CookieNotFoundException
+
+                    elif resp.rc == ResultCode.COOKIE_COLLISION:
+                        exc_class = rex.CookieCollisionException
+
+                    elif resp.rc == ResultCode.WORKER_WENT_AWAY:
+                        exc_class = rex.WorkerWentAwayException
+
+                    elif resp.rc == ResultCode.BROKER_WENT_AWAY:
+                        exc_class = rex.BrokerWentAwayException
+
+                    elif resp.rc == ResultCode.PROCESSOR_EXCEPTION:
+                        exc_class = rex.ProcessorException
+
+                    elif resp.rc == ResultCode.EXCEPTION:
+                        exc_class = rex.GeneralException
+
+                    assert exc_class is not None
+
+                    raise exc_class(
+                        cookie=resp.cookie,
+                        rc=resp.rc,
+                        error=resp.error,
+                        stacktrace=resp.stacktrace,
+                    )
+
+                # Return the response
+                assert resp.rc == ResultCode.OK
+
+                if resp.result is None:
+                    return None
+
+                return json.loads(resp.result)

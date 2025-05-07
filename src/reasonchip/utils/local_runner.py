@@ -24,6 +24,10 @@ class LocalRunner:
         # Create the variables
         self._default_variables: Variables = Variables(default_variables)
 
+    @property
+    def engine(self) -> Engine:
+        return self._engine
+
     async def run(
         self,
         pipeline: str,

@@ -57,12 +57,11 @@ class ResultCode(enum.StrEnum):
     BAD_PACKET = "BAD_PACKET"
     UNSUPPORTED_PACKET_TYPE = "UNSUPPORTED_PACKET_TYPE"
     NO_CAPACITY = "NO_CAPACITY"
-    NOT_FOR_US = "NOT_FOR_US"
     COOKIE_NOT_FOUND = "COOKIE_NOT_FOUND"
     COOKIE_COLLISION = "COOKIE_COLLISION"
     WORKER_WENT_AWAY = "WORKER_WENT_AWAY"
     BROKER_WENT_AWAY = "BROKER_WENT_AWAY"
-    CANCELLED = "CANCELLED"
+    PROCESSOR_EXCEPTION = "PROCESSOR_EXCEPTION"
     EXCEPTION = "EXCEPTION"
 
 
@@ -83,6 +82,7 @@ class SocketPacket(BaseModel):
     # Run variables
     pipeline: typing.Optional[str] = None
     variables: typing.Optional[str] = None
+    detach: typing.Optional[bool] = None
 
     # Result variables
     rc: typing.Optional[ResultCode] = None

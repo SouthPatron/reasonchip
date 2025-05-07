@@ -7,6 +7,7 @@ import typing
 import argparse
 import re
 import json
+import traceback
 
 from reasonchip.core import exceptions as rex
 from reasonchip.core.engine.variables import Variables
@@ -95,27 +96,37 @@ class RunLocalCommand(AsyncCommand):
             # Create the local runner
             runner = LocalRunner(
                 collections=args.collections,
-                default_variables=variables.vdict,
+                default_variables=variables.vmap,
             )
 
             # Run the engine
             rc = await runner.run(args.pipeline)
-
             if rc:
                 print(json.dumps(rc))
 
             # Shutdown the engine
             runner.shutdown()
-
             return ExitCode.OK
 
-        except rex.ReasonChipException as ex:
-            msg = rex.print_reasonchip_exception(ex)
-            print(msg)
+        except rex.ProcessorException as ex:
+            print(f"************** PROCESSOR EXCEPTION **************")
+
+            if ex.stack:
+                stack = ex.stack
+                if stack:
+                    stack.print()
+
+            exc_type = ex.__class__.__name__
+
+            print("\n")
+            print(f"{exc_type}: {str(ex)}")
+            print("\n")
+
             return ExitCode.ERROR
 
         except Exception as ex:
             print(f"************** UNHANDLED EXCEPTION **************")
-            print(f"\n\n{type(ex)}\n\n")
-            print(ex)
+
+            traceback.print_exc()
+
             return ExitCode.ERROR

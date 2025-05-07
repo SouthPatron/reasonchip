@@ -27,7 +27,7 @@ from openai.types.chat.completion_create_params import (
 
 from pydantic import BaseModel, Field, HttpUrl
 
-from reasonchip.core.engine.registry import Registry
+from reasonchip import Registry
 
 
 class ClientSettings(BaseModel):

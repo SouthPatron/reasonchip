@@ -8,9 +8,7 @@ import argparse
 import signal
 import asyncio
 import traceback
-import ssl
 
-from reasonchip.core import exceptions as rex
 from reasonchip.core.engine.engine import Engine
 from reasonchip.net.worker import TaskManager
 
@@ -156,11 +154,6 @@ It's an incredibly intolerant process by design. It will die if anything strange
             # Shutdown the engine
             engine.shutdown()
             return ExitCode.OK
-
-        except rex.ReasonChipException as ex:
-            msg = rex.print_reasonchip_exception(ex)
-            print(msg)
-            return ExitCode.ERROR
 
         except Exception as ex:
             print(f"************** UNHANDLED EXCEPTION **************")

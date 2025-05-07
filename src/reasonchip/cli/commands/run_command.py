@@ -7,10 +7,15 @@ import typing
 import argparse
 import re
 import json
+import uuid
 
 from reasonchip.core.engine.variables import Variables
 
-from reasonchip.net.client import Multiplexor, Api
+from reasonchip.net.client import (
+    Multiplexor,
+    Api,
+    exceptions as clex,
+)
 from reasonchip.net.protocol import DEFAULT_SERVERS
 from reasonchip.net.transports import client_to_broker, SSLClientOptions
 
@@ -66,6 +71,20 @@ pipeline. You may specify variables on the command line.
             type=str,
             help="Variable file to load",
         )
+        parser.add_argument(
+            "--detach",
+            action="store_true",
+            default=False,
+            help="Detach from the broker after starting",
+        )
+        parser.add_argument(
+            "--cookie",
+            action="store",
+            metavar="<UUID>",
+            default=None,
+            type=uuid.UUID,
+            help="Cookie to use (defaults to a random UUID)",
+        )
 
         cls.add_default_options(parser)
         cls.add_ssl_client_options(parser)
@@ -113,13 +132,33 @@ pipeline. You may specify variables on the command line.
         # Get the API helper class
         api = Api(multiplexor)
 
-        resp = await api.run_pipeline(
-            pipeline=args.pipeline,
-            variables=variables.vdict,
-        )
+        try:
+            resp = await api.run_pipeline(
+                pipeline=args.pipeline,
+                variables=variables.vmap,
+                detached=args.detach,
+                cookie=args.cookie,
+            )
 
-        if resp:
-            print(json.dumps(resp))
+            if resp:
+                print(json.dumps(resp))
+
+        except clex.RemoteException as ex:
+            print("************** REMOTE EXCEPTION *****************")
+            print()
+            print(f"ResultCode: {ex.rc}")
+            print(f"Cookie: {ex.cookie}")
+            print(f"Error: {ex.error}")
+            print()
+
+            if ex.stacktrace:
+                for l in ex.stacktrace:
+                    print(l)
+
+        except clex.ClientException as ex:
+            print("************** CLIENT EXCEPTION *****************")
+            print()
+            print(f"Exception: {str(ex)}")
 
         await multiplexor.stop()
 

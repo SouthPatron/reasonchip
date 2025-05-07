@@ -1,9 +1,0 @@
-
-
-- dispatch: init_user
-
-- dispatch: handle_message
-
-- dispatch: update_personality
-
-

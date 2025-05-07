@@ -1,6 +1,6 @@
 ---
 title: 'Conditionals'
-date: 2025-02-24
+date: 2025-05-07
 ---
 
 <h3 class="px-4 py-2 bg-primary-subtle border shadow">
@@ -11,11 +11,10 @@ date: 2025-02-24
 	<p>
 	  The <code>when</code> field in ReasonChip tasks lets you control
 	  whether a task should run based on a Python expression. It's evaluated
-	  securely using only the current variable context—no built-in functions
-	  or external access are allowed.
+	  securely using only the current variable context and a restricted set of
+	  built-in functions.
 	</p>
 </div>
-
 
 <h3 class="px-4 py-2 bg-success-subtle border shadow">
 <i class="text-success me-3 bi bi-arrow-right-square-fill"></i> How It Works
@@ -26,15 +25,41 @@ date: 2025-02-24
 	  Internally, <code>when</code> expressions are evaluated using:
 	</p>
 	<pre class="rounded p-3 bg-secondary-subtle"><code>
-result = eval(expr, {"__builtins__": {}}, variables.vobj)
+result = eval(expr, {"__builtins__": SAFE_BUILTINS}, variables.vobj)
 	</code></pre>
 	<p>
-	  This means your pipeline variables are available as Python-safe attributes:
+	  This means your pipeline variables are available as Python-safe attributes,
+	  along with the following safe built-ins:
 	</p>
 	<ul>
-	  <li><code>user.is_active</code></li>
-	  <li><code>result.success == True</code></li>
-	  <li><code>counter > 10</code></li>
+		<li><code>abs</code></li>
+		<li><code>min</code></li>
+		<li><code>max</code></li>
+		<li><code>sum</code></li>
+		<li><code>round</code></li>
+		<li><code>pow</code></li>
+		<li><code>len</code></li>
+		<li><code>int</code></li>
+		<li><code>float</code></li>
+		<li><code>str</code></li>
+		<li><code>bool</code></li>
+		<li><code>list</code></li>
+		<li><code>tuple</code></li>
+		<li><code>dict</code></li>
+		<li><code>sorted</code></li>
+		<li><code>reversed</code></li>
+		<li><code>enumerate</code></li>
+		<li><code>range</code></li>
+		<li><code>all</code></li>
+		<li><code>any</code></li>
+		<li><code>repr</code></li>
+		<li><code>format</code></li>
+		<li><code>type</code></li>
+		<li><code>isinstance</code></li>
+		<li><code>iter</code></li>
+		<li><code>next</code></li>
+		<li><code>escape</code></li>
+		<li><code>unescape</code></li>
 	</ul>
 	<p>
 	  Errors during evaluation raise a safe <code>EvaluationException</code>
@@ -48,20 +73,22 @@ result = eval(expr, {"__builtins__": {}}, variables.vobj)
 
 <div class="p-3">
 	<ul>
-	  <li>Access to your variables only (<code>variables.vobj</code>)</li>
-	  <li>Standard Python logic operators (<code>and</code>, <code>or</code>, <code>not</code>, comparisons)</li>
+	  <li>Access to your variables (<code>variables.vobj</code>)</li>
+	  <li>Standard Python logic operators (<code>and</code>, <code>or</code>,
+		  <code>not</code>, comparisons)</li>
 	  <li>Safe attribute, dict, or object traversal</li>
+	  <li>Safe built-in functions listed above</li>
 	</ul>
 	<p>
 	  <strong>✅ Example:</strong>
 	</p>
 	<pre class="rounded p-3 bg-secondary-subtle"><code>
-when: user.age > 18 and user.country == "ZA"
+when: len(items) > 0 and user.is_active
 	</code></pre>
 </div>
 
-<h3 class="px-4 py-2 bg-success-subtle border shadow">
-<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> Not Allowed
+<h3 class="px-4 py-2 bg-danger-subtle border shadow">
+<i class="text-danger me-3 bi bi-exclamation-triangle-fill"></i> Not Allowed
 </h3>
 
 <div class="p-3">
@@ -70,27 +97,18 @@ when: user.age > 18 and user.country == "ZA"
 	</p>
 
 	<ul>
-	  <li>No built-in functions like <code>len()</code>, <code>sum()</code>, <code>sorted()</code></li>
+	  <li>No use of <code>eval</code>, <code>exec</code>, <code>compile</code></li>
 	  <li>No imports or external libraries</li>
-	  <li>No access to Python internals</li>
+	  <li>No filesystem, network, or system access</li>
 	</ul>
 
-	<p><strong>❌ Example that will fail:</strong></p>
+	<p><strong>Example that will still fail (if you try a disallowed object):</strong></p>
 
 	<pre class="rounded p-3 bg-secondary-subtle"><code>
-when: len(items) > 0
+when: open("/etc/passwd")
 	</code></pre>
 
-	<p>Instead, calculate length with a chip or prepare it in advance:</p>
-
-	<pre class="rounded p-3 bg-secondary-subtle"><code>
-- name: "Store length"
-  declare:
-    item_count: "{{ len(data) }}"
-
-- name: "Use it safely"
-  when: item_count > 0
-	</code></pre>
+	<p>Always keep conditional logic safe and data-driven.</p>
 </div>
 
 <h3 class="px-4 py-2 bg-success-subtle border shadow">
@@ -99,10 +117,9 @@ when: len(items) > 0
 
 <div class="p-3">
 	<ul>
-	  <li>Keep <code>when</code> logic simple and safe.</li>
-	  <li>Pre-compute complex conditions using Chips or <code>DeclareTask</code>.</li>
+	  <li>Keep <code>when</code> logic simple and declarative.</li>
+	  <li>Use <code>DeclareTask</code> or <code>CodeTask</code> for complex pre-logic.</li>
 	  <li>Use <code>variables.vobj</code> as your mental model: it's a flattened, attribute-accessible object view of all variables.</li>
-	  <li>If an expression fails, the pipeline will raise an <code>EvaluationException</code> and halt unless caught upstream.</li>
+	  <li>If an expression fails, the pipeline raises <code>EvaluationException</code> and halts unless handled upstream.</li>
 	</ul>
 </div>
-

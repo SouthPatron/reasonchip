@@ -13,7 +13,7 @@ import json
 
 from pydantic import BaseModel, Field
 
-from reasonchip.core.engine.registry import Registry
+from reasonchip import Registry
 
 
 class JsonDumpsRequest(BaseModel):

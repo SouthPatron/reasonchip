@@ -9,7 +9,6 @@ import asyncio
 import signal
 import traceback
 
-from reasonchip.core import exceptions as rex
 from reasonchip.net.broker import Broker
 from reasonchip.net.transports import SSLServerOptions
 
@@ -109,11 +108,6 @@ This can listen on multiple sockets, IP4, and IP6 addresses.
             await broker.stop()
 
             return ExitCode.OK
-
-        except rex.ReasonChipException as ex:
-            msg = rex.print_reasonchip_exception(ex)
-            print(msg)
-            return ExitCode.ERROR
 
         except Exception as ex:
             print(f"************** UNHANDLED EXCEPTION **************")

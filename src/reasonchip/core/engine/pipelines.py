@@ -38,7 +38,10 @@ def parse_task(t: typing.Union[Task, typing.Dict], task_no: int) -> Task:
             return TaskSet.model_validate(t)
 
         if "dispatch" in t:
-            return DispatchPipelineTask.model_validate(t)
+            return DispatchTask.model_validate(t)
+
+        if "branch" in t:
+            return BranchTask.model_validate(t)
 
         if "return" in t:
             return ReturnTask.model_validate(t)
@@ -55,6 +58,12 @@ def parse_task(t: typing.Union[Task, typing.Dict], task_no: int) -> Task:
         if "chip" in t:
             return ChipTask.model_validate(t)
 
+        if "code" in t:
+            return CodeTask.model_validate(t)
+
+        if "assert" in t:
+            return AssertTask.model_validate(t)
+
     except ValidationError as ve:
         raise rex.TaskParseException(
             message="Task failed to parse",
@@ -68,20 +77,40 @@ def parse_task(t: typing.Union[Task, typing.Dict], task_no: int) -> Task:
     )
 
 
+# -------------------------- SUPPORT STRUCTURES -----------------------------
+
+
+class KeyValuePair(BaseModel):
+    name: str
+    key: str
+
+    class Config:
+        extra = "forbid"
+
+
 # -------------------------- DIFFERENT TASKS --------------------------------
+
+
+TaskLogLevel = typing.Literal["info", "debug", "trace"]
 
 
 class TaskSet(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     run_async: bool = False
 
     tasks: typing.List[Task]
+    params: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
+    key_result_into: typing.Optional[KeyValuePair] = None
+    return_result: bool = False
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
 
@@ -96,17 +125,23 @@ class TaskSet(BaseModel):
         return [parse_task(t, i) for i, t in enumerate(tasks)]
 
 
-class DispatchPipelineTask(BaseModel):
+class DispatchTask(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     run_async: bool = False
 
     dispatch: str
+    params: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
+    key_result_into: typing.Optional[KeyValuePair] = None
+    return_result: bool = False
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
 
@@ -114,18 +149,38 @@ class DispatchPipelineTask(BaseModel):
         extra = "forbid"
 
 
+class BranchTask(BaseModel):
+    name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
+    when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
+    variables: typing.Optional[typing.Dict[str, typing.Any]] = None
+
+    branch: str
+    params: typing.Optional[typing.Dict[str, typing.Any]] = None
+
+    class Config:
+        extra = "forbid"
+
+
 class ChipTask(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
     variables: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     run_async: bool = False
 
     chip: str
-    params: typing.Any
+    params: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     store_result_as: typing.Optional[str] = None
     append_result_into: typing.Optional[str] = None
+    key_result_into: typing.Optional[KeyValuePair] = None
+    return_result: bool = False
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
 
@@ -135,7 +190,11 @@ class ChipTask(BaseModel):
 
 class ReturnTask(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
+
     result: typing.Any
 
     class Config:
@@ -149,7 +208,9 @@ class ReturnTask(BaseModel):
 
         ignore_list = [
             "name",
+            "comment",
             "when",
+            "log",
         ]
 
         method_keys = [key for key in data.keys() if key not in ignore_list]
@@ -165,13 +226,12 @@ class ReturnTask(BaseModel):
 
 class DeclareTask(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
-    variables: typing.Optional[typing.Dict[str, typing.Any]] = None
+    log: typing.Optional[TaskLogLevel] = None
 
     declare: typing.Dict[str, typing.Any]
-
-    store_result_as: typing.Optional[str] = None
-    append_result_into: typing.Optional[str] = None
 
     loop: typing.Optional[typing.Union[str, typing.List]] = None
 
@@ -181,7 +241,7 @@ class DeclareTask(BaseModel):
 
 class CommentTask(BaseModel):
     name: typing.Optional[str] = None
-    comment: typing.Any
+    comment: str
 
     class Config:
         extra = "forbid"
@@ -189,7 +249,10 @@ class CommentTask(BaseModel):
 
 class TerminateTask(BaseModel):
     name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
     when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
 
     terminate: typing.Any
 
@@ -197,23 +260,97 @@ class TerminateTask(BaseModel):
         extra = "forbid"
 
 
+class CodeTask(BaseModel):
+    name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
+    when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
+    variables: typing.Optional[typing.Dict[str, typing.Any]] = None
+
+    run_async: bool = False
+
+    code: str
+    params: typing.Optional[typing.Dict[str, typing.Any]] = None
+
+    store_result_as: typing.Optional[str] = None
+    append_result_into: typing.Optional[str] = None
+    key_result_into: typing.Optional[KeyValuePair] = None
+    return_result: bool = False
+
+    loop: typing.Optional[typing.Union[str, typing.List]] = None
+
+    class Config:
+        extra = "forbid"
+
+
+class AssertTask(BaseModel):
+    name: typing.Optional[str] = None
+    comment: typing.Optional[str] = None
+
+    when: typing.Optional[str] = None
+    log: typing.Optional[TaskLogLevel] = None
+
+    checks: typing.Union[str, typing.List[str]]
+
+    loop: typing.Optional[typing.Union[str, typing.List]] = None
+
+    class Config:
+        extra = "forbid"
+
+    @model_validator(mode="before")
+    @classmethod
+    def map_return_value(cls, data: typing.Any) -> typing.Any:
+        if not isinstance(data, dict):
+            return data
+
+        ignore_list = [
+            "name",
+            "comment",
+            "when",
+            "log",
+            "loop",
+        ]
+
+        method_keys = [key for key in data.keys() if key not in ignore_list]
+
+        if len(method_keys) != 1:
+            raise ValueError(f"You have to define some checks")
+
+        assert method_keys[0] == "assert"
+
+        data["checks"] = data.pop("assert")
+        return data
+
+
 # -------------------------- TYPES AND THE PIPELINE -------------------------
 
 Task = typing.Union[
     TaskSet,
-    DispatchPipelineTask,
+    DispatchTask,
+    BranchTask,
     ChipTask,
     ReturnTask,
     DeclareTask,
     CommentTask,
     TerminateTask,
+    CodeTask,
+    AssertTask,
 ]
 
 SaveableTask = typing.Union[
-    TaskSet, DispatchPipelineTask, DeclareTask, ChipTask
+    TaskSet,
+    DispatchTask,
+    ChipTask,
+    CodeTask,
 ]
 LoopableTask = typing.Union[
-    TaskSet, DispatchPipelineTask, DeclareTask, ChipTask
+    TaskSet,
+    DispatchTask,
+    DeclareTask,
+    ChipTask,
+    CodeTask,
+    AssertTask,
 ]
 
 

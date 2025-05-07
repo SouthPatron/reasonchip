@@ -1,6 +1,6 @@
 ---
 title: 'Task Types'
-date: 2025-02-24
+date: 2025-05-07
 ---
 
 <h3 class="px-4 py-2 bg-primary-subtle border shadow">
@@ -23,208 +23,240 @@ date: 2025-02-24
 
 <div class="p-3">
 	<p>
-	These are common fields that can be used in most task types. They provide
-	the same functionality throughout. Refer to the individual task type to
-	see if they are explicitly supported.
+	These are common fields used across most task types. They provide consistent
+	functionality for conditional logic, asynchronous execution, and result
+	handling. Some fields are supported only in select task types.
 	</p>
 
 	<ul>
-	  <li><strong>name</strong>: A human-readable identifier for the task, not used. Just for you.</li>
+	  <li><strong>name</strong>: A human-readable identifier for the task.</li>
+	  <li><strong>comment</strong>: A non-executing note or description.</li>
+	  <li><strong>log</strong>: Log level for task output (<code>info</code>,
+		  <code>debug</code>, <code>trace</code>).</li>
 	  <li><strong>when</strong>: Conditional expression. If false, the task is skipped.</li>
 	  <li><strong>loop</strong>: Repeats the task over a list, range, or object.</li>
 	  <li><strong>run_async</strong>: Runs the task asynchronously if true.</li>
 	  <li><strong>store_result_as</strong>: Saves the task result in a named variable.</li>
 	  <li><strong>append_result_into</strong>: Appends the result into a list variable (created if needed).</li>
+	  <li><strong>key_result_into</strong>: Stores the result into a dictionary under the given key.</li>
+	  <li><strong>return_result</strong>: Immediately returns the result from this task instead of
+		  continuing. The result is returned in a variable called "_".</li>
 	</ul>
+
+	<p><strong>Note:</strong> <code>variables</code> are injected directly, and
+	<code>params</code> are interpolated. Use <code>variables</code> for static
+	values, and <code>params</code> for templated input.</p>
+
 	<p>Loop context variables include:</p>
 	<ul>
-		<li><strong>item</strong>: The item within the loop</li>
+		<li><strong>item</strong>: The current item in the loop</li>
 		<li><strong>loop.index</strong>: The counter of the loop, starting at 1</li>
 		<li><strong>loop.index0</strong>: The counter of the loop, starting at 0</li>
-		<li><strong>loop.first</strong>: True if the first iteration of the loop</li>
-		<li><strong>loop.last</strong>: True if the last iteration of the loop</li>
-		<li><strong>loop.even</strong>: True if an even iteration of the loop</li>
-		<li><strong>loop.odd</strong>: True if an odd iteration of the loop</li>
-		<li><strong>loop.revindex</strong>: The reverse counter of the loop, which starts at 1</li>
-		<li><strong>loop.revindex0</strong>: The reverse counter of the loop, which starts at 0</li>
+		<li><strong>loop.first</strong>: True if the first iteration</li>
+		<li><strong>loop.last</strong>: True if the last iteration</li>
+		<li><strong>loop.even</strong>: True if iteration is even</li>
+		<li><strong>loop.odd</strong>: True if iteration is odd</li>
+		<li><strong>loop.revindex</strong>: Reverse counter starting at 1</li>
+		<li><strong>loop.revindex0</strong>: Reverse counter starting at 0</li>
 	</ul>
 </div>
+
+<!-- Task Sections -->
 
 <h3 class="px-4 py-2 bg-success-subtle border shadow">
 <i class="text-success me-3 bi bi-arrow-right-square-fill"></i> TaskSet
 </h3>
-
 <div class="p-3">
-	<p>
-	  A group of tasks executed in sequence. Can include its own variable
-	  scope, conditional logic, and loop execution.
-	</p>
+	<p>Executes a group of tasks in sequence. Supports scoped variables and
+	local result handling.</p>
 	<ul>
-	  <li><strong>variables</strong>: Scoped variable declarations for the set.</li>
-	  <li><strong>tasks</strong>: A list of task definitions.</li>
+		<li><strong>variables</strong>: Scoped variable declarations for the set.</li>
+		<li><strong>tasks</strong>: A list of task definitions.</li>
 	</ul>
 	<p>Supports all <strong>common fields</strong>.</p>
-	<p><strong>Note:</strong> If a <code>ReturnTask</code> is used inside a <code>TaskSet</code>, the set is exited immediately.</p>
-
 	<pre class="rounded p-3 bg-secondary-subtle"><code>
 - name: "Grouped steps"
   variables:
     greeting: "Hello"
   tasks:
-    - name: "Step 1"
-      chip: myapp.chips.say
+    - chip: myapp.chips.say
       params:
         text: "{{ greeting }} {{ item }}"
-    - name: "Step 2"
-      chip: myapp.chips.wait
+    - chip: myapp.chips.wait
       params:
         seconds: 1
-  loop: items
+  loop: var(items)
 	</code></pre>
 </div>
 
 <h3 class="px-4 py-2 bg-success-subtle border shadow">
-<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> DispatchPipelineTask
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> DispatchTask
 </h3>
-
 <div class="p-3">
-	<p>
-	  Calls another pipeline from within the current one. Execution can
-	  continue afterward or branch away permanently.
-	</p>
+	<p>Calls another pipeline by name, optionally passing in variables and
+	parameters. Execution resumes after the pipeline completes.</p>
 	<ul>
-	  <li><strong>variables</strong>: Variables passed into the new pipeline context.</li>
-	  <li><strong>dispatch</strong>: Name of the pipeline to call</li>
+		<li><strong>dispatch</strong>: Name of the pipeline to call</li>
+		<li><strong>variables</strong>: Variables passed into the new pipeline context</li>
+		<li><strong>params</strong>: Interpolated parameters passed into the new pipeline</li>
 	</ul>
 	<p>Supports all <strong>common fields</strong>.</p>
-
 	<pre class="rounded p-3 bg-secondary-subtle"><code>
-- name: "Run follow-up pipeline"
-  when: should_run
-  variables:
-    user_id: "{{ user.id }}"
-  dispatch: "notifications.send_summary"
+- name: "Run follow-up"
+  dispatch: notifications.send_summary
+  params:
+    user_id: var(user.id)
+	</code></pre>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> BranchTask
+</h3>
+<div class="p-3">
+	<p>Redirects execution to another pipeline permanently. Existing variables
+	become global in the new branch. Control never returns to the current
+	pipeline.</p>
+	<ul>
+		<li><strong>branch</strong>: Name of the new pipeline to redirect to</li>
+		<li><strong>variables</strong>: Injected as-is</li>
+		<li><strong>params</strong>: Interpolated parameters</li>
+	</ul>
+	<p>Supports: <strong>name</strong>, <strong>comment</strong>, <strong>when</strong>, <strong>log</strong></p>
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- branch: onboarding.start
+  params:
+    user_id: var(user.id)
 	</code></pre>
 </div>
 
 <h3 class="px-4 py-2 bg-success-subtle border shadow">
 <i class="text-success me-3 bi bi-arrow-right-square-fill"></i> ChipTask
 </h3>
-
 <div class="p-3">
-	<p>
-	  Invokes a registered chip by name, with specified parameters. The most
-	  common task type.
-	</p>
+	<p>Executes a registered chip with given parameters. Chips are reusable,
+	named components.</p>
 	<ul>
-	  <li><strong>variables</strong>: A set of temporary set of variables to use
-		  within the call</li>
-	  <li><strong>chip</strong>: Fully qualified name of the chip.</li>
-	  <li><strong>params</strong>: Input arguments for the chip.</li>
+		<li><strong>chip</strong>: Fully qualified chip name</li>
+		<li><strong>params</strong>: Interpolated arguments</li>
+		<li><strong>variables</strong>: Injected values</li>
 	</ul>
 	<p>Supports all <strong>common fields</strong>.</p>
-
 	<pre class="rounded p-3 bg-secondary-subtle"><code>
 - chip: chatbot.send_message
-  when: new_user
-  variables:
-    greeting: "Welcome!"
   params:
-    user_id: "{{ user.id }}"
-    message: "{{ greeting }}"
-  store_result_as: "send_result"
+    message: "Hello, {{ user.name }}"
+  store_result_as: result
 	</code></pre>
+</div>
 
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> CodeTask
+</h3>
+<div class="p-3">
+	<p>Executes inline code logic with access to current variables and
+	inputs.</p>
+	<ul>
+		<li><strong>code</strong>: Python code as a string</li>
+		<li><strong>params</strong>: Interpolated arguments</li>
+		<li><strong>variables</strong>: Injected variables</li>
+	</ul>
+	<p>Supports all <strong>common fields</strong>.</p>
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- code: |
+	result = a + b
+  params:
+    a: 1
+    b: 2
+  store_result_as: sum
+	</code></pre>
+</div>
+
+<h3 class="px-4 py-2 bg-success-subtle border shadow">
+<i class="text-success me-3 bi bi-arrow-right-square-fill"></i> AssertTask
+</h3>
+<div class="p-3">
+	<p>Asserts one or more boolean conditions. Fails if any are false.</p>
+	<ul>
+		<li><strong>assert</strong>: A condition or list of conditions to assert</li>
+	</ul>
+	<p>Supports: <strong>name</strong>, <strong>comment</strong>,
+	<strong>when</strong>, <strong>log</strong>, <strong>loop</strong>
+	</p>
+	<pre class="rounded p-3 bg-secondary-subtle"><code>
+- assert:
+    - user.age > 0
+    - user.active == true
+	</code></pre>
 </div>
 
 <h3 class="px-4 py-2 bg-success-subtle border shadow">
 <i class="text-success me-3 bi bi-arrow-right-square-fill"></i> ReturnTask
 </h3>
-
 <div class="p-3">
-	<p>
-	  Ends the current pipeline or <code>TaskSet</code> early and returns a
-	  result to the pipeline that dispatched it, or as a result to the entire
-	  workflow if used at the top level.
-	</p>
+	<p>Ends the current task set or pipeline early and returns a value to the
+	caller.</p>
 	<ul>
-	  <li><strong>return</strong>: The value to return.</li>
+		<li><strong>return</strong>: Value to return (internally mapped to
+			<code>result</code>)
+		</li>
 	</ul>
-	<p>Supports: <strong>name</strong>, <strong>when</strong></p>
-
+	<p>Supports: <strong>name</strong>, <strong>comment</strong>,
+	<strong>when</strong>, <strong>log</strong></p>
 	<pre class="rounded p-3 bg-secondary-subtle"><code>
-- name: "Stop if error occurred"
-  when: result.status != 'OK'
+- when: result.status != 'OK'
   return:
     status: "error"
-    message: "{{ error_message }}"
+    message: "Failed validation"
 	</code></pre>
-
 </div>
 
 <h3 class="px-4 py-2 bg-success-subtle border shadow">
 <i class="text-success me-3 bi bi-arrow-right-square-fill"></i> DeclareTask
 </h3>
-
 <div class="p-3">
-	<p>
-	  Declares or overrides variables in the current context. These declarations
-	  are available to all tasks in the current pipeline, <code>TaskSet</code>,
-      or any dispatched pipelines.
-	</p>
+	<p>Declares or overrides variables in the current scope. These variables
+	propagate downward.</p>
 	<ul>
-	  <li><strong>variables</strong>: A temporary set of variables to use
-		  within the declare field</li>
-	  <li><strong>declare</strong>: Key-value dictionary of variables to
-		  declare.</li>
+		<li><strong>declare</strong>: Key-value variable pairs</li>
 	</ul>
-	<p>Does not support: <strong>run_async</strong></p>
-
+	<p>Supports: <strong>name</strong>, <strong>comment</strong>,
+	<strong>when</strong>, <strong>log</strong>, <strong>loop</strong></p>
 	<pre class="rounded p-3 bg-secondary-subtle"><code>
 - declare:
-    attempt: 0
-    is_retry: false
+    is_admin: false
+    retry_count: 0
 	</code></pre>
 </div>
 
 <h3 class="px-4 py-2 bg-success-subtle border shadow">
 <i class="text-success me-3 bi bi-arrow-right-square-fill"></i> CommentTask
 </h3>
-
 <div class="p-3">
-	<p>
-	  A non-executing task used for documentation or inline notes.
-	</p>
+	<p>A passive task that does nothing. Useful for annotation.</p>
 	<ul>
-	  <li><strong>comment</strong>: Text to display as a comment.</li>
+		<li><strong>comment</strong>: Text description</li>
 	</ul>
 	<p>Supports: <strong>name</strong></p>
-
 	<pre class="rounded p-3 bg-secondary-subtle"><code>
-- comment: "This section will validate the user input and sanitize fields."
+- comment: "This is a logic block for retry control"
 	</code></pre>
 </div>
 
 <h3 class="px-4 py-2 bg-success-subtle border shadow">
 <i class="text-success me-3 bi bi-arrow-right-square-fill"></i> TerminateTask
 </h3>
-
 <div class="p-3">
-	<p>
-	  Stops the entire workflow immediately and returns a value to the
-	  caller of the entire workflow.
-	</p>
+	<p>Immediately stops the entire workflow and returns the provided value as
+	the final output.</p>
 	<ul>
-	  <li><strong>terminate</strong>: Final result.</li>
+		<li><strong>terminate</strong>: Final result</li>
 	</ul>
-	<p>Supports: <strong>name</strong></p>
-
+	<p>Supports: <strong>name</strong>, <strong>comment</strong>,
+	<strong>when</strong>, <strong>log</strong></p>
 	<pre class="rounded p-3 bg-secondary-subtle"><code>
-- when: shutdown_signal == True
+- when: shutdown_signal == true
   terminate:
-    reason: "Manual shutdown"
+    reason: "Manual override"
     status: "terminated"
 	</code></pre>
 </div>
-
-
