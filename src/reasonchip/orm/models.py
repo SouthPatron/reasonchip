@@ -2,14 +2,10 @@ from __future__ import annotations
 
 import uuid
 import typing
-import re
 
 from pydantic import BaseModel, Field
 
-
-def pascal_to_snake(name: str) -> str:
-    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
-    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+from .utils import pascal_to_snake
 
 
 class RoxModelMeta:
@@ -22,13 +18,14 @@ class RoxModelMeta:
 
 
 class RoxRegistry:
-    _registry: typing.Dict[str, typing.Type[RoxModel]] = {}
+    _registry: typing.Dict[uuid.UUID, typing.Type[RoxModel]] = {}
 
 
 class RoxModel(BaseModel):
 
     # Common field for all Rox models
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, alias="_id")
+    id: typing.Optional[uuid.UUID] = None
+    version: int = Field(default=1, frozen=True)
 
     # Registry management for RoxModel
     def __init_subclass__(cls):
@@ -36,6 +33,7 @@ class RoxModel(BaseModel):
 
         classname = pascal_to_snake(cls.__name__)
 
+        # Check the Meta class
         meta = getattr(cls, "Meta", None)
         if meta is None:
             raise TypeError(f"{cls.__name__}.Meta must be defined")
@@ -53,7 +51,7 @@ class RoxModel(BaseModel):
         class_uuid = meta.class_uuid
         if class_uuid in RoxRegistry._registry:
             raise TypeError(
-                f"UUID {class_uuid} already registered for {RoxRegistry._registry[class_uuid]}"
+                f"UUID {class_uuid} ({cls}) already registered for {RoxRegistry._registry[class_uuid]}"
             )
 
         RoxRegistry._registry[class_uuid] = cls

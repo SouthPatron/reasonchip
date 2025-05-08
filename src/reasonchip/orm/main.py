@@ -1,17 +1,17 @@
-import typing
-import asyncio
+#!/usr/bin/env python
 
-import sqlalchemy as sa
+import typing
+
+from pydantic import BaseModel, Field
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     async_engine_from_config,
 )
 
-from pydantic import BaseModel, Field
-
-from models import RoxModel
-from rox import Rox
+from reasonchip.orm.models import RoxModel
+from reasonchip.orm.rox import Rox
+from reasonchip.orm.manager import RoxManager
 
 
 class PhoneNumber(BaseModel):
@@ -50,7 +50,27 @@ async def main():
     )
 
     rox = Rox(engine=engine, schema="sammy")
-    await rox.initialize()
+
+    man = RoxManager(rox=rox)
+    await man.initialize()
+
+    person = Person(
+        first_name="John",
+        first_name_two="Doe",
+        middle_name="Smith",
+        last_name="Doe",
+        age=30,
+        phones=[
+            PhoneNumber(
+                location="home", country_code="+1", number="1234567890"
+            ),
+            PhoneNumber(
+                location="work", country_code="+1", number="0987654321"
+            ),
+        ],
+    )
+
+    await man.save(person)
 
 
 if __name__ == "__main__":
