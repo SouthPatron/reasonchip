@@ -4,7 +4,7 @@ import asyncio
 
 import sqlalchemy as sa
 
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from dataclasses import dataclass, field
 
@@ -90,28 +90,33 @@ class RoxManager:
 
         tbl = self._tables[class_uuid]
 
-        if obj.id is None:
-            return await self._db_create(obj, tbl)
-
-        async with self._rox.engine.begin() as session, session.begin():
+        async with AsyncSession(self._rox.engine) as session, session.begin():
 
             # Check if the object already exists
-            stmt = sa.select(
-                tbl.c.version,
-                tbl.c.revision,
-                tbl.c.model,
-            ).where(tbl.c.id == obj.id)
+            if obj.id:
+                stmt = (
+                    sa.select(
+                        tbl.c.version,
+                        tbl.c.revision,
+                        tbl.c.model,
+                    )
+                    .where(tbl.c.id == obj.id)
+                    .with_for_update()
+                )
 
-            for row in await session.execute(stmt):
-                # TODO: We need to do version management here
-                version = row[0]
-                revision = row[1]
-                json_str = row[2]
+                for row in await session.execute(stmt):
+                    version, revision, json_str = row
+                    return self._db_update(
+                        session,
+                        obj,
+                        tbl,
+                        version,
+                        revision,
+                        json_str,
+                    )
 
-                break
-
-        # If we get here, we didn't find an existing object
-        return self._db_create(obj, tbl)
+            # If we get here, it's a new object for sure
+            return await self._db_create(session, obj, tbl)
 
     # ------------------------ LOADING ---------------------------------------
 
@@ -128,7 +133,7 @@ class RoxManager:
 
         tbl = self._tables[class_uuid]
 
-        async with self._rox.engine.begin() as session:
+        async with AsyncSession(self._rox.engine) as session:
 
             stmt = sa.select(
                 tbl.c.version,
@@ -139,7 +144,6 @@ class RoxManager:
             for row in await session.execute(stmt):
 
                 # TODO: We need to do version management here
-
                 version = row[0]
                 revision = row[1]
                 json_str = row[2]
@@ -153,18 +157,53 @@ class RoxManager:
 
     async def _db_create(
         self,
+        session: AsyncSession,
         obj: RoxModel,
         tbl: sa.Table,
     ):
         if obj.id is None:
             obj.id = uuid.uuid4()
 
+        stmt = sa.insert(tbl).values(
+            id=obj.id,
+            version=1,
+            revision=1,
+            model=obj.model_dump_json(),
+        )
+
+        result = await session.execute(stmt)
+        if result.rowcount == 1:
+            return
+
+        raise RuntimeError(
+            f"Failed to insert object {obj} into table {tbl.name}"
+        )
+
     async def _db_update(
         self,
+        session: AsyncSession,
         obj: RoxModel,
         tbl: sa.Table,
+        version: int,
+        revision: int,
+        json_str: str,
     ):
-        return
+        stmt = (
+            sa.update(tbl)
+            .where(tbl.c.id == obj.id)
+            .values(
+                revision=revision + 1,
+                model=obj.model_dump_json(),
+            )
+        )
+
+        result = await session.execute(stmt)
+        if result.rowcount == 1:
+            return
+
+        raise RuntimeError(
+            f"Failed to update object {obj.id} into table {tbl.name}"
+        )
 
     # ------------------------ ADDITIONAL ------------------------------------
 
@@ -177,6 +216,17 @@ class RoxManager:
                 sa.Column("version", sa.Integer, nullable=False),
                 sa.Column("revision", sa.BigInteger, nullable=False, default=0),
                 sa.Column("model", sa.JSON, nullable=False),
-                sa.Column("last_updated_at", sa.DateTime, nullable=False),
-                sa.Column("created_at", sa.DateTime, nullable=False),
+                sa.Column(
+                    "last_updated_at",
+                    sa.DateTime,
+                    nullable=False,
+                    server_default=sa.func.now(),
+                    onupdate=sa.func.now(),
+                ),
+                sa.Column(
+                    "created_at",
+                    sa.DateTime,
+                    nullable=False,
+                    server_default=sa.func.now(),
+                ),
             )

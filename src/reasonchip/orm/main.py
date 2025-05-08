@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import typing
+import asyncio
+import uuid
 
 from pydantic import BaseModel, Field
 
@@ -70,7 +72,15 @@ async def main():
         ],
     )
 
-    await man.save(person)
+    # print(f"{person}")
+    # await man.save(person)
+
+    obj = await man.load(
+        Person,
+        uuid.UUID("e7e5c864-9b2e-4d4e-99e1-c8344b8f0200"),
+    )
+
+    print(f"{obj}")
 
 
 if __name__ == "__main__":
