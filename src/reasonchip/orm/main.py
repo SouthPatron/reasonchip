@@ -13,10 +13,11 @@ from sqlalchemy.ext.asyncio import (
 
 from reasonchip.orm.models import RoxModel
 from reasonchip.orm.rox import Rox
-from reasonchip.orm.manager import RoxManager
+
+# from reasonchip.orm.manager import RoxManager
 
 
-class PhoneNumber(BaseModel):
+class PhoneNumber(RoxModel):
     location: typing.Literal["home", "work", "mobile"]
     country_code: str
     number: str
@@ -34,9 +35,8 @@ class Person(RoxModel):
     )
 
     phones: typing.List[PhoneNumber] = Field(default_factory=list)
-
-    class Meta:
-        class_uuid = "e30c0a66-6ee7-4854-9674-47c66236fb49"
+    emergency_contact: typing.Optional[PhoneNumber] = None
+    required_contact: PhoneNumber
 
 
 async def main():
@@ -53,8 +53,8 @@ async def main():
 
     rox = Rox(engine=engine, schema="sammy")
 
-    man = RoxManager(rox=rox)
-    await man.initialize()
+    # man = RoxManager(rox=rox)
+    # await man.initialize()
 
     person = Person(
         first_name="John",
@@ -70,17 +70,18 @@ async def main():
                 location="work", country_code="+1", number="0987654321"
             ),
         ],
+        required_contact=PhoneNumber(
+            location="mobile", country_code="+1", number="5555555555"
+        ),
     )
 
-    # print(f"{person}")
-    # await man.save(person)
+    print(f"{person}")
 
-    obj = await man.load(
-        Person,
-        uuid.UUID("e7e5c864-9b2e-4d4e-99e1-c8344b8f0200"),
-    )
+    new_id = await person.save()
 
-    print(f"{obj}")
+    print(f"New ID = [{new_id}]")
+
+    print(f"{person}")
 
 
 if __name__ == "__main__":

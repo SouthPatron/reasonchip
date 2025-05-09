@@ -1,24 +1,10 @@
-from __future__ import annotations
-
 import uuid
 import typing
 
-from pydantic import BaseModel, Field
-
-from .utils import pascal_to_snake
-
-
-class RoxModelMeta:
-    table_name: str
-    class_uuid: uuid.UUID
-
-    _required_meta_fields: typing.List[str] = [
-        "class_uuid",
-    ]
-
-
-class RoxRegistry:
-    _registry: typing.Dict[uuid.UUID, typing.Type[RoxModel]] = {}
+from pydantic import (
+    BaseModel,
+    Field,
+)
 
 
 class RoxModel(BaseModel):
@@ -27,31 +13,51 @@ class RoxModel(BaseModel):
     id: typing.Optional[uuid.UUID] = None
     version: int = Field(default=1, frozen=True)
 
-    # Registry management for RoxModel
-    def __init_subclass__(cls):
-        super().__init_subclass__()
+    @property
+    def manager(self) -> "RoxManager":
+        from .manager import RoxManager
 
-        classname = pascal_to_snake(cls.__name__)
+        return RoxManager.get_instance()
 
-        # Check the Meta class
-        meta = getattr(cls, "Meta", None)
-        if meta is None:
-            raise TypeError(f"{cls.__name__}.Meta must be defined")
+    async def save(self) -> uuid.UUID:
+        rc = await self._recursive_save_and_replace(self)
+        assert self.id is not None
+        return self.id
 
-        for f in RoxModelMeta._required_meta_fields:
-            if not hasattr(meta, f):
-                raise TypeError(
-                    f"{cls.__name__}.Meta must define {f} attribute"
-                )
+    async def _recursive_save_and_replace(self, obj: typing.Any):
+        if isinstance(obj, RoxModel):
+            create = obj.id is None
 
-        if not hasattr(meta, "table_name"):
-            meta.table_name = classname
+            if obj.id is None:
+                obj.id = uuid.uuid4()
 
-        # Register into the factory
-        class_uuid = meta.class_uuid
-        if class_uuid in RoxRegistry._registry:
-            raise TypeError(
-                f"UUID {class_uuid} ({cls}) already registered for {RoxRegistry._registry[class_uuid]}"
+            result = {}
+            for name in obj.__class__.model_fields.keys():
+                value = getattr(obj, name)
+                result[name] = await self._recursive_save_and_replace(value)
+
+            # Save the object to the database here
+            await self.manager.save(
+                model=obj.__class__,
+                oid=obj.id,
+                obj=result,
+                create=create,
             )
 
-        RoxRegistry._registry[class_uuid] = cls
+            # Return the reference
+            return {
+                "__ref__": obj.id,
+                "__rox__": obj.__class__.__name__,
+            }
+
+        elif isinstance(obj, list):
+            return [await self._recursive_save_and_replace(i) for i in obj]
+
+        elif isinstance(obj, dict):
+            return {
+                k: await self._recursive_save_and_replace(v)
+                for k, v in obj.items()
+            }
+
+        else:
+            return obj

@@ -1,65 +1,66 @@
+from __future__ import annotations
+
 import typing
 import uuid
 import asyncio
+import json
 
 import sqlalchemy as sa
 
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-
-from dataclasses import dataclass, field
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.schema import CreateSchema
 
 from .models import RoxModel
 from .rox import Rox
-from .models import RoxRegistry
+
+from .utils import pascal_to_snake
 
 
-from sqlalchemy.schema import CreateSchema
+def custom_json_serializer(obj):
 
+    if isinstance(obj, uuid.UUID):
+        return str(obj)
 
-@dataclass
-class RoxCachedModel:
-    model: RoxModel
-    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    raise TypeError(f"Type {type(obj)} not serializable")
 
 
 class RoxManager:
 
-    def __init__(
-        self,
-        rox: Rox,
-    ):
-        self._rox: Rox = rox
+    _instance: typing.Optional[RoxManager] = None
+    _initialized: bool = False
+
+    # ------------------------ CONSTRUCTORS ----------------------------------
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+
         self._lock: asyncio.Lock = asyncio.Lock()
-        self._cache: typing.Dict[uuid.UUID, RoxCachedModel] = {}
-        self._tables: typing.Dict[uuid.UUID, sa.Table] = {}
+        self._seen: typing.Dict[str, typing.Dict[str, sa.sa.Table]] = {}
+        self._rox: typing.Optional[Rox] = None
+
+        self._initialized = True
 
     # ------------------------ PROPERTIES ------------------------------------
 
     @property
-    def engine(self) -> AsyncEngine:
-        return self._rox.engine
+    def rox(self) -> Rox:
+        if not self._rox:
+            self._rox = Rox.get_instance()
+        return self._rox
 
-    @property
-    def metadata(self) -> sa.MetaData:
-        return self._rox.metadata
+    # ------------------------ SUPPORT ---------------------------------------
 
-    @property
-    def schema(self) -> str:
-        return self._rox.schema
-
-    # ------------------------ LIFECYCLE -------------------------------------
-
-    async def initialize(self) -> None:
-        # Ensure schemas
-        async with self.engine.begin() as conn:
-            await conn.execute(CreateSchema(self.schema, if_not_exists=True))
-
-        # Create table definitions for all models
-        await self._build_model_tables()
-
-        # Create the tables in the database
-        async with self.engine.begin() as conn:
-            await conn.run_sync(self.metadata.create_all)
+    @classmethod
+    def get_instance(cls) -> RoxManager:
+        if not cls._instance:
+            return cls()
+        return cls._instance
 
     # ------------------------ DATABASE --------------------------------------
 
@@ -69,38 +70,33 @@ class RoxManager:
         oid: uuid.UUID,
     ) -> typing.Optional[RoxModel]:
 
+        tbl = await self._fetch_table(model)
+
         async with self._lock:
-            if oid in self._cache:
-                return self._cache[oid].model
-
-            obj = await self._db_load(model, oid)
-            if obj:
-                self._cache[oid] = RoxCachedModel(model=obj)
-
-            return obj
+            return await self._db_load(model, oid, tbl)
 
     async def save(
         self,
-        obj: RoxModel,
+        model: typing.Type[RoxModel],
+        oid: uuid.UUID,
+        obj: typing.Dict[str, typing.Any],
+        create: bool,
     ):
-        class_uuid = obj.__class__.Meta.class_uuid
-        assert (
-            class_uuid in self._tables
-        ), f"Class UUID {class_uuid} ({obj.__class__}) not found in tables"
+        rox = self.rox
 
-        tbl = self._tables[class_uuid]
+        tbl = await self._fetch_table(model)
 
-        async with AsyncSession(self._rox.engine) as session, session.begin():
+        async with AsyncSession(rox.engine) as session, session.begin():
 
             # Check if the object already exists
-            if obj.id:
+            if not create:
                 stmt = (
                     sa.select(
                         tbl.c.version,
                         tbl.c.revision,
                         tbl.c.model,
                     )
-                    .where(tbl.c.id == obj.id)
+                    .where(tbl.c.id == oid)
                     .with_for_update()
                 )
 
@@ -108,6 +104,8 @@ class RoxManager:
                     version, revision, json_str = row
                     return self._db_update(
                         session,
+                        model,
+                        oid,
                         obj,
                         tbl,
                         version,
@@ -116,7 +114,13 @@ class RoxManager:
                     )
 
             # If we get here, it's a new object for sure
-            return await self._db_create(session, obj, tbl)
+            return await self._db_create(
+                session,
+                model,
+                obj,
+                oid,
+                tbl,
+            )
 
     # ------------------------ LOADING ---------------------------------------
 
@@ -124,16 +128,12 @@ class RoxManager:
         self,
         model: typing.Type[RoxModel],
         oid: uuid.UUID,
+        tbl: sa.Table,
     ) -> typing.Optional[RoxModel]:
 
-        class_uuid = model.Meta.class_uuid
-        assert (
-            class_uuid in self._tables
-        ), f"Class UUID {class_uuid} ({model}) not found in tables"
+        rox = self.rox
 
-        tbl = self._tables[class_uuid]
-
-        async with AsyncSession(self._rox.engine) as session:
+        async with AsyncSession(rox.engine) as session:
 
             stmt = sa.select(
                 tbl.c.version,
@@ -158,17 +158,16 @@ class RoxManager:
     async def _db_create(
         self,
         session: AsyncSession,
-        obj: RoxModel,
+        model: typing.Type[RoxModel],
+        obj: typing.Dict[str, typing.Any],
+        oid: uuid.UUID,
         tbl: sa.Table,
     ):
-        if obj.id is None:
-            obj.id = uuid.uuid4()
-
         stmt = sa.insert(tbl).values(
-            id=obj.id,
+            id=oid,
             version=1,
             revision=1,
-            model=obj.model_dump_json(),
+            model=json.dumps(obj, default=custom_json_serializer),
         )
 
         result = await session.execute(stmt)
@@ -182,7 +181,9 @@ class RoxManager:
     async def _db_update(
         self,
         session: AsyncSession,
-        obj: RoxModel,
+        model: typing.Type[RoxModel],
+        oid: uuid.UUID,
+        obj: typing.Dict[str, typing.Any],
         tbl: sa.Table,
         version: int,
         revision: int,
@@ -190,10 +191,10 @@ class RoxManager:
     ):
         stmt = (
             sa.update(tbl)
-            .where(tbl.c.id == obj.id)
+            .where(tbl.c.id == oid)
             .values(
                 revision=revision + 1,
-                model=obj.model_dump_json(),
+                model=json.dumps(obj, default=custom_json_serializer),
             )
         )
 
@@ -202,31 +203,74 @@ class RoxManager:
             return
 
         raise RuntimeError(
-            f"Failed to update object {obj.id} into table {tbl.name}"
+            f"Failed to update object {oid} into table {tbl.name}"
         )
 
-    # ------------------------ ADDITIONAL ------------------------------------
+    # ------------------------ SCHEMA CONTROL --------------------------------
 
-    async def _build_model_tables(self) -> None:
-        for class_uuid, model in RoxRegistry._registry.items():
-            self._tables[class_uuid] = sa.Table(
-                model.Meta.table_name,
-                self.metadata,
-                sa.Column("id", sa.UUID, primary_key=True),
-                sa.Column("version", sa.Integer, nullable=False),
-                sa.Column("revision", sa.BigInteger, nullable=False, default=0),
-                sa.Column("model", sa.JSON, nullable=False),
-                sa.Column(
-                    "last_updated_at",
-                    sa.DateTime,
-                    nullable=False,
-                    server_default=sa.func.now(),
-                    onupdate=sa.func.now(),
-                ),
-                sa.Column(
-                    "created_at",
-                    sa.DateTime,
-                    nullable=False,
-                    server_default=sa.func.now(),
-                ),
-            )
+    async def _fetch_table(
+        self,
+        model: typing.Type[RoxModel],
+    ) -> sa.Table:
+
+        rox = self.rox
+        schema = rox.schema
+
+        # Derive the table name from the class name
+        table_name = pascal_to_snake(model.__name__)
+
+        async with self._lock:
+
+            # Check if we're aware of it.
+            create_schema = schema not in self._seen
+            if not create_schema:
+                if table_name in self._seen[schema]:
+                    return self._seen[schema][table_name]
+
+            # We need to create something.
+            async with self.rox.engine.begin() as conn:
+                if create_schema:
+                    await conn.execute(
+                        CreateSchema(
+                            schema,
+                            if_not_exists=True,
+                        )
+                    )
+                    self._seen[schema] = {}
+
+                tbl = await self._build_table(
+                    rox=rox,
+                    table_name=table_name,
+                )
+
+                await conn.run_sync(tbl.create, checkfirst=True)
+                self._seen[schema][table_name] = tbl
+
+            return tbl
+
+    async def _build_table(
+        self,
+        rox: Rox,
+        table_name: str,
+    ) -> sa.Table:
+        return sa.Table(
+            table_name,
+            rox.metadata,
+            sa.Column("id", sa.UUID, primary_key=True),
+            sa.Column("version", sa.Integer, nullable=False),
+            sa.Column("revision", sa.BigInteger, nullable=False, default=0),
+            sa.Column("model", sa.JSON, nullable=False),
+            sa.Column(
+                "last_updated_at",
+                sa.DateTime,
+                nullable=False,
+                server_default=sa.func.now(),
+                onupdate=sa.func.now(),
+            ),
+            sa.Column(
+                "created_at",
+                sa.DateTime,
+                nullable=False,
+                server_default=sa.func.now(),
+            ),
+        )
