@@ -19,7 +19,10 @@ from .utils import pascal_to_snake
 ResultType = typing.Optional[
     typing.Tuple[int, int, typing.Dict[str, typing.Any]]
 ]
-UpdateCallbackType = typing.Callable[[ResultType], typing.Awaitable[ResultType]]
+UpdateCallbackType = typing.Callable[
+    [ResultType, typing.Optional[typing.Dict[str, typing.Any]]],
+    typing.Awaitable[ResultType],
+]
 
 
 def custom_json_serializer(obj):
@@ -127,6 +130,7 @@ class RoxManager:
         model: typing.Type[RoxModel],
         oid: uuid.UUID,
         callback: UpdateCallbackType,
+        obj: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> ResultType:
 
         rox = self.rox
@@ -146,28 +150,34 @@ class RoxManager:
             result = await session.execute(stmt)
 
             row = result.first()
-            if not row:
-                return None
 
-            version = row[0]
-            revision = row[1]
-            json_str = row[2]
+            params = (row[0], row[1], json.loads(row[2])) if row else None
 
             # Call the callback to get the new object
-            rc = await callback((version, revision, json.loads(json_str)))
+            rc = await callback(params, obj)
             if not rc:
                 return None
 
-            # Update according to request
-            stmt = (
-                sa.update(tbl)
-                .where(tbl.c.id == oid)
-                .values(
-                    version=rc[0],
-                    revision=rc[1],
-                    model=json.dumps(rc[2], default=custom_json_serializer),
+            json_str = json.dumps(rc[2], default=custom_json_serializer)
+
+            # Update or create depending on find
+            if params:
+                stmt = (
+                    sa.update(tbl)
+                    .where(tbl.c.id == oid)
+                    .values(
+                        version=rc[0],
+                        revision=rc[1],
+                        model=json_str,
+                    )
                 )
-            )
+            else:
+                stmt = sa.insert(tbl).values(
+                    id=oid,
+                    version=rc[0],
+                    revision=1,
+                    model=json_str,
+                )
 
             result = await session.execute(stmt)
             if result.rowcount == 1:

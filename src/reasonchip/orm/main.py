@@ -2,6 +2,7 @@
 
 import typing
 import asyncio
+import uuid
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -56,7 +57,10 @@ async def main():
         age=30,
         phones=[
             PhoneNumber(
-                location="home", country_code="+1", number="1234567890"
+                id=uuid.UUID("22a7829e-9fb6-4ac6-ad99-6e57200441a4"),
+                location="home",
+                country_code="+1",
+                number="1234567890",
             ),
             PhoneNumber(
                 location="work", country_code="+1", number="0987654321"
