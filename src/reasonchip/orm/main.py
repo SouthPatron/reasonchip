@@ -2,19 +2,14 @@
 
 import typing
 import asyncio
-import uuid
-
-from pydantic import BaseModel, Field
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     async_engine_from_config,
 )
 
-from reasonchip.orm.models import RoxModel
+from reasonchip.orm.models import RoxModel, Field
 from reasonchip.orm.rox import Rox
-
-# from reasonchip.orm.manager import RoxManager
 
 
 class PhoneNumber(RoxModel):
@@ -51,10 +46,7 @@ async def main():
         prefix="",
     )
 
-    rox = Rox(engine=engine, schema="sammy")
-
-    # man = RoxManager(rox=rox)
-    # await man.initialize()
+    Rox(engine=engine, schema="sammy")
 
     person = Person(
         first_name="John",

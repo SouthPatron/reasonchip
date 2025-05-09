@@ -11,7 +11,10 @@ class RoxModel(BaseModel):
 
     # Common field for all Rox models
     id: typing.Optional[uuid.UUID] = None
-    version: int = Field(default=1, frozen=True)
+
+    _version: typing.ClassVar[int] = 1
+
+    # ------------ ORM METHODS -----------------------------------------------
 
     @property
     def manager(self) -> "RoxManager":

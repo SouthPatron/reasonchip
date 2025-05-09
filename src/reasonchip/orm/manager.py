@@ -16,8 +16,13 @@ from .rox import Rox
 from .utils import pascal_to_snake
 
 
-def custom_json_serializer(obj):
+ResultType = typing.Optional[
+    typing.Tuple[int, int, typing.Dict[str, typing.Any]]
+]
+UpdateCallbackType = typing.Callable[[ResultType], typing.Awaitable[ResultType]]
 
+
+def custom_json_serializer(obj):
     if isinstance(obj, uuid.UUID):
         return str(obj)
 
@@ -62,149 +67,129 @@ class RoxManager:
             return cls()
         return cls._instance
 
-    # ------------------------ DATABASE --------------------------------------
+    # ------------------------ CRUD ------------------------------------------
+
+    async def create(
+        self,
+        model: typing.Type[RoxModel],
+        oid: uuid.UUID,
+        obj: typing.Dict[str, typing.Any],
+    ):
+
+        rox = self.rox
+        tbl = await self._fetch_table(model)
+
+        async with AsyncSession(rox.engine) as session, session.begin():
+            stmt = sa.insert(tbl).values(
+                id=oid,
+                version=model._version,
+                revision=1,
+                model=json.dumps(obj, default=custom_json_serializer),
+            )
+
+            result = await session.execute(stmt)
+            if result.rowcount == 1:
+                return
+
+            raise RuntimeError(
+                f"Failed to insert object {obj} into table {tbl.name}"
+            )
 
     async def load(
         self,
         model: typing.Type[RoxModel],
         oid: uuid.UUID,
-    ) -> typing.Optional[RoxModel]:
-
-        tbl = await self._fetch_table(model)
-
-        async with self._lock:
-            return await self._db_load(model, oid, tbl)
-
-    async def save(
-        self,
-        model: typing.Type[RoxModel],
-        oid: uuid.UUID,
-        obj: typing.Dict[str, typing.Any],
-        create: bool,
-    ):
-        rox = self.rox
-
-        tbl = await self._fetch_table(model)
-
-        async with AsyncSession(rox.engine) as session, session.begin():
-
-            # Check if the object already exists
-            if not create:
-                stmt = (
-                    sa.select(
-                        tbl.c.version,
-                        tbl.c.revision,
-                        tbl.c.model,
-                    )
-                    .where(tbl.c.id == oid)
-                    .with_for_update()
-                )
-
-                for row in await session.execute(stmt):
-                    version, revision, json_str = row
-                    return self._db_update(
-                        session,
-                        model,
-                        oid,
-                        obj,
-                        tbl,
-                        version,
-                        revision,
-                        json_str,
-                    )
-
-            # If we get here, it's a new object for sure
-            return await self._db_create(
-                session,
-                model,
-                obj,
-                oid,
-                tbl,
-            )
-
-    # ------------------------ LOADING ---------------------------------------
-
-    async def _db_load(
-        self,
-        model: typing.Type[RoxModel],
-        oid: uuid.UUID,
-        tbl: sa.Table,
-    ) -> typing.Optional[RoxModel]:
+    ) -> ResultType:
 
         rox = self.rox
+        tbl = await self._fetch_table(model)
 
         async with AsyncSession(rox.engine) as session:
-
             stmt = sa.select(
                 tbl.c.version,
                 tbl.c.revision,
                 tbl.c.model,
             ).where(tbl.c.id == oid)
 
-            for row in await session.execute(stmt):
+            result = await session.execute(stmt)
 
-                # TODO: We need to do version management here
-                version = row[0]
-                revision = row[1]
-                json_str = row[2]
+            row = result.first()
+            if not row:
+                return None
 
-                obj = model.model_validate_json(json_str)
-                return obj
+            version = row[0]
+            revision = row[1]
+            json_str = row[2]
+            return version, revision, json.loads(json_str)
 
-        return None
-
-    # ------------------------ SAVING ----------------------------------------
-
-    async def _db_create(
+    async def update(
         self,
-        session: AsyncSession,
-        model: typing.Type[RoxModel],
-        obj: typing.Dict[str, typing.Any],
-        oid: uuid.UUID,
-        tbl: sa.Table,
-    ):
-        stmt = sa.insert(tbl).values(
-            id=oid,
-            version=1,
-            revision=1,
-            model=json.dumps(obj, default=custom_json_serializer),
-        )
-
-        result = await session.execute(stmt)
-        if result.rowcount == 1:
-            return
-
-        raise RuntimeError(
-            f"Failed to insert object {obj} into table {tbl.name}"
-        )
-
-    async def _db_update(
-        self,
-        session: AsyncSession,
         model: typing.Type[RoxModel],
         oid: uuid.UUID,
-        obj: typing.Dict[str, typing.Any],
-        tbl: sa.Table,
-        version: int,
-        revision: int,
-        json_str: str,
-    ):
-        stmt = (
-            sa.update(tbl)
-            .where(tbl.c.id == oid)
-            .values(
-                revision=revision + 1,
-                model=json.dumps(obj, default=custom_json_serializer),
+        callback: UpdateCallbackType,
+    ) -> ResultType:
+
+        rox = self.rox
+        tbl = await self._fetch_table(model)
+
+        async with AsyncSession(rox.engine) as session, session.begin():
+            stmt = (
+                sa.select(
+                    tbl.c.version,
+                    tbl.c.revision,
+                    tbl.c.model,
+                )
+                .where(tbl.c.id == oid)
+                .with_for_update()
             )
-        )
 
-        result = await session.execute(stmt)
-        if result.rowcount == 1:
-            return
+            result = await session.execute(stmt)
 
-        raise RuntimeError(
-            f"Failed to update object {oid} into table {tbl.name}"
-        )
+            row = result.first()
+            if not row:
+                return None
+
+            version = row[0]
+            revision = row[1]
+            json_str = row[2]
+
+            # Call the callback to get the new object
+            rc = await callback((version, revision, json.loads(json_str)))
+            if not rc:
+                return None
+
+            # Update according to request
+            stmt = (
+                sa.update(tbl)
+                .where(tbl.c.id == oid)
+                .values(
+                    version=rc[0],
+                    revision=rc[1],
+                    model=json.dumps(rc[2], default=custom_json_serializer),
+                )
+            )
+
+            result = await session.execute(stmt)
+            if result.rowcount == 1:
+                return rc
+
+            raise RuntimeError(
+                f"Failed to update object {oid} into table {tbl.name}"
+            )
+
+    async def delete(
+        self,
+        model: typing.Type[RoxModel],
+        oid: uuid.UUID,
+    ) -> bool:
+
+        rox = self.rox
+        tbl = await self._fetch_table(model)
+
+        async with AsyncSession(rox.engine) as session, session.begin():
+            stmt = sa.delete(tbl).where(tbl.c.id == oid)
+            result = await session.execute(stmt)
+            return result.rowcount == 1
 
     # ------------------------ SCHEMA CONTROL --------------------------------
 
