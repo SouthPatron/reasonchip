@@ -121,6 +121,7 @@ class RoxModel(BaseModel):
                 return {
                     "__ref__": new_id,
                     "__rox__": obj.__class__.__name__,
+                    "__schema__": obj.__class__._schema,
                 }
 
             # We are saving ourselves
@@ -166,6 +167,7 @@ class RoxModel(BaseModel):
             return {
                 "__ref__": obj.id,
                 "__rox__": obj.__class__.__name__,
+                "__schema__": obj.__class__._schema,
             }
 
         elif isinstance(obj, list):
@@ -268,13 +270,16 @@ class RoxModel(BaseModel):
             if "__ref__" in value and "__rox__" in value:
                 ref = uuid.UUID(value["__ref__"])
                 ref_model_name = value["__rox__"]
+                ref_schema = value["__schema__"]
 
-                if ref_model_name not in cls._registry:
+                key_name = f"{ref_schema}.{ref_model_name}"
+
+                if key_name not in cls._registry:
                     raise ValueError(
-                        f"Model {ref_model_name} not registered but it's needed to load from the DB."
+                        f"Model {key_name} not registered but it's needed to load from the DB."
                     )
 
-                sub_model = cls._registry[ref_model_name]
+                sub_model = cls._registry[key_name]
                 return await sub_model.load(oid=ref, session=session)
 
             # Not a reference
@@ -295,9 +300,11 @@ class RoxModel(BaseModel):
     def __init_subclass__(cls):
         super().__init_subclass__()
 
-        if cls.__name__ in cls._registry:
+        key_name = f"{cls._schema}.{cls.__name__}"
+
+        if key_name in cls._registry:
             raise ValueError(
-                f"Class {cls.__name__} already registered in the registry."
+                f"Class {key_name} already registered in the registry."
             )
 
-        cls._registry[cls.__name__] = cls
+        cls._registry[key_name] = cls

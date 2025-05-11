@@ -13,15 +13,17 @@ from reasonchip.orm.models import RoxModel, Field
 from reasonchip.orm.rox import Rox
 
 
-class PhoneNumber(RoxModel):
+class SammyModel(RoxModel):
+    _schema: typing.ClassVar[str] = "sammy"
+
+
+class PhoneNumber(SammyModel):
     location: typing.Literal["home", "work", "mobile"]
     country_code: str
     number: str
 
-    _schema: typing.ClassVar[str] = "sammy"
 
-
-class Person(RoxModel):
+class Person(SammyModel):
     first_name: str
     first_name_two: "str"
     middle_name: typing.Optional[str] = None
@@ -35,8 +37,6 @@ class Person(RoxModel):
     phones: typing.List[PhoneNumber] = Field(default_factory=list)
     emergency_contact: typing.Optional[PhoneNumber] = None
     required_contact: PhoneNumber
-
-    _schema: typing.ClassVar[str] = "sammy"
 
 
 async def main():
@@ -74,8 +74,10 @@ async def main():
         ),
     )
 
+    # await person.save()
+
     person = await Person.load(
-        uuid.UUID("a95ceb26-e113-49a2-a602-bc73ff939243")
+        uuid.UUID("09880a05-ede4-405f-bf8b-f2ab5be1d29a")
     )
     assert person
     print(f"{person}")
