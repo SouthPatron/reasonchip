@@ -47,7 +47,7 @@ async def main():
         prefix="",
     )
 
-    Rox(engine=engine, schema="sammy")
+    Rox(engine=engine)
 
     person = Person(
         first_name="John",

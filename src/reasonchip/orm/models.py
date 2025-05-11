@@ -3,9 +3,17 @@ from __future__ import annotations
 import uuid
 import typing
 
+import sqlalchemy as sa
+
 from pydantic import (
     BaseModel,
     Field,
+)
+
+from .rox import Rox, RoxSession
+from .manager import (
+    RoxManager,
+    ResultType,
 )
 
 
@@ -16,39 +24,85 @@ class RoxModel(BaseModel):
 
     _revision: int = 1
     _version: typing.ClassVar[int] = 1
+    _schema: typing.ClassVar[str] = "public"
 
     # ------------ ORM METHODS -----------------------------------------------
 
     @classmethod
-    async def load(cls, oid: uuid.UUID) -> typing.Optional[RoxModel]:
-        obj = await cls._recursive_load(cls, oid)
+    async def load(
+        cls,
+        oid: uuid.UUID,
+        session: typing.Optional[sa.AsyncSession] = None,
+    ) -> typing.Optional[RoxModel]:
+
+        # Retrieve a session
+        if session is None:
+            rox = Rox.get_instance()
+            async with RoxSession(rox) as session:
+                return await cls.load(oid=oid, session=session)
+
+        # Perform the load operation
+        obj = await cls._recursive_load(
+            session=session,
+            model=cls,
+            oid=oid,
+        )
+        if obj is None:
+            print(f"Object with id {oid} not found.")
+            return None
+
         print(
             f"Loaded {cls.__name__} with id {oid} and revision {obj._revision}"
         )
         return obj
 
-    async def save(self) -> uuid.UUID:
-        await self._recursive_save_and_replace(self, 0)
+    async def save(
+        self,
+        session: typing.Optional[sa.AsyncSession] = None,
+    ) -> uuid.UUID:
+
+        # Retrieve a session
+        if session is None:
+            rox = Rox.get_instance()
+            async with RoxSession(rox) as session, session.begin():
+                return await self.save(session=session)
+
+        # Perform the save operation
+        await self._recursive_save_and_replace(
+            session=session,
+            obj=self,
+            depth=0,
+        )
         assert self.id is not None
         return self.id
 
-    async def delete(self) -> bool:
+    async def delete(
+        self,
+        session: typing.Optional[sa.AsyncSession] = None,
+    ) -> bool:
         assert self.id is not None
 
+        # Retrieve a session
+        if session is None:
+            rox = Rox.get_instance()
+            async with RoxSession(rox) as session, session.begin():
+                return await self.delete(session=session)
+
+        # Perform the delete operation
         return await self.manager().delete(
-            model=self.__class__,
+            session=session,
+            schema=self._schema,
+            model_name=self.__class__.__name__,
             oid=self.id,
         )
 
     # ------------ SUPPORT METHODS -------------------------------------------
 
-    _manager: typing.ClassVar[typing.Optional["RoxManager"]] = None
+    _manager: typing.ClassVar[typing.Optional[RoxManager]] = None
 
     @classmethod
-    def manager(cls) -> "RoxManager":
+    def manager(cls) -> RoxManager:
         if not cls._manager:
-            from .manager import RoxManager
-
             cls._manager = RoxManager.get_instance()
         return cls._manager
 
@@ -56,13 +110,14 @@ class RoxModel(BaseModel):
 
     async def _recursive_save_and_replace(
         self,
+        session: sa.AsyncSession,
         obj: typing.Any,
         depth: int,
     ):
         if isinstance(obj, RoxModel):
             # We are not saving ourselves, we're saving a child.
             if depth > 0:
-                new_id = await obj.save()
+                new_id = await obj.save(session=session)
                 return {
                     "__ref__": new_id,
                     "__rox__": obj.__class__.__name__,
@@ -78,6 +133,7 @@ class RoxModel(BaseModel):
             for name in obj.__class__.model_fields.keys():
                 value = getattr(obj, name)
                 result[name] = await self._recursive_save_and_replace(
+                    session=session,
                     obj=value,
                     depth=depth + 1,
                 )
@@ -85,13 +141,19 @@ class RoxModel(BaseModel):
             # Save the object to the database here
             if create:
                 await self.manager().create(
-                    model=obj.__class__,
+                    session=session,
+                    model_name=obj.__class__.__name__,
+                    schema=self._schema,
+                    version=self._version,
+                    revision=self._revision,
                     oid=obj.id,
                     obj=result,
                 )
             else:
                 await self.manager().update(
-                    model=obj.__class__,
+                    session=session,
+                    schema=self._schema,
+                    model_name=obj.__class__.__name__,
                     oid=obj.id,
                     callback=self._update_collision_check,
                     obj=result,
@@ -109,6 +171,7 @@ class RoxModel(BaseModel):
         elif isinstance(obj, list):
             return [
                 await self._recursive_save_and_replace(
+                    session=session,
                     obj=i,
                     depth=depth + 1,
                 )
@@ -118,6 +181,7 @@ class RoxModel(BaseModel):
         elif isinstance(obj, dict):
             return {
                 k: await self._recursive_save_and_replace(
+                    session=session,
                     obj=v,
                     depth=depth + 1,
                 )
@@ -129,11 +193,9 @@ class RoxModel(BaseModel):
 
     async def _update_collision_check(
         self,
-        existing_row: typing.Optional[
-            typing.Tuple[int, int, typing.Dict[str, typing.Any]]
-        ],
+        existing_row: ResultType,
         obj: typing.Dict[str, typing.Any],
-    ) -> typing.Optional[typing.Tuple[int, int, typing.Dict[str, typing.Any]]]:
+    ) -> ResultType:
 
         if not existing_row:
             return (self._version, self._revision, obj)
@@ -165,11 +227,17 @@ class RoxModel(BaseModel):
     @classmethod
     async def _recursive_load(
         cls,
+        session: sa.AsyncSession,
         model: typing.Type[RoxModel],
         oid: uuid.UUID,
     ) -> typing.Optional[RoxModel]:
 
-        row = await cls.manager().load(model=model, oid=oid)
+        row = await cls.manager().load(
+            session=session,
+            schema=model._schema,
+            model_name=model.__name__,
+            oid=oid,
+        )
         if row is None:
             return None
 
@@ -182,7 +250,7 @@ class RoxModel(BaseModel):
             raise ValueError(f"Version mismatch: {version} != {cls._version}")
 
         # New object
-        new_obj = await cls._unflatten_value(obj)
+        new_obj = await cls._unflatten_value(session=session, value=obj)
 
         rc = model.model_validate(new_obj)
         rc._revision = revision + 1
@@ -191,6 +259,7 @@ class RoxModel(BaseModel):
     @classmethod
     async def _unflatten_value(
         cls,
+        session: sa.AsyncSession,
         value: typing.Any,
     ) -> typing.Optional[typing.Any]:
 
@@ -206,16 +275,16 @@ class RoxModel(BaseModel):
                     )
 
                 sub_model = cls._registry[ref_model_name]
-                return await sub_model.load(ref)
+                return await sub_model.load(oid=ref, session=session)
 
             # Not a reference
             for name, val in value.items():
-                value[name] = await cls._unflatten_value(val)
+                value[name] = await cls._unflatten_value(session, val)
 
             return value
 
         if isinstance(value, list):
-            return [await cls._unflatten_value(x) for x in value]
+            return [await cls._unflatten_value(session, x) for x in value]
 
         return value
 

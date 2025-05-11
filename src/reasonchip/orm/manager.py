@@ -7,12 +7,10 @@ import json
 
 import sqlalchemy as sa
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.schema import CreateSchema
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncConnection
 
-from .models import RoxModel
 from .rox import Rox
-
 from .utils import pascal_to_snake
 
 
@@ -20,7 +18,7 @@ ResultType = typing.Optional[
     typing.Tuple[int, int, typing.Dict[str, typing.Any]]
 ]
 UpdateCallbackType = typing.Callable[
-    [ResultType, typing.Optional[typing.Dict[str, typing.Any]]],
+    [ResultType, typing.Dict[str, typing.Any]],
     typing.Awaitable[ResultType],
 ]
 
@@ -74,145 +72,149 @@ class RoxManager:
 
     async def create(
         self,
-        model: typing.Type[RoxModel],
+        session: AsyncSession,
+        model_name: str,
+        schema: str,
         oid: uuid.UUID,
+        version: int,
+        revision: int,
         obj: typing.Dict[str, typing.Any],
     ):
 
-        rox = self.rox
-        tbl = await self._fetch_table(model)
+        tbl = await self._fetch_table(session, schema, model_name)
 
-        async with AsyncSession(rox.engine) as session, session.begin():
-            stmt = sa.insert(tbl).values(
-                id=oid,
-                version=model._version,
-                revision=1,
-                model=json.dumps(obj, default=custom_json_serializer),
-            )
+        stmt = sa.insert(tbl).values(
+            id=oid,
+            version=version,
+            revision=revision,
+            model=json.dumps(obj, default=custom_json_serializer),
+        )
 
-            result = await session.execute(stmt)
-            if result.rowcount == 1:
-                return
+        result = await session.execute(stmt)
+        if result.rowcount == 1:
+            return
 
-            raise RuntimeError(
-                f"Failed to insert object {obj} into table {tbl.name}"
-            )
+        raise RuntimeError(
+            f"Failed to insert object {obj} into table {tbl.name}"
+        )
 
     async def load(
         self,
-        model: typing.Type[RoxModel],
+        session: AsyncSession,
+        schema: str,
+        model_name: str,
         oid: uuid.UUID,
     ) -> ResultType:
 
-        rox = self.rox
-        tbl = await self._fetch_table(model)
+        tbl = await self._fetch_table(session, schema, model_name)
 
-        async with AsyncSession(rox.engine) as session:
-            stmt = sa.select(
-                tbl.c.version,
-                tbl.c.revision,
-                tbl.c.model,
-            ).where(tbl.c.id == oid)
+        stmt = sa.select(
+            tbl.c.version,
+            tbl.c.revision,
+            tbl.c.model,
+        ).where(tbl.c.id == oid)
 
-            result = await session.execute(stmt)
+        result = await session.execute(stmt)
 
-            row = result.first()
-            if not row:
-                return None
+        row = result.first()
+        if not row:
+            return None
 
-            version = row[0]
-            revision = row[1]
-            json_str = row[2]
-            return version, revision, json.loads(json_str)
+        version = row[0]
+        revision = row[1]
+        json_str = row[2]
+        return version, revision, json.loads(json_str)
 
     async def update(
         self,
-        model: typing.Type[RoxModel],
+        session: AsyncSession,
+        schema: str,
+        model_name: str,
         oid: uuid.UUID,
         callback: UpdateCallbackType,
-        obj: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        obj: typing.Dict[str, typing.Any],
     ) -> ResultType:
 
-        rox = self.rox
-        tbl = await self._fetch_table(model)
+        tbl = await self._fetch_table(session, schema, model_name)
 
-        async with AsyncSession(rox.engine) as session, session.begin():
-            stmt = (
-                sa.select(
-                    tbl.c.version,
-                    tbl.c.revision,
-                    tbl.c.model,
-                )
-                .where(tbl.c.id == oid)
-                .with_for_update()
+        stmt = (
+            sa.select(
+                tbl.c.version,
+                tbl.c.revision,
+                tbl.c.model,
             )
+            .where(tbl.c.id == oid)
+            .with_for_update()
+        )
 
-            result = await session.execute(stmt)
+        result = await session.execute(stmt)
 
-            row = result.first()
+        row = result.first()
 
-            params = (row[0], row[1], json.loads(row[2])) if row else None
+        params = (row[0], row[1], json.loads(row[2])) if row else None
 
-            # Call the callback to get the new object
-            rc = await callback(params, obj)
-            if not rc:
-                return None
+        # Call the callback to get the new object
+        rc = await callback(params, obj)
+        if not rc:
+            return None
 
-            json_str = json.dumps(rc[2], default=custom_json_serializer)
+        json_str = json.dumps(rc[2], default=custom_json_serializer)
 
-            # Update or create depending on find
-            if params:
-                stmt = (
-                    sa.update(tbl)
-                    .where(tbl.c.id == oid)
-                    .values(
-                        version=rc[0],
-                        revision=rc[1],
-                        model=json_str,
-                    )
-                )
-            else:
-                stmt = sa.insert(tbl).values(
-                    id=oid,
+        # Update or create depending on find
+        if params:
+            stmt = (
+                sa.update(tbl)
+                .where(tbl.c.id == oid)
+                .values(
                     version=rc[0],
-                    revision=1,
+                    revision=rc[1],
                     model=json_str,
                 )
-
-            result = await session.execute(stmt)
-            if result.rowcount == 1:
-                return rc
-
-            raise RuntimeError(
-                f"Failed to update object {oid} into table {tbl.name}"
             )
+        else:
+            stmt = sa.insert(tbl).values(
+                id=oid,
+                version=rc[0],
+                revision=1,
+                model=json_str,
+            )
+
+        result = await session.execute(stmt)
+        if result.rowcount == 1:
+            return rc
+
+        raise RuntimeError(
+            f"Failed to update object {oid} into table {tbl.name}"
+        )
 
     async def delete(
         self,
-        model: typing.Type[RoxModel],
+        session: AsyncSession,
+        schema: str,
+        model_name: str,
         oid: uuid.UUID,
     ) -> bool:
 
-        rox = self.rox
-        tbl = await self._fetch_table(model)
+        tbl = await self._fetch_table(session, schema, model_name)
 
-        async with AsyncSession(rox.engine) as session, session.begin():
-            stmt = sa.delete(tbl).where(tbl.c.id == oid)
-            result = await session.execute(stmt)
-            return result.rowcount == 1
+        stmt = sa.delete(tbl).where(tbl.c.id == oid)
+        result = await session.execute(stmt)
+        return result.rowcount == 1
 
     # ------------------------ SCHEMA CONTROL --------------------------------
 
     async def _fetch_table(
         self,
-        model: typing.Type[RoxModel],
+        session: AsyncSession,
+        schema: str,
+        model_name: str,
     ) -> sa.Table:
 
         rox = self.rox
-        schema = rox.schema
+        metadata = rox.metadata
 
         # Derive the table name from the class name
-        table_name = pascal_to_snake(model.__name__)
+        table_name = pascal_to_snake(model_name)
 
         async with self._lock:
 
@@ -222,52 +224,38 @@ class RoxManager:
                 if table_name in self._seen[schema]:
                     return self._seen[schema][table_name]
 
-            # We need to create something.
-            async with self.rox.engine.begin() as conn:
-                if create_schema:
+            # We need a direct connection.
+            conn = await session.connection()
 
-                    # Make sure the schema exists
-                    await conn.execute(
-                        CreateSchema(
-                            schema,
-                            if_not_exists=True,
-                        )
-                    )
-
-                    # Make sure we have an entity table
-                    tbl = await self._build_entity_table(rox=rox)
-                    await conn.run_sync(tbl.create, checkfirst=True)
-                    self._seen[schema] = {"rox_entity": tbl}
-
-                    # Make sure we have a changelog table
-                    tbl = await self._build_changelog_table(rox=rox)
-                    await conn.run_sync(tbl.create, checkfirst=True)
-                    self._seen[schema] = {"rox_changelog": tbl}
-
-                    # Make sure we have an association table
-                    tbl = await self._build_association_table(rox=rox)
-                    await conn.run_sync(tbl.create, checkfirst=True)
-                    self._seen[schema] = {"rox_association": tbl}
-
-                # Ensure actual table exists
-                tbl = await self._build_table(
-                    rox=rox,
-                    table_name=table_name,
+            # Make sure the schema exists along with rox tables
+            if create_schema:
+                await conn.execute(CreateSchema(schema, if_not_exists=True))
+                rox_tables = await self._build_rox_tables(
+                    conn,
+                    metadata,
+                    schema,
                 )
+                self._seen[schema] = rox_tables
 
-                await conn.run_sync(tbl.create, checkfirst=True)
-                self._seen[schema][table_name] = tbl
+            # Ensure actual table exists
+            tbl = await self._build_table(
+                metadata=metadata,
+                table_name=table_name,
+            )
+
+            await conn.run_sync(tbl.create, checkfirst=True)
+            self._seen[schema][table_name] = tbl
 
             return tbl
 
     async def _build_table(
         self,
-        rox: Rox,
+        metadata: sa.MetaData,
         table_name: str,
     ) -> sa.Table:
         return sa.Table(
             table_name,
-            rox.metadata,
+            metadata,
             sa.Column("id", sa.UUID, primary_key=True),
             sa.Column("version", sa.Integer, nullable=False),
             sa.Column("revision", sa.BigInteger, nullable=False, default=0),
@@ -287,13 +275,40 @@ class RoxManager:
             ),
         )
 
+    async def _build_rox_tables(
+        self,
+        conn: AsyncConnection,
+        metadata: sa.MetaData,
+        schema: str,
+    ) -> typing.Dict[str, sa.Table]:
+
+        rc = {}
+
+        # Make sure we have an entity table
+        tbl = await self._build_entity_table(metadata, schema)
+        await conn.run_sync(tbl.create, checkfirst=True)
+        rc["rox_entity"] = tbl
+
+        # Make sure we have a changelog table
+        tbl = await self._build_changelog_table(metadata, schema)
+        await conn.run_sync(tbl.create, checkfirst=True)
+        rc["rox_changelog"] = tbl
+
+        # Make sure we have an association table
+        tbl = await self._build_association_table(metadata, schema)
+        await conn.run_sync(tbl.create, checkfirst=True)
+        rc["rox_association"] = tbl
+
+        return rc
+
     async def _build_entity_table(
         self,
-        rox: Rox,
+        metadata: sa.MetaData,
+        schema: str,
     ) -> sa.Table:
         return sa.Table(
             "rox_entity",
-            rox.metadata,
+            metadata,
             sa.Column("id", sa.UUID, primary_key=True),
             sa.Column("model_name", sa.String(255), nullable=False, index=True),
             sa.Column(
@@ -309,15 +324,17 @@ class RoxManager:
                 nullable=False,
                 server_default=sa.func.now(),
             ),
+            schema=schema,
         )
 
     async def _build_changelog_table(
         self,
-        rox: Rox,
+        metadata: sa.MetaData,
+        schema: str,
     ) -> sa.Table:
         return sa.Table(
             "rox_changelog",
-            rox.metadata,
+            metadata,
             sa.Column("id", sa.UUID, primary_key=True),
             sa.Column(
                 "obj_id",
@@ -335,15 +352,17 @@ class RoxManager:
                 nullable=False,
                 server_default=sa.func.now(),
             ),
+            schema=schema,
         )
 
     async def _build_association_table(
         self,
-        rox: Rox,
+        metadata: sa.MetaData,
+        schema: str,
     ) -> sa.Table:
         return sa.Table(
             "rox_association",
-            rox.metadata,
+            metadata,
             sa.Column("id", sa.UUID, primary_key=True),
             sa.Column(
                 "parent_id",
@@ -365,4 +384,5 @@ class RoxManager:
                 nullable=False,
                 server_default=sa.func.now(),
             ),
+            schema=schema,
         )
