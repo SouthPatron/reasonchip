@@ -57,7 +57,6 @@ async def main():
         age=30,
         phones=[
             PhoneNumber(
-                id=uuid.UUID("22a7829e-9fb6-4ac6-ad99-6e57200441a4"),
                 location="home",
                 country_code="+1",
                 number="1234567890",
@@ -71,13 +70,23 @@ async def main():
         ),
     )
 
+    person = await Person.load(
+        uuid.UUID("a95ceb26-e113-49a2-a602-bc73ff939243")
+    )
+    assert person
     print(f"{person}")
 
-    new_id = await person.save()
+    for p in range(1, 10):
+        print(f"REVISION: [{person.id}] {person._revision}")
 
-    print(f"New ID = [{new_id}]")
+        if p % 4 == 0:
+            person.id = None
 
-    print(f"{person}")
+        await person.save()
+
+    # new_id = await person.save()
+    # print(f"New ID = [{new_id}]")
+    # print(f"{person}")
 
 
 if __name__ == "__main__":
