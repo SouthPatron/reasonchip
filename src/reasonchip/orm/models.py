@@ -97,6 +97,9 @@ class RoxModel(BaseModel):
                     obj=result,
                 )
 
+            # Increment the revision
+            self._revision += 1
+
             # Return the reference
             return {
                 "__ref__": obj.id,
@@ -141,19 +144,18 @@ class RoxModel(BaseModel):
 
         print(f"Comparing DB {revision} == OBJ {self._revision}")
 
-        if version != self._version:
-            # TODO: Handle migration of object.
-            raise ValueError(f"Version mismatch: {version} != {self._version}")
+        # NOTE:
+        # 1. It's okay for versions to be different.
+        # 2. Revisions should be equal, or else someone has touched it before us.
 
-        if revision != self._revision:
+        if revision != (self._revision - 1):
             # TODO: Handle merging of the object
-            print(f"Revision mismatch: {obj} {revision} != {self._revision}")
-            raise ValueError(
-                f"Revision mismatch: {revision} != {self._revision}"
+            print(
+                f"Revision mismatch: {obj} {revision} != {self._revision - 1}"
             )
-
-        else:
-            self._revision += 1
+            raise ValueError(
+                f"Revision mismatch: {revision} != {self._revision - 1}"
+            )
 
         rc = (self._version, self._revision, obj)
         return rc
@@ -183,7 +185,7 @@ class RoxModel(BaseModel):
         new_obj = await cls._unflatten_value(obj)
 
         rc = model.model_validate(new_obj)
-        rc._revision = revision
+        rc._revision = revision + 1
         return rc
 
     @classmethod

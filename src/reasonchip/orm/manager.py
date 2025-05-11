@@ -225,14 +225,31 @@ class RoxManager:
             # We need to create something.
             async with self.rox.engine.begin() as conn:
                 if create_schema:
+
+                    # Make sure the schema exists
                     await conn.execute(
                         CreateSchema(
                             schema,
                             if_not_exists=True,
                         )
                     )
-                    self._seen[schema] = {}
 
+                    # Make sure we have an entity table
+                    tbl = await self._build_entity_table(rox=rox)
+                    await conn.run_sync(tbl.create, checkfirst=True)
+                    self._seen[schema] = {"rox_entity": tbl}
+
+                    # Make sure we have a changelog table
+                    tbl = await self._build_changelog_table(rox=rox)
+                    await conn.run_sync(tbl.create, checkfirst=True)
+                    self._seen[schema] = {"rox_changelog": tbl}
+
+                    # Make sure we have an association table
+                    tbl = await self._build_association_table(rox=rox)
+                    await conn.run_sync(tbl.create, checkfirst=True)
+                    self._seen[schema] = {"rox_association": tbl}
+
+                # Ensure actual table exists
                 tbl = await self._build_table(
                     rox=rox,
                     table_name=table_name,
@@ -261,6 +278,86 @@ class RoxManager:
                 nullable=False,
                 server_default=sa.func.now(),
                 onupdate=sa.func.now(),
+            ),
+            sa.Column(
+                "created_at",
+                sa.DateTime,
+                nullable=False,
+                server_default=sa.func.now(),
+            ),
+        )
+
+    async def _build_entity_table(
+        self,
+        rox: Rox,
+    ) -> sa.Table:
+        return sa.Table(
+            "rox_entity",
+            rox.metadata,
+            sa.Column("id", sa.UUID, primary_key=True),
+            sa.Column("model_name", sa.String(255), nullable=False, index=True),
+            sa.Column(
+                "last_updated_at",
+                sa.DateTime,
+                nullable=False,
+                server_default=sa.func.now(),
+                onupdate=sa.func.now(),
+            ),
+            sa.Column(
+                "created_at",
+                sa.DateTime,
+                nullable=False,
+                server_default=sa.func.now(),
+            ),
+        )
+
+    async def _build_changelog_table(
+        self,
+        rox: Rox,
+    ) -> sa.Table:
+        return sa.Table(
+            "rox_changelog",
+            rox.metadata,
+            sa.Column("id", sa.UUID, primary_key=True),
+            sa.Column(
+                "obj_id",
+                sa.UUID,
+                sa.ForeignKey("rox_entity.id", ondelete="CASCADE"),
+                nullable=False,
+                index=True,
+            ),
+            sa.Column("version", sa.Integer, nullable=False),
+            sa.Column("revision", sa.BigInteger, nullable=False, default=0),
+            sa.Column("patch", sa.JSON, nullable=False),
+            sa.Column(
+                "created_at",
+                sa.DateTime,
+                nullable=False,
+                server_default=sa.func.now(),
+            ),
+        )
+
+    async def _build_association_table(
+        self,
+        rox: Rox,
+    ) -> sa.Table:
+        return sa.Table(
+            "rox_association",
+            rox.metadata,
+            sa.Column("id", sa.UUID, primary_key=True),
+            sa.Column(
+                "parent_id",
+                sa.UUID,
+                sa.ForeignKey("rox_entity.id", ondelete="CASCADE"),
+                nullable=False,
+                index=True,
+            ),
+            sa.Column(
+                "child_id",
+                sa.UUID,
+                sa.ForeignKey("rox_entity.id", ondelete="CASCADE"),
+                nullable=False,
+                index=True,
             ),
             sa.Column(
                 "created_at",
