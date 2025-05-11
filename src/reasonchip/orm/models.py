@@ -26,6 +26,12 @@ class RoxModel(BaseModel):
     _version: typing.ClassVar[int] = 1
     _schema: typing.ClassVar[str] = "public"
 
+    # ------------ CONSTRUCTORS ----------------------------------------------
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._dirty: bool = False
+
     # ------------ ORM METHODS -----------------------------------------------
 
     @classmethod
@@ -51,9 +57,7 @@ class RoxModel(BaseModel):
             print(f"Object with id {oid} not found.")
             return None
 
-        print(
-            f"Loaded {cls.__name__} with id {oid} and revision {obj._revision}"
-        )
+        obj._dirty = False
         return obj
 
     async def save(
@@ -74,6 +78,7 @@ class RoxModel(BaseModel):
             depth=0,
         )
         assert self.id is not None
+        self._dirty = False
         return self.id
 
     async def delete(
@@ -125,11 +130,15 @@ class RoxModel(BaseModel):
                 }
 
             # We are saving ourselves
+            assert obj == self
+
+            # Determine if we are creating or updating
             create = obj.id is None
             if obj.id is None:
                 self._revision = 1
-                obj.id = uuid.uuid4()
+                obj.id = uuid.uuid4()  # NOTE: This will mark us dirty
 
+            # Iterate over the fields of the object
             result = {}
             for name in obj.__class__.model_fields.keys():
                 value = getattr(obj, name)
@@ -140,28 +149,26 @@ class RoxModel(BaseModel):
                 )
 
             # Save the object to the database here
-            if create:
-                await self.manager().create(
-                    session=session,
-                    model_name=obj.__class__.__name__,
-                    schema=self._schema,
-                    version=self._version,
-                    revision=self._revision,
-                    oid=obj.id,
-                    obj=result,
-                )
-            else:
-                await self.manager().update(
-                    session=session,
-                    schema=self._schema,
-                    model_name=obj.__class__.__name__,
-                    oid=obj.id,
-                    callback=self._update_collision_check,
-                    obj=result,
-                )
-
-            # Increment the revision
-            self._revision += 1
+            if self._dirty:
+                if create:
+                    await self.manager().create(
+                        session=session,
+                        model_name=obj.__class__.__name__,
+                        schema=self._schema,
+                        version=self._version,
+                        revision=self._revision,
+                        oid=obj.id,
+                        obj=result,
+                    )
+                else:
+                    await self.manager().update(
+                        session=session,
+                        schema=self._schema,
+                        model_name=obj.__class__.__name__,
+                        oid=obj.id,
+                        callback=self._update_collision_check,
+                        obj=result,
+                    )
 
             # Return the reference
             return {
@@ -205,8 +212,6 @@ class RoxModel(BaseModel):
         version = existing_row[0]
         revision = existing_row[1]
         old_obj = existing_row[2]
-
-        print(f"Comparing DB {revision} == OBJ {self._revision}")
 
         # NOTE:
         # 1. It's okay for versions to be different.
@@ -255,7 +260,7 @@ class RoxModel(BaseModel):
         new_obj = await cls._unflatten_value(session=session, value=obj)
 
         rc = model.model_validate(new_obj)
-        rc._revision = revision + 1
+        rc._revision = revision
         return rc
 
     @classmethod
@@ -292,6 +297,21 @@ class RoxModel(BaseModel):
             return [await cls._unflatten_value(session, x) for x in value]
 
         return value
+
+    # ------------ DIRTY MANAGEMENT ------------------------------------------
+
+    def __setattr__(self, name, value):
+        super().__setattr__(name, value)
+
+        if name not in ["_dirty"]:
+            if self._dirty == False:
+                object.__setattr__(self, "_dirty", True)
+
+            if name != "_revision":
+                object.__setattr__(self, "_revision", self._revision + 1)
+
+    def is_dirty(self) -> bool:
+        return self._dirty
 
     # ------------ FACTORY REGISTRY ------------------------------------------
 

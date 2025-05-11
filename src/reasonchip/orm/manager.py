@@ -175,7 +175,7 @@ class RoxManager:
             stmt = sa.insert(tbl).values(
                 id=oid,
                 version=rc[0],
-                revision=1,
+                revision=rc[1],
                 model=json_str,
             )
 
