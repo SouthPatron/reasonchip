@@ -16,6 +16,8 @@ from .manager import (
     ResultType,
 )
 
+RX = typing.TypeVar("RX", bound="RoxModel")
+
 
 class RoxModel(BaseModel):
 
@@ -36,10 +38,10 @@ class RoxModel(BaseModel):
 
     @classmethod
     async def load(
-        cls,
+        cls: typing.Type[RX],
         oid: uuid.UUID,
         session: typing.Optional[sa.AsyncSession] = None,
-    ) -> typing.Optional[RoxModel]:
+    ) -> typing.Optional[RX]:
 
         # Retrieve a session
         if session is None:
@@ -233,11 +235,11 @@ class RoxModel(BaseModel):
 
     @classmethod
     async def _recursive_load(
-        cls,
+        cls: typing.Type[RX],
         session: sa.AsyncSession,
-        model: typing.Type[RoxModel],
+        model: typing.Type[RX],
         oid: uuid.UUID,
-    ) -> typing.Optional[RoxModel]:
+    ) -> typing.Optional[RX]:
 
         row = await cls.manager().load(
             session=session,

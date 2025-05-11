@@ -76,7 +76,7 @@ async def main():
 
     # await person.save()
 
-    person: Person = await Person.load(
+    person = await Person.load(
         uuid.UUID("09880a05-ede4-405f-bf8b-f2ab5be1d29a")
     )
     assert person
@@ -89,6 +89,9 @@ async def main():
             person.id = None
             if person.emergency_contact:
                 person.emergency_contact.location = "home"
+        else:
+            if person.emergency_contact:
+                person.emergency_contact.location = "mobile"
 
         await person.save()
 
