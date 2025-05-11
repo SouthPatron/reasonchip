@@ -240,6 +240,7 @@ class RoxManager:
             # Ensure actual table exists
             tbl = await self._build_table(
                 metadata=metadata,
+                schema=schema,
                 table_name=table_name,
             )
 
@@ -251,6 +252,7 @@ class RoxManager:
     async def _build_table(
         self,
         metadata: sa.MetaData,
+        schema: str,
         table_name: str,
     ) -> sa.Table:
         return sa.Table(
@@ -273,6 +275,7 @@ class RoxManager:
                 nullable=False,
                 server_default=sa.func.now(),
             ),
+            schema=schema,
         )
 
     async def _build_rox_tables(
@@ -339,7 +342,7 @@ class RoxManager:
             sa.Column(
                 "obj_id",
                 sa.UUID,
-                sa.ForeignKey("rox_entity.id", ondelete="CASCADE"),
+                sa.ForeignKey(f"{schema}.rox_entity.id", ondelete="CASCADE"),
                 nullable=False,
                 index=True,
             ),
@@ -367,14 +370,14 @@ class RoxManager:
             sa.Column(
                 "parent_id",
                 sa.UUID,
-                sa.ForeignKey("rox_entity.id", ondelete="CASCADE"),
+                sa.ForeignKey(f"{schema}.rox_entity.id", ondelete="CASCADE"),
                 nullable=False,
                 index=True,
             ),
             sa.Column(
                 "child_id",
                 sa.UUID,
-                sa.ForeignKey("rox_entity.id", ondelete="CASCADE"),
+                sa.ForeignKey(f"{schema}.rox_entity.id", ondelete="CASCADE"),
                 nullable=False,
                 index=True,
             ),

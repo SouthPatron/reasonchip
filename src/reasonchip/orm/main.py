@@ -18,6 +18,8 @@ class PhoneNumber(RoxModel):
     country_code: str
     number: str
 
+    _schema: typing.ClassVar[str] = "sammy"
+
 
 class Person(RoxModel):
     first_name: str
@@ -33,6 +35,8 @@ class Person(RoxModel):
     phones: typing.List[PhoneNumber] = Field(default_factory=list)
     emergency_contact: typing.Optional[PhoneNumber] = None
     required_contact: PhoneNumber
+
+    _schema: typing.ClassVar[str] = "sammy"
 
 
 async def main():
