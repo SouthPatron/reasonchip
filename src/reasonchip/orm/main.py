@@ -72,6 +72,9 @@ async def main():
         required_contact=PhoneNumber(
             location="mobile", country_code="+1", number="5555555555"
         ),
+        emergency_contact=PhoneNumber(
+            location="home", country_code="+1", number="1112223333"
+        ),
     )
 
     await person.save()
@@ -85,13 +88,16 @@ async def main():
     for p in range(1, 10):
         print(f"REVISION: [{person.id}] {person._revision}")
 
-        if p % 4 == 0:
+        if p % 5 == 0:
             person.id = None
             if person.emergency_contact:
                 person.emergency_contact.location = "home"
-        else:
+        elif p % 2 == 0:
             if person.emergency_contact:
                 person.emergency_contact.location = "mobile"
+        else:
+            if person.emergency_contact:
+                person.emergency_contact.location = "work"
 
         await person.save()
 

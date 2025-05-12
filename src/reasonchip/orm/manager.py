@@ -5,6 +5,8 @@ import uuid
 import asyncio
 import json
 
+import diff_match_patch as dmp_module
+
 import sqlalchemy as sa
 
 from sqlalchemy.schema import CreateSchema
@@ -88,13 +90,14 @@ class RoxManager:
         revision: int,
         obj: typing.Dict[str, typing.Any],
     ):
+        json_str = json.dumps(obj, default=custom_json_serializer)
 
         tbl = await self._fetch_table(session, schema, model_name)
         stmt = sa.insert(tbl).values(
             id=oid,
             version=version,
             revision=revision,
-            model=json.dumps(obj, default=custom_json_serializer),
+            model=json_str,
         )
 
         # Create the entity
@@ -108,6 +111,21 @@ class RoxManager:
         if not await self.register_entity(session, schema, model_name, oid):
             raise RuntimeError(
                 f"Failed to register entity {oid} into table {tbl.name}"
+            )
+
+        # Record the changelog
+        success = await self.create_changelog_entry(
+            session,
+            schema,
+            oid,
+            version,
+            revision,
+            "",
+            json_str,
+        )
+        if not success:
+            raise RuntimeError(
+                f"Failed to create changelog entry for {oid} into table {tbl.name}"
             )
 
     async def load(
@@ -163,7 +181,12 @@ class RoxManager:
 
         row = result.first()
 
-        params = (row[0], row[1], json.loads(row[2])) if row else None
+        if row:
+            old_json_str = row[2]
+            params = (row[0], row[1], json.loads(row[2]))
+        else:
+            old_json_str = ""
+            params = None
 
         # Call the callback to get the new object
         rc = await callback(params, obj)
@@ -195,32 +218,45 @@ class RoxManager:
                 raise RuntimeError(
                     f"Failed to touch entity {oid} into table {tbl.name}"
                 )
-
-            return rc
-
-        # Create because it doesn't exist
-        stmt = sa.insert(tbl).values(
-            id=oid,
-            version=rc[0],
-            revision=rc[1],
-            model=json_str,
-        )
-        result = await session.execute(stmt)
-        if result.rowcount != 1:
-            raise RuntimeError(
-                f"Failed to update (via insert) object {oid} into table {tbl.name}"
+        else:
+            # Create because it doesn't exist
+            stmt = sa.insert(tbl).values(
+                id=oid,
+                version=rc[0],
+                revision=rc[1],
+                model=json_str,
             )
+            result = await session.execute(stmt)
+            if result.rowcount != 1:
+                raise RuntimeError(
+                    f"Failed to update (via insert) object {oid} into table {tbl.name}"
+                )
 
-        # Register the entity
-        result = await self.register_entity(
+            # Register the entity
+            result = await self.register_entity(
+                session,
+                schema,
+                model_name,
+                oid,
+            )
+            if not result:
+                raise RuntimeError(
+                    f"Failed to register entity {oid} into table {tbl.name}"
+                )
+
+        # Record the changelog
+        success = await self.create_changelog_entry(
             session,
             schema,
-            model_name,
             oid,
+            rc[0],
+            rc[1],
+            old_json_str,
+            json_str,
         )
-        if not result:
+        if not success:
             raise RuntimeError(
-                f"Failed to register entity {oid} into table {tbl.name}"
+                f"Failed to create changelog entry for {oid} into table {tbl.name}"
             )
 
         return rc
@@ -329,6 +365,43 @@ class RoxManager:
             await session.execute(stmt)
 
         return True
+
+    # ------------------------ CHANGELOG CONTROL -----------------------------
+
+    async def create_changelog_entry(
+        self,
+        session: AsyncSession,
+        schema: str,
+        oid: uuid.UUID,
+        version: int,
+        revision: int,
+        old_json: str,
+        new_json: str,
+    ) -> bool:
+
+        # First we generate the patch difference
+        dmp = dmp_module.diff_match_patch()
+
+        diffs = dmp.diff_main(old_json, new_json)
+        dmp.diff_cleanupSemantic(diffs)
+
+        patches = dmp.patch_make(old_json, diffs)
+
+        patch = dmp.patch_toText(patches)
+
+        # Now we record it.
+        tbl = await self._fetch_table(session, schema, "rox_changelog")
+
+        stmt = sa.insert(tbl).values(
+            id=uuid.uuid4(),
+            oid=oid,
+            version=version,
+            revision=revision,
+            patch=patch,
+        )
+
+        result = await session.execute(stmt)
+        return result.rowcount == 1
 
     # ------------------------ SCHEMA CONTROL --------------------------------
 
@@ -469,7 +542,7 @@ class RoxManager:
             metadata,
             sa.Column("id", sa.UUID, primary_key=True),
             sa.Column(
-                "obj_id",
+                "oid",
                 sa.UUID,
                 sa.ForeignKey(f"{schema}.rox_entity.id", ondelete="CASCADE"),
                 nullable=False,
@@ -477,7 +550,7 @@ class RoxManager:
             ),
             sa.Column("version", sa.Integer, nullable=False),
             sa.Column("revision", sa.BigInteger, nullable=False, default=0),
-            sa.Column("patch", sa.JSON, nullable=False),
+            sa.Column("patch", sa.Text, nullable=False),
             sa.Column(
                 "created_at",
                 sa.DateTime,
