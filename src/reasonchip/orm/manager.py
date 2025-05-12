@@ -233,16 +233,24 @@ class RoxManager:
         oid: uuid.UUID,
     ) -> bool:
 
+        # Try delete the entity first to trigger any foreign key constraints
+        rc = await self.deregister_entity(
+            session,
+            schema,
+            oid,
+        )
+        if not rc:
+            return False
+
+        # Seems we're okay. Delete the object.
         tbl = await self._fetch_table(session, schema, model_name)
 
         stmt = sa.delete(tbl).where(tbl.c.id == oid)
         await session.execute(stmt)
 
-        return await self.deregister_entity(
-            session,
-            schema,
-            oid,
-        )
+        # It doesn't matter if the actual object didn't exist. It matters
+        # that it's been deregistered as an entity.
+        return True
 
     # ------------------------ ENTITY CONTROL --------------------------------
 
