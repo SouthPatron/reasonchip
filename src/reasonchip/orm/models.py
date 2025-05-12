@@ -13,6 +13,7 @@ from pydantic import (
 from .rox import Rox, RoxSession
 from .manager import (
     RoxManager,
+    RoxAssociation,
     ResultType,
 )
 
@@ -74,12 +75,24 @@ class RoxModel(BaseModel):
                 return await self.save(session=session)
 
         # Perform the save operation
+        associations: typing.List[RoxAssociation] = []
         await self._recursive_save_and_replace(
             session=session,
             obj=self,
             depth=0,
+            associations=associations,
         )
+
         assert self.id is not None
+
+        # Update all associations
+        await self.manager().set_entity_associations(
+            session=session,
+            schema=self._schema,
+            oid=self.id,
+            associations=associations,
+        )
+
         self._dirty = False
         return self.id
 
@@ -120,11 +133,37 @@ class RoxModel(BaseModel):
         session: sa.AsyncSession,
         obj: typing.Any,
         depth: int,
+        associations: typing.List[RoxAssociation],
     ):
+        """
+        NOTE:
+
+        This will iterate over the current object into all the fields. It will
+        delve into lists and dicts.
+
+        If it finds another RoxModel, it will:
+
+        1. Call save on that model so it can do it's thing.
+        2. Replace the storage reference with a dict that contains the
+            reference to the other reference.
+
+        It also keeps track of all associations at this current level (ie:
+        not any sub-RoxModels) within the provided parameter.
+        """
+
         if isinstance(obj, RoxModel):
             # We are not saving ourselves, we're saving a child.
             if depth > 0:
                 new_id = await obj.save(session=session)
+
+                # Keep track of associations
+                associations.append(
+                    RoxAssociation(
+                        child_schema=obj._schema,
+                        child_id=new_id,
+                    )
+                )
+
                 return {
                     "__ref__": new_id,
                     "__rox__": obj.__class__.__name__,
@@ -148,6 +187,7 @@ class RoxModel(BaseModel):
                     session=session,
                     obj=value,
                     depth=depth + 1,
+                    associations=associations,
                 )
 
             # Save the object to the database here
@@ -185,6 +225,7 @@ class RoxModel(BaseModel):
                     session=session,
                     obj=i,
                     depth=depth + 1,
+                    associations=associations,
                 )
                 for i in obj
             ]
@@ -195,6 +236,7 @@ class RoxModel(BaseModel):
                     session=session,
                     obj=v,
                     depth=depth + 1,
+                    associations=associations,
                 )
                 for k, v in obj.items()
             }

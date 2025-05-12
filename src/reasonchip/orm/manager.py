@@ -10,6 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.schema import CreateSchema
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncConnection
 
+from dataclasses import dataclass
+
 from .rox import Rox
 from .utils import pascal_to_snake
 
@@ -28,6 +30,12 @@ def custom_json_serializer(obj):
         return str(obj)
 
     raise TypeError(f"Type {type(obj)} not serializable")
+
+
+@dataclass
+class RoxAssociation:
+    child_schema: str
+    child_id: uuid.UUID
 
 
 class RoxManager:
@@ -82,7 +90,6 @@ class RoxManager:
     ):
 
         tbl = await self._fetch_table(session, schema, model_name)
-
         stmt = sa.insert(tbl).values(
             id=oid,
             version=version,
@@ -90,13 +97,18 @@ class RoxManager:
             model=json.dumps(obj, default=custom_json_serializer),
         )
 
+        # Create the entity
         result = await session.execute(stmt)
-        if result.rowcount == 1:
-            return
+        if result.rowcount != 1:
+            raise RuntimeError(
+                f"Failed to insert object {obj} into table {tbl.name}"
+            )
 
-        raise RuntimeError(
-            f"Failed to insert object {obj} into table {tbl.name}"
-        )
+        # Register the entity
+        if not await self.register_entity(session, schema, model_name, oid):
+            raise RuntimeError(
+                f"Failed to register entity {oid} into table {tbl.name}"
+            )
 
     async def load(
         self,
@@ -115,7 +127,6 @@ class RoxManager:
         ).where(tbl.c.id == oid)
 
         result = await session.execute(stmt)
-
         row = result.first()
         if not row:
             return None
@@ -135,6 +146,7 @@ class RoxManager:
         obj: typing.Dict[str, typing.Any],
     ) -> ResultType:
 
+        # Get the entity from the database
         tbl = await self._fetch_table(session, schema, model_name)
 
         stmt = (
@@ -160,7 +172,7 @@ class RoxManager:
 
         json_str = json.dumps(rc[2], default=custom_json_serializer)
 
-        # Update or create depending on find
+        # Update because it already exists
         if params:
             stmt = (
                 sa.update(tbl)
@@ -171,21 +183,47 @@ class RoxManager:
                     model=json_str,
                 )
             )
-        else:
-            stmt = sa.insert(tbl).values(
-                id=oid,
-                version=rc[0],
-                revision=rc[1],
-                model=json_str,
-            )
 
-        result = await session.execute(stmt)
-        if result.rowcount == 1:
+            result = await session.execute(stmt)
+            if result.rowcount != 1:
+                raise RuntimeError(
+                    f"Failed to update object {oid} into table {tbl.name}"
+                )
+
+            # Touch entity
+            if not await self.touch_entity(session, schema, oid):
+                raise RuntimeError(
+                    f"Failed to touch entity {oid} into table {tbl.name}"
+                )
+
             return rc
 
-        raise RuntimeError(
-            f"Failed to update object {oid} into table {tbl.name}"
+        # Create because it doesn't exist
+        stmt = sa.insert(tbl).values(
+            id=oid,
+            version=rc[0],
+            revision=rc[1],
+            model=json_str,
         )
+        result = await session.execute(stmt)
+        if result.rowcount != 1:
+            raise RuntimeError(
+                f"Failed to update (via insert) object {oid} into table {tbl.name}"
+            )
+
+        # Register the entity
+        result = await self.register_entity(
+            session,
+            schema,
+            model_name,
+            oid,
+        )
+        if not result:
+            raise RuntimeError(
+                f"Failed to register entity {oid} into table {tbl.name}"
+            )
+
+        return rc
 
     async def delete(
         self,
@@ -198,8 +236,91 @@ class RoxManager:
         tbl = await self._fetch_table(session, schema, model_name)
 
         stmt = sa.delete(tbl).where(tbl.c.id == oid)
+        await session.execute(stmt)
+
+        return await self.deregister_entity(
+            session,
+            schema,
+            oid,
+        )
+
+    # ------------------------ ENTITY CONTROL --------------------------------
+
+    async def register_entity(
+        self,
+        session: AsyncSession,
+        schema: str,
+        model_name: str,
+        oid: uuid.UUID,
+    ) -> bool:
+
+        tbl = await self._fetch_table(session, schema, "rox_entity")
+
+        stmt = sa.insert(tbl).values(
+            id=oid,
+            model_name=model_name,
+        )
         result = await session.execute(stmt)
         return result.rowcount == 1
+
+    async def touch_entity(
+        self,
+        session: AsyncSession,
+        schema: str,
+        oid: uuid.UUID,
+    ) -> bool:
+
+        tbl = await self._fetch_table(session, schema, "rox_entity")
+
+        stmt = (
+            sa.update(tbl)
+            .where(tbl.c.id == oid)
+            .values(
+                last_updated_at=sa.func.now(),
+            )
+        )
+
+        result = await session.execute(stmt)
+        return result.rowcount == 1
+
+    async def deregister_entity(
+        self,
+        session: AsyncSession,
+        schema: str,
+        oid: uuid.UUID,
+    ) -> bool:
+
+        tbl = await self._fetch_table(session, schema, "rox_entity")
+
+        stmt = sa.delete(tbl).where(tbl.c.id == oid)
+        result = await session.execute(stmt)
+        return result.rowcount == 1
+
+    async def set_entity_associations(
+        self,
+        session: AsyncSession,
+        schema: str,
+        oid: uuid.UUID,
+        associations: typing.List[RoxAssociation],
+    ):
+
+        tbl = await self._fetch_table(session, schema, "rox_association")
+
+        # Delete all existing associations
+        stmt = sa.delete(tbl).where(tbl.c.parent_id == oid)
+        await session.execute(stmt)
+
+        # Create new associations
+        for assoc in associations:
+            stmt = sa.insert(tbl).values(
+                id=uuid.uuid4(),
+                parent_id=oid,
+                child_schema=assoc.child_schema,
+                child_id=assoc.child_id,
+            )
+            await session.execute(stmt)
+
+        return True
 
     # ------------------------ SCHEMA CONTROL --------------------------------
 
@@ -375,9 +496,14 @@ class RoxManager:
                 index=True,
             ),
             sa.Column(
+                "child_schema",
+                sa.String(255),
+                nullable=False,
+            ),
+            sa.Column(
                 "child_id",
                 sa.UUID,
-                sa.ForeignKey(f"{schema}.rox_entity.id", ondelete="CASCADE"),
+                sa.ForeignKey(f"{schema}.rox_entity.id", ondelete="RESTRICT"),
                 nullable=False,
                 index=True,
             ),

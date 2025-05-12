@@ -74,11 +74,11 @@ async def main():
         ),
     )
 
-    # await person.save()
+    await person.save()
 
-    person = await Person.load(
-        uuid.UUID("09880a05-ede4-405f-bf8b-f2ab5be1d29a")
-    )
+    assert person.id is not None
+
+    person = await Person.load(person.id)
     assert person
     print(f"{person}")
 
