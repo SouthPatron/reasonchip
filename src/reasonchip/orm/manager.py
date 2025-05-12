@@ -89,6 +89,7 @@ class RoxManager:
         version: int,
         revision: int,
         obj: typing.Dict[str, typing.Any],
+        changelog: bool,
     ):
         json_str = json.dumps(obj, default=custom_json_serializer)
 
@@ -112,6 +113,9 @@ class RoxManager:
             raise RuntimeError(
                 f"Failed to register entity {oid} into table {tbl.name}"
             )
+
+        if not changelog:
+            return
 
         # Record the changelog
         success = await self.create_changelog_entry(
@@ -162,6 +166,7 @@ class RoxManager:
         oid: uuid.UUID,
         callback: UpdateCallbackType,
         obj: typing.Dict[str, typing.Any],
+        changelog: bool,
     ) -> ResultType:
 
         # Get the entity from the database
@@ -245,6 +250,9 @@ class RoxManager:
                 raise RuntimeError(
                     f"Failed to register entity {oid} into table {tbl.name}"
                 )
+
+        if not changelog:
+            return rc
 
         # Record the changelog
         success = await self.create_changelog_entry(

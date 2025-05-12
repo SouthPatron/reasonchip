@@ -28,6 +28,7 @@ class RoxModel(BaseModel):
     _revision: int = 1
     _version: typing.ClassVar[int] = 1
     _schema: typing.ClassVar[str] = "public"
+    _changelog: typing.ClassVar[bool] = False
 
     # ------------ CONSTRUCTORS ----------------------------------------------
 
@@ -201,6 +202,7 @@ class RoxModel(BaseModel):
                         revision=obj._revision,
                         oid=obj.id,
                         obj=result,
+                        changelog=obj._changelog,
                     )
                 else:
                     await self.manager().update(
@@ -210,6 +212,7 @@ class RoxModel(BaseModel):
                         oid=obj.id,
                         callback=self._update_collision_check,
                         obj=result,
+                        changelog=obj._changelog,
                     )
 
             # Return the reference
