@@ -2,6 +2,7 @@
 
 import typing
 import asyncio
+import datetime
 import uuid
 
 from sqlalchemy.ext.asyncio import (
@@ -85,21 +86,39 @@ async def main():
     assert person
     print(f"{person}")
 
-    for p in range(1, 10):
-        print(f"REVISION: [{person.id}] {person._revision}")
+    total_time = 0
+    total_people = 1000
 
+    for p in range(1, total_people):
         if p % 5 == 0:
+            print(f"******************  {p}  *******************************")
             person.id = None
             if person.emergency_contact:
                 person.emergency_contact.location = "home"
+            person.last_name = "McCormick"
         elif p % 2 == 0:
             if person.emergency_contact:
                 person.emergency_contact.location = "mobile"
+            person.age = 35
+            person.last_name = "Smith"
         else:
             if person.emergency_contact:
                 person.emergency_contact.location = "work"
+            person.age = 30
+            person.last_name = "Doe"
 
+        start_time = datetime.datetime.now()
         await person.save()
+        end_time = datetime.datetime.now()
+
+        diff_ms = (end_time - start_time).total_seconds() * 1000
+        total_time += diff_ms
+
+        print(f"REVISION: [{person.id}] {person._revision} [{diff_ms:.2f} ms]")
+
+    average_time = total_time / total_people
+
+    print(f"Average time to save: {average_time:.2f} ms")
 
     # new_id = await person.save()
     # print(f"New ID = [{new_id}]")

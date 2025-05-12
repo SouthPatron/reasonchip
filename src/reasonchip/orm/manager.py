@@ -183,7 +183,7 @@ class RoxManager:
 
         if row:
             old_json_str = row[2]
-            params = (row[0], row[1], json.loads(row[2]))
+            params = (row[0], row[1], json.loads(old_json_str))
         else:
             old_json_str = ""
             params = None
@@ -193,6 +193,8 @@ class RoxManager:
         if not rc:
             return None
 
+        new_version = rc[0]
+        new_revision = rc[1]
         json_str = json.dumps(rc[2], default=custom_json_serializer)
 
         # Update because it already exists
@@ -201,8 +203,8 @@ class RoxManager:
                 sa.update(tbl)
                 .where(tbl.c.id == oid)
                 .values(
-                    version=rc[0],
-                    revision=rc[1],
+                    version=new_version,
+                    revision=new_revision,
                     model=json_str,
                 )
             )
@@ -222,8 +224,8 @@ class RoxManager:
             # Create because it doesn't exist
             stmt = sa.insert(tbl).values(
                 id=oid,
-                version=rc[0],
-                revision=rc[1],
+                version=new_version,
+                revision=new_revision,
                 model=json_str,
             )
             result = await session.execute(stmt)
@@ -249,8 +251,8 @@ class RoxManager:
             session,
             schema,
             oid,
-            rc[0],
-            rc[1],
+            new_version,
+            new_revision,
             old_json_str,
             json_str,
         )
@@ -382,12 +384,18 @@ class RoxManager:
         # First we generate the patch difference
         dmp = dmp_module.diff_match_patch()
 
-        diffs = dmp.diff_main(old_json, new_json)
-        dmp.diff_cleanupSemantic(diffs)
+        # Upwards
+        diffs_up = dmp.diff_main(old_json, new_json)
+        diffs_down = dmp.diff_main(new_json, old_json)
 
-        patches = dmp.patch_make(old_json, diffs)
+        dmp.diff_cleanupSemantic(diffs_up)
+        dmp.diff_cleanupSemantic(diffs_down)
 
-        patch = dmp.patch_toText(patches)
+        patches_up = dmp.patch_make(old_json, diffs_up)
+        patches_down = dmp.patch_make(new_json, diffs_down)
+
+        patch_up = dmp.patch_toText(patches_up)
+        patch_down = dmp.patch_toText(patches_down)
 
         # Now we record it.
         tbl = await self._fetch_table(session, schema, "rox_changelog")
@@ -397,7 +405,8 @@ class RoxManager:
             oid=oid,
             version=version,
             revision=revision,
-            patch=patch,
+            patch_up=patch_up,
+            patch_down=patch_down,
         )
 
         result = await session.execute(stmt)
@@ -550,7 +559,8 @@ class RoxManager:
             ),
             sa.Column("version", sa.Integer, nullable=False),
             sa.Column("revision", sa.BigInteger, nullable=False, default=0),
-            sa.Column("patch", sa.Text, nullable=False),
+            sa.Column("patch_up", sa.Text, nullable=False),
+            sa.Column("patch_down", sa.Text, nullable=False),
             sa.Column(
                 "created_at",
                 sa.DateTime,

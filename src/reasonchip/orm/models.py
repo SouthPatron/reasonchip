@@ -176,8 +176,8 @@ class RoxModel(BaseModel):
             # Determine if we are creating or updating
             create = obj.id is None
             if obj.id is None:
-                self._revision = 1
                 obj.id = uuid.uuid4()  # NOTE: This will mark us dirty
+                obj._revision = 1
 
             # Iterate over the fields of the object
             result = {}
@@ -191,21 +191,21 @@ class RoxModel(BaseModel):
                 )
 
             # Save the object to the database here
-            if self._dirty:
+            if obj.is_dirty():
                 if create:
                     await self.manager().create(
                         session=session,
                         model_name=obj.__class__.__name__,
-                        schema=self._schema,
-                        version=self._version,
-                        revision=self._revision,
+                        schema=obj._schema,
+                        version=obj._version,
+                        revision=obj._revision,
                         oid=obj.id,
                         obj=result,
                     )
                 else:
                     await self.manager().update(
                         session=session,
-                        schema=self._schema,
+                        schema=obj._schema,
                         model_name=obj.__class__.__name__,
                         oid=obj.id,
                         callback=self._update_collision_check,
@@ -347,12 +347,13 @@ class RoxModel(BaseModel):
     def __setattr__(self, name, value):
         super().__setattr__(name, value)
 
-        if name not in ["_dirty"]:
-            if self._dirty == False:
-                object.__setattr__(self, "_dirty", True)
+        if name in ["_dirty"]:
+            return
 
-            if name != "_revision":
-                object.__setattr__(self, "_revision", self._revision + 1)
+        if self._dirty == False:
+            self._dirty = True
+            if name not in ["_revision"]:
+                self._revision = self._revision + 1
 
     def is_dirty(self) -> bool:
         return self._dirty
