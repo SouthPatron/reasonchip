@@ -45,6 +45,56 @@ class BaseCommand(ABC):
         )
 
     @classmethod
+    def add_db_options(
+        cls,
+        parser: argparse.ArgumentParser,
+    ):
+        group = parser.add_argument_group("Database Options")
+        group.add_argument(
+            "--db-url",
+            dest="db_url",
+            action="store",
+            metavar="<URL>",
+            help="URL to database. Two example: 'postgresql+asyncpg://user@/db' or 'sqlite+aiosqlite://./db.sqlite'",
+        )
+        group.add_argument(
+            "--db-pool-size",
+            dest="db_pool_size",
+            action="store",
+            default=10,
+            type=int,
+            metavar="<number>",
+            help="Size of the database connection pool. Default is 10.",
+        )
+        group.add_argument(
+            "--db-max-overflow",
+            dest="db_max_overflow",
+            action="store",
+            default=20,
+            type=int,
+            metavar="<number>",
+            help="Maximum overflow size of the database connection pool. Default is 20.",
+        )
+        group.add_argument(
+            "--db-pool-recycle",
+            dest="db_pool_recycle",
+            action="store",
+            default=300,
+            type=int,
+            metavar="<number>",
+            help="Time in seconds to recycle connections in the pool. Default is 300.",
+        )
+        group.add_argument(
+            "--db-pool-timeout",
+            dest="db_pool_timeout",
+            action="store",
+            default=30,
+            type=int,
+            metavar="<number>",
+            help="Timeout in seconds for acquiring a connection from the pool. Default is 30.",
+        )
+
+    @classmethod
     def add_ssl_client_options(
         cls,
         parser: argparse.ArgumentParser,

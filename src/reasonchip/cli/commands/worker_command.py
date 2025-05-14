@@ -86,6 +86,7 @@ It's an incredibly intolerant process by design. It will die if anything strange
         )
 
         cls.add_default_options(parser)
+        cls.add_db_options(parser)
         cls.add_ssl_client_options(parser)
 
     async def main(

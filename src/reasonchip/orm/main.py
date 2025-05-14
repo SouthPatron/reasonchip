@@ -3,7 +3,6 @@
 import typing
 import asyncio
 import datetime
-import uuid
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -34,7 +33,6 @@ class Person(SammyModel):
         le=120,
         description="Age in years",
     )
-
     phones: typing.List[PhoneNumber] = Field(default_factory=list)
     emergency_contact: typing.Optional[PhoneNumber] = None
     required_contact: PhoneNumber
