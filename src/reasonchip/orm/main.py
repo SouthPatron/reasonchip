@@ -4,13 +4,8 @@ import typing
 import asyncio
 import datetime
 
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    async_engine_from_config,
-)
-
 from reasonchip.orm.models import RoxModel, Field
-from reasonchip.orm.rox import Rox
+from reasonchip.orm.rox import Rox, RoxConfiguration
 
 
 class SammyModel(RoxModel):
@@ -39,18 +34,9 @@ class Person(SammyModel):
 
 
 async def main():
-    engine: AsyncEngine = async_engine_from_config(
-        {
-            "url": "postgresql+asyncpg://durand@/katana",
-            "pool_size": 1,
-            "max_overflow": 10,
-            "pool_recycle": 300,
-            "pool_timeout": 30,
-        },
-        prefix="",
-    )
+    config: RoxConfiguration = RoxConfiguration()
 
-    Rox(engine=engine)
+    Rox(config)
 
     person = Person(
         first_name="John",

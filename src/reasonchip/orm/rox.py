@@ -3,10 +3,22 @@ from __future__ import annotations
 import typing
 import sqlalchemy as sa
 
+from pydantic import BaseModel, Field
+
+
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
+    async_engine_from_config,
 )
+
+
+class RoxConfiguration(BaseModel):
+    url: str = Field(default="sqlite+aiosqlite:///./rox.sqlite")
+    pool_size: int = Field(default=1, ge=1)
+    max_overflow: int = Field(default=10, ge=0)
+    pool_recycle: int = Field(default=300, ge=0)
+    pool_timeout: int = Field(default=30, ge=0)
 
 
 class Rox:
@@ -21,10 +33,15 @@ class Rox:
 
     def __init__(
         self,
-        engine: AsyncEngine,
+        configuration: RoxConfiguration,
     ):
         if Rox._initialized:
             return
+
+        engine = async_engine_from_config(
+            configuration.model_dump(),
+            prefix="",
+        )
 
         self._engine: AsyncEngine = engine
         self._metadata: sa.MetaData = sa.MetaData()

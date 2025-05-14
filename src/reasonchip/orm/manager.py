@@ -10,7 +10,10 @@ import diff_match_patch as dmp_module
 import sqlalchemy as sa
 
 from sqlalchemy.schema import CreateSchema
-from sqlalchemy.ext.asyncio import AsyncSession, AsyncConnection
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    AsyncConnection,
+)
 
 from dataclasses import dataclass
 
@@ -38,6 +41,11 @@ def custom_json_serializer(obj):
 class RoxAssociation:
     child_schema: str
     child_id: uuid.UUID
+
+
+ROX_ENTITY = "rox_entity"
+ROX_CHANGELOG = "rox_changelog"
+ROX_ASSOCIATION = "rox_association"
 
 
 class RoxManager:
@@ -308,7 +316,7 @@ class RoxManager:
         oid: uuid.UUID,
     ) -> bool:
 
-        tbl = await self._fetch_table(session, schema, "rox_entity")
+        tbl = await self._fetch_table(session, schema, ROX_ENTITY)
 
         stmt = sa.insert(tbl).values(
             id=oid,
@@ -324,7 +332,7 @@ class RoxManager:
         oid: uuid.UUID,
     ) -> bool:
 
-        tbl = await self._fetch_table(session, schema, "rox_entity")
+        tbl = await self._fetch_table(session, schema, ROX_ENTITY)
 
         stmt = (
             sa.update(tbl)
@@ -344,7 +352,7 @@ class RoxManager:
         oid: uuid.UUID,
     ) -> bool:
 
-        tbl = await self._fetch_table(session, schema, "rox_entity")
+        tbl = await self._fetch_table(session, schema, ROX_ENTITY)
 
         stmt = sa.delete(tbl).where(tbl.c.id == oid)
         result = await session.execute(stmt)
@@ -358,7 +366,7 @@ class RoxManager:
         associations: typing.List[RoxAssociation],
     ):
 
-        tbl = await self._fetch_table(session, schema, "rox_association")
+        tbl = await self._fetch_table(session, schema, ROX_ASSOCIATION)
 
         # Delete all existing associations
         stmt = sa.delete(tbl).where(tbl.c.parent_id == oid)
@@ -406,7 +414,7 @@ class RoxManager:
         patch_down = dmp.patch_toText(patches_down)
 
         # Now we record it.
-        tbl = await self._fetch_table(session, schema, "rox_changelog")
+        tbl = await self._fetch_table(session, schema, ROX_CHANGELOG)
 
         stmt = sa.insert(tbl).values(
             id=uuid.uuid4(),
@@ -432,6 +440,12 @@ class RoxManager:
         rox = self.rox
         metadata = rox.metadata
 
+        # Determine schema support
+        engine = session.get_bind()
+        assert isinstance(engine, sa.Engine)
+
+        use_schema = engine.dialect.name != "sqlite"
+
         # Derive the table name from the class name
         table_name = pascal_to_snake(model_name)
 
@@ -448,11 +462,11 @@ class RoxManager:
 
             # Make sure the schema exists along with rox tables
             if create_schema:
-                await conn.execute(CreateSchema(schema, if_not_exists=True))
                 rox_tables = await self._build_rox_tables(
                     conn,
                     metadata,
                     schema,
+                    use_schema,
                 )
                 self._seen[schema] = rox_tables
 
@@ -461,6 +475,7 @@ class RoxManager:
                 metadata=metadata,
                 schema=schema,
                 table_name=table_name,
+                use_schema=use_schema,
             )
 
             await conn.run_sync(tbl.create, checkfirst=True)
@@ -473,9 +488,16 @@ class RoxManager:
         metadata: sa.MetaData,
         schema: str,
         table_name: str,
+        use_schema: bool,
     ) -> sa.Table:
+
+        if use_schema:
+            tname = table_name
+        else:
+            tname = f"{schema}_{table_name}"
+
         return sa.Table(
-            table_name,
+            tname,
             metadata,
             sa.Column("id", sa.UUID, primary_key=True),
             sa.Column("version", sa.Integer, nullable=False),
@@ -494,7 +516,7 @@ class RoxManager:
                 nullable=False,
                 server_default=sa.func.now(),
             ),
-            schema=schema,
+            schema=schema if use_schema else None,
         )
 
     async def _build_rox_tables(
@@ -502,24 +524,31 @@ class RoxManager:
         conn: AsyncConnection,
         metadata: sa.MetaData,
         schema: str,
+        use_schema: bool,
     ) -> typing.Dict[str, sa.Table]:
 
         rc = {}
 
+        # Create the schema if supported and it doesn't exist
+        if use_schema:
+            await conn.execute(CreateSchema(schema, if_not_exists=True))
+
         # Make sure we have an entity table
-        tbl = await self._build_entity_table(metadata, schema)
+        tbl = await self._build_entity_table(metadata, schema, use_schema)
         await conn.run_sync(tbl.create, checkfirst=True)
-        rc["rox_entity"] = tbl
+        rc[ROX_ENTITY] = tbl
 
         # Make sure we have a changelog table
-        tbl = await self._build_changelog_table(metadata, schema)
+        tbl = await self._build_changelog_table(metadata, schema, use_schema)
         await conn.run_sync(tbl.create, checkfirst=True)
-        rc["rox_changelog"] = tbl
+        rc[ROX_CHANGELOG] = tbl
 
         # Make sure we have an association table
-        tbl = await self._build_association_table(metadata, schema)
+        tbl = await self._build_association_table(metadata, schema, use_schema)
         await conn.run_sync(tbl.create, checkfirst=True)
-        rc["rox_association"] = tbl
+        rc[ROX_ASSOCIATION] = tbl
+
+        print(f"Created Rox tables in schema {schema}: {rc}")
 
         return rc
 
@@ -527,9 +556,16 @@ class RoxManager:
         self,
         metadata: sa.MetaData,
         schema: str,
+        use_schema: bool,
     ) -> sa.Table:
+
+        if use_schema:
+            tname = ROX_ENTITY
+        else:
+            tname = f"{schema}_{ROX_ENTITY}"
+
         return sa.Table(
-            "rox_entity",
+            tname,
             metadata,
             sa.Column("id", sa.UUID, primary_key=True),
             sa.Column("model_name", sa.String(255), nullable=False, index=True),
@@ -546,22 +582,31 @@ class RoxManager:
                 nullable=False,
                 server_default=sa.func.now(),
             ),
-            schema=schema,
+            schema=schema if use_schema else None,
         )
 
     async def _build_changelog_table(
         self,
         metadata: sa.MetaData,
         schema: str,
+        use_schema: bool,
     ) -> sa.Table:
+
+        if use_schema:
+            tname = ROX_CHANGELOG
+            fkey = f"{schema}.{ROX_ENTITY}.id"
+        else:
+            tname = f"{schema}_{ROX_CHANGELOG}"
+            fkey = f"{schema}_{ROX_ENTITY}.id"
+
         return sa.Table(
-            "rox_changelog",
+            tname,
             metadata,
             sa.Column("id", sa.UUID, primary_key=True),
             sa.Column(
                 "oid",
                 sa.UUID,
-                sa.ForeignKey(f"{schema}.rox_entity.id", ondelete="CASCADE"),
+                sa.ForeignKey(fkey, ondelete="CASCADE"),
                 nullable=False,
                 index=True,
             ),
@@ -575,22 +620,31 @@ class RoxManager:
                 nullable=False,
                 server_default=sa.func.now(),
             ),
-            schema=schema,
+            schema=schema if use_schema else None,
         )
 
     async def _build_association_table(
         self,
         metadata: sa.MetaData,
         schema: str,
+        use_schema: bool,
     ) -> sa.Table:
+
+        if use_schema:
+            tname = ROX_ASSOCIATION
+            fkey = f"{schema}.{ROX_ENTITY}.id"
+        else:
+            tname = f"{schema}_{ROX_ASSOCIATION}"
+            fkey = f"{schema}_{ROX_ENTITY}.id"
+
         return sa.Table(
-            "rox_association",
+            tname,
             metadata,
             sa.Column("id", sa.UUID, primary_key=True),
             sa.Column(
                 "parent_id",
                 sa.UUID,
-                sa.ForeignKey(f"{schema}.rox_entity.id", ondelete="CASCADE"),
+                sa.ForeignKey(fkey, ondelete="CASCADE"),
                 nullable=False,
                 index=True,
             ),
@@ -602,7 +656,7 @@ class RoxManager:
             sa.Column(
                 "child_id",
                 sa.UUID,
-                sa.ForeignKey(f"{schema}.rox_entity.id", ondelete="RESTRICT"),
+                sa.ForeignKey(fkey, ondelete="RESTRICT"),
                 nullable=False,
                 index=True,
             ),
@@ -612,5 +666,5 @@ class RoxManager:
                 nullable=False,
                 server_default=sa.func.now(),
             ),
-            schema=schema,
+            schema=schema if use_schema else None,
         )
