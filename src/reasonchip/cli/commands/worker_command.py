@@ -10,6 +10,9 @@ import asyncio
 import traceback
 
 from reasonchip.core.engine.engine import Engine
+
+from reasonchip.orm.rox import Rox, RoxConfiguration
+
 from reasonchip.net.worker import TaskManager
 
 from reasonchip.net.protocol import DEFAULT_LISTENERS
@@ -101,6 +104,18 @@ It's an incredibly intolerant process by design. It will die if anything strange
         if not args.collections:
             args.collections = ["."]
 
+        # Initialize Rox ORM
+        if args.db_url:
+            config: RoxConfiguration = RoxConfiguration(
+                url=args.db_url,
+                pool_size=args.db_pool_size,
+                max_overflow=args.db_max_overflow,
+                pool_recycle=args.db_pool_recycle,
+                pool_timeout=args.db_pool_timeout,
+            )
+            Rox(configuration=config)
+
+        # SSL Context
         ssl_options = SSLClientOptions.from_args(args)
         ssl_context = ssl_options.create_ssl_context() if ssl_options else None
 
