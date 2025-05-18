@@ -13,7 +13,7 @@ from reasonchip.core import exceptions as rex
 from reasonchip.core.engine.variables import Variables
 from reasonchip.utils.local_runner import LocalRunner
 
-from reasonchip.orm.rox import Rox, RoxConfiguration
+from reasonchip.persistence.rox.rox import Rox, RoxConfiguration
 
 from .exit_code import ExitCode
 from .command import AsyncCommand

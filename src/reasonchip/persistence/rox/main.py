@@ -4,8 +4,8 @@ import typing
 import asyncio
 import datetime
 
-from reasonchip.orm.models import RoxModel, Field
-from reasonchip.orm.rox import Rox, RoxConfiguration
+from reasonchip.persistence.rox.models import RoxModel, Field
+from reasonchip.persistence.rox.rox import Rox, RoxConfiguration
 
 
 class SammyModel(RoxModel):

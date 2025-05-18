@@ -11,7 +11,7 @@ import traceback
 
 from reasonchip.core.engine.engine import Engine
 
-from reasonchip.orm.rox import Rox, RoxConfiguration
+from reasonchip.persistence.rox.rox import Rox, RoxConfiguration
 
 from reasonchip.net.worker import TaskManager
 
