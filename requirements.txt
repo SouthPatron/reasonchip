@@ -22,9 +22,9 @@ SQLAlchemy>=2.0.40
 asyncpg>=0.30.0
 aiosqlite>=0.21.0
 diff-match-patch>=20241021
+httpx>=0.28.1				# RESTful
 
 # Chip specific
-httpx>=0.28.1
 openai>=1.61.1
 redis[hiredis]>=5.2.1
 python-telegram-bot>=21.10
