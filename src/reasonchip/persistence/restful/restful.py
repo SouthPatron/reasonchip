@@ -1,10 +1,14 @@
 import uuid
 import typing
 import httpx
+import asyncio
+
+from datetime import datetime
 
 from pydantic import (
     BaseModel,
     Field,
+    create_model,
 )
 
 from .models import RestfulModel
@@ -17,6 +21,56 @@ class RestfulResult(BaseModel):
     results: typing.List[RestfulModel] = Field(default_factory=list)
 
 
+def generate_model_from_post_schema(
+    schema: typing.Dict[str, typing.Any],
+    model_name: str,
+) -> typing.Type[BaseModel]:
+
+    fields = {}
+
+    for field_name, meta in schema.items():
+
+        field_type: typing.Any
+        default: typing.Any = None
+
+        field_type = meta["type"]
+
+        if field_type == "string":
+            field_type = str
+
+        elif field_type == "datetime":
+            field_type = datetime
+
+        elif field_type == "choice":
+            field_type = str
+
+        else:
+            print(
+                f"Warning: Unsupported field type '{field_type}' for field '{field_name}' in model '{model_name}'"
+            )
+            assert (
+                False
+            ), f"Unsupported field type '{field_type}' for field '{field_name}' in model '{model_name}'"
+            field_type = typing.Any
+
+        # Optional if not required or read_only
+        if not meta.get("required", False) or meta.get("read_only", False):
+            field_type = typing.Optional[field_type]
+            default = None
+
+        # You could enhance this with constraints (max_length, choices, etc.)
+        fields[field_name] = (
+            field_type,
+            Field(
+                default=default,
+                description=meta.get("label", ""),
+            ),
+        )
+
+    model = create_model(model_name, **fields)
+    return model
+
+
 class RestfulSession:
 
     def __init__(
@@ -27,13 +81,36 @@ class RestfulSession:
         self._session: httpx.AsyncClient = session
         self._model: typing.Type[RestfulModel] = model
 
+    async def inspect(self):
+        mod = self._model
+        endpoint = "/m/" + mod._endpoint.rstrip("/")
+
+        async with self._session as client:
+            resp = await client.options(endpoint)
+            if resp.status_code != 200:
+                raise RuntimeError("Unable to fetch OPTIONS")
+
+            rc = resp.json()
+
+            print(f"RC = {rc}")
+
+            post_schema = resp.json()["actions"]["POST"]
+            model_name = mod.__name__
+
+            new_model = generate_model_from_post_schema(
+                schema=post_schema,
+                model_name=model_name,
+            )
+
+            return new_model
+
     async def load(
         self,
         oid: uuid.UUID,
     ) -> typing.Optional[RestfulModel]:
 
         mod = self._model
-        endpoint = mod._endpoint + f"/{oid}/"
+        endpoint = "/m/" + mod._endpoint + f"/{oid}/"
 
         async with self._session as client:
             resp = await client.get(endpoint)
@@ -48,9 +125,13 @@ class Restful:
 
     def __init__(
         self,
-        params: typing.Optional[dict] = None,
+        params: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ):
         p = params or {}
+
+        if "follow_redirects" not in p:
+            p["follow_redirects"] = True
+
         self._session = httpx.AsyncClient(**p)
 
     async def __aenter__(self):

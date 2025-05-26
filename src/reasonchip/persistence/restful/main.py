@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import uuid
 import typing
 import asyncio
 
@@ -16,14 +15,22 @@ async def main():
     url = "http://127.0.0.1:8000/restful/"
     url = url.rstrip("/")
 
+    headers = {
+        "Accept": "application/json",
+    }
+
     restful = Restful(
         params={
             "base_url": url,
+            "headers": headers,
         }
     )
 
     async with restful as rf:
-        rf(PlayerModel)
+        rs = rf(PlayerModel)
+        model = await rs.inspect()
+
+        print(f"Model = {model}")
 
 
 if __name__ == "__main__":
