@@ -1,7 +1,6 @@
 import uuid
 import typing
 import httpx
-import asyncio
 
 from datetime import datetime
 
@@ -11,6 +10,7 @@ from pydantic import (
     create_model,
 )
 
+from auth.auth_handler import AuthHandler
 from .models import RestfulModel
 
 
@@ -77,17 +77,30 @@ class RestfulSession:
         self,
         session: httpx.AsyncClient,
         model: typing.Type[RestfulModel],
+        auth: typing.Optional[AuthHandler] = None,
     ):
         self._session: httpx.AsyncClient = session
         self._model: typing.Type[RestfulModel] = model
+        self._auth: typing.Optional[AuthHandler] = auth
 
     async def inspect(self):
         mod = self._model
-        endpoint = "/m/" + mod._endpoint.rstrip("/")
+        endpoint = "/m/" + mod._endpoint.rstrip("/") + "/"
 
         async with self._session as client:
+
+            # Authentication
+            if self._auth:
+                await self._auth.on_request(client)
+
+            # Perform request
             resp = await client.options(endpoint)
             if resp.status_code != 200:
+
+                if resp.status_code == 401 and self._auth:
+                    await self._auth.on_forbidden(client)
+                    return await self.inspect()
+
                 raise RuntimeError("Unable to fetch OPTIONS")
 
             rc = resp.json()
@@ -126,7 +139,10 @@ class Restful:
     def __init__(
         self,
         params: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        auth: typing.Optional[AuthHandler] = None,
     ):
+        self._auth: typing.Optional[AuthHandler] = auth
+
         p = params or {}
 
         if "follow_redirects" not in p:
@@ -139,6 +155,7 @@ class Restful:
             return RestfulSession(
                 session=self._session,
                 model=rm,
+                auth=self._auth,
             )
 
         return create_rs

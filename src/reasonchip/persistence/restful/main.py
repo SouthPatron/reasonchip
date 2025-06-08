@@ -6,6 +6,8 @@ import asyncio
 from reasonchip.persistence.restful.restful import Restful
 from reasonchip.persistence.restful.models import RestfulModel
 
+from auth.django_restful_token import DjangoRestfulTokenAuth
+
 
 class PlayerModel(RestfulModel):
     _endpoint: typing.ClassVar[str] = "player"
@@ -19,11 +21,18 @@ async def main():
         "Accept": "application/json",
     }
 
+    auth = DjangoRestfulTokenAuth(
+        login_url="/auth/token",
+        username="reasonchip",
+        password="stupid password",
+    )
+
     restful = Restful(
         params={
             "base_url": url,
             "headers": headers,
-        }
+        },
+        auth=auth,
     )
 
     async with restful as rf:
