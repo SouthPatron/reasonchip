@@ -4,12 +4,16 @@ import typing
 import asyncio
 
 from reasonchip.persistence.restful.restful import Restful
-from reasonchip.persistence.restful.models import RestfulModel
+from reasonchip.persistence.restful.models import (
+    RestfulModel,
+    DefinedModel,
+    DynamicModel,
+)
 
 from auth.django_restful_token import DjangoRestfulTokenAuth
 
 
-class PlayerModel(RestfulModel):
+class PlayerModel(DynamicModel):
     _endpoint: typing.ClassVar[str] = "player"
 
 
@@ -37,9 +41,13 @@ async def main():
 
     async with restful as rf:
         rs = rf(PlayerModel)
-        model = await rs.get_page(page_no=1)
+        page = await rs.get_page(page_no=1)
 
-        print(f"MODEL ==== {model}")
+        print(f"PAGE ==== {page}")
+
+        if page:
+            for item in page.results:
+                print(f"ITEM ==== {item}")
 
 
 if __name__ == "__main__":

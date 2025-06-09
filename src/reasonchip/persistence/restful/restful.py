@@ -7,7 +7,11 @@ from pydantic import (
     Field,
 )
 from auth.auth_handler import AuthHandler
-from .models import RestfulModel
+from .models import (
+    RestfulModel,
+    DefinedModel,
+    DynamicModel,
+)
 
 from .inspector import Inspector
 
@@ -34,13 +38,24 @@ class RestfulSession:
         self._model: typing.Type[RestfulModel] = model
         self._auth: typing.Optional[AuthHandler] = auth
 
-    async def _get_model(self) -> typing.Optional[typing.Type[BaseModel]]:
+    async def _get_model(self) -> typing.Optional[typing.Type[RestfulModel]]:
+
+        # If it's a defined model, we don't need to inspect
+        if issubclass(self._model, DefinedModel):
+            return self._model
+
+        # Else it's a dynamic model and needs to be interpolated
         mod = await Inspector.inspect(
             session=self._session,
             model=self._model,
             auth=self._auth,
         )
-        return mod
+
+        # Absorb fields into a new subclass of DynamicModel
+        AbsorbedModel = type(
+            f"Absorbed{self._model.__name__}", (DynamicModel, mod), {}
+        )
+        return AbsorbedModel
 
     async def get_page(
         self,
@@ -95,12 +110,28 @@ class RestfulSession:
         mod = self._model
         endpoint = "/m/" + mod._endpoint + f"/{oid}/"
 
+        bm = await self._get_model()
+        if not bm:
+            raise RuntimeError(f"Unable to get model information: {mod}")
+
+        # Get the
         resp = await self._session.get(endpoint)
         if resp.status_code == 200:
-            rc = mod.model_validate(resp.content)
+            rc = bm.model_validate(resp.content)
             return rc
 
-        return None
+        # Handle authentication errors
+        if resp.status_code == 401 and self._auth:
+            await self._auth.on_forbidden(self._session)
+            return await self.load(oid=oid)
+
+        # Probably page not found
+        if resp.status_code == 404:
+            return None
+
+        raise RuntimeError(
+            f"Unable to get object: {mod}: {oid} {resp.status_code} - {resp.text}"
+        )
 
 
 class Restful:
