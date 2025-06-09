@@ -49,6 +49,11 @@ async def main():
             for item in page.results:
                 print(f"ITEM ==== {item}")
 
+                obj = await rs.load(item.id)
+
+                if obj:
+                    print(f"LOADED OBJECT ==== {obj}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

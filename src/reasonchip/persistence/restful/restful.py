@@ -114,10 +114,16 @@ class RestfulSession:
         if not bm:
             raise RuntimeError(f"Unable to get model information: {mod}")
 
-        # Get the
+        # Authentication
+        if self._auth:
+            await self._auth.on_request(self._session)
+
+        # Get the object
         resp = await self._session.get(endpoint)
+
+        # Successful retrieval
         if resp.status_code == 200:
-            rc = bm.model_validate(resp.content)
+            rc = bm.model_validate(resp.json())
             return rc
 
         # Handle authentication errors
