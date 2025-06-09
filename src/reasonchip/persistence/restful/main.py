@@ -37,9 +37,9 @@ async def main():
 
     async with restful as rf:
         rs = rf(PlayerModel)
-        model = await rs.inspect()
+        model = await rs.get_page(page_no=1)
 
-        print(f"Model = {model}")
+        print(f"MODEL ==== {model}")
 
 
 if __name__ == "__main__":

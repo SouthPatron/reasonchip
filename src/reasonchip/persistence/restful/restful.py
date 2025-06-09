@@ -2,73 +2,24 @@ import uuid
 import typing
 import httpx
 
-from datetime import datetime
-
 from pydantic import (
     BaseModel,
     Field,
-    create_model,
 )
-
 from auth.auth_handler import AuthHandler
 from .models import RestfulModel
 
+from .inspector import Inspector
 
-class RestfulResult(BaseModel):
+
+RRT = typing.TypeVar("RRT", bound=BaseModel)
+
+
+class RestfulResult(BaseModel, typing.Generic[RRT]):
     count: int
     next: typing.Optional[str] = None
     previous: typing.Optional[str] = None
-    results: typing.List[RestfulModel] = Field(default_factory=list)
-
-
-def generate_model_from_post_schema(
-    schema: typing.Dict[str, typing.Any],
-    model_name: str,
-) -> typing.Type[BaseModel]:
-
-    fields = {}
-
-    for field_name, meta in schema.items():
-
-        field_type: typing.Any
-        default: typing.Any = None
-
-        field_type = meta["type"]
-
-        if field_type == "string":
-            field_type = str
-
-        elif field_type == "datetime":
-            field_type = datetime
-
-        elif field_type == "choice":
-            field_type = str
-
-        else:
-            print(
-                f"Warning: Unsupported field type '{field_type}' for field '{field_name}' in model '{model_name}'"
-            )
-            assert (
-                False
-            ), f"Unsupported field type '{field_type}' for field '{field_name}' in model '{model_name}'"
-            field_type = typing.Any
-
-        # Optional if not required or read_only
-        if not meta.get("required", False) or meta.get("read_only", False):
-            field_type = typing.Optional[field_type]
-            default = None
-
-        # You could enhance this with constraints (max_length, choices, etc.)
-        fields[field_name] = (
-            field_type,
-            Field(
-                default=default,
-                description=meta.get("label", ""),
-            ),
-        )
-
-    model = create_model(model_name, **fields)
-    return model
+    results: typing.List[RRT] = Field(default_factory=list)
 
 
 class RestfulSession:
@@ -83,39 +34,58 @@ class RestfulSession:
         self._model: typing.Type[RestfulModel] = model
         self._auth: typing.Optional[AuthHandler] = auth
 
-    async def inspect(self):
+    async def _get_model(self) -> typing.Optional[typing.Type[BaseModel]]:
+        mod = await Inspector.inspect(
+            session=self._session,
+            model=self._model,
+            auth=self._auth,
+        )
+        return mod
+
+    async def get_page(
+        self,
+        page_no: int = 1,
+        page_size: int = 20,
+    ) -> typing.Optional[RestfulResult]:
+
         mod = self._model
         endpoint = "/m/" + mod._endpoint.rstrip("/") + "/"
 
-        async with self._session as client:
+        bm = await self._get_model()
+        if not bm:
+            raise RuntimeError(f"Unable to get model information: {mod}")
 
-            # Authentication
-            if self._auth:
-                await self._auth.on_request(client)
+        # Authentication
+        if self._auth:
+            await self._auth.on_request(self._session)
 
-            # Perform request
-            resp = await client.options(endpoint)
-            if resp.status_code != 200:
+        # Handle parameters
+        params = {"page": page_no, "page_size": page_size}
 
-                if resp.status_code == 401 and self._auth:
-                    await self._auth.on_forbidden(client)
-                    return await self.inspect()
+        # Perform request
+        resp = await self._session.get(endpoint, params=params)
+        if resp.status_code != 200:
 
-                raise RuntimeError("Unable to fetch OPTIONS")
+            # Handle authentication errors
+            if resp.status_code == 401 and self._auth:
+                await self._auth.on_forbidden(self._session)
+                return await self.get_page(
+                    page_no,
+                    page_size,
+                )
 
-            rc = resp.json()
+            # Probably page not found
+            if resp.status_code == 404:
+                return None
 
-            print(f"RC = {rc}")
-
-            post_schema = resp.json()["actions"]["POST"]
-            model_name = mod.__name__
-
-            new_model = generate_model_from_post_schema(
-                schema=post_schema,
-                model_name=model_name,
+            raise RuntimeError(
+                f"Unable to get page: {mod}: {resp.status_code} - {resp.text}"
             )
 
-            return new_model
+        rc = resp.json()
+
+        RestfulPageModel = RestfulResult[bm]
+        return RestfulPageModel.model_validate(rc)
 
     async def load(
         self,
@@ -125,13 +95,12 @@ class RestfulSession:
         mod = self._model
         endpoint = "/m/" + mod._endpoint + f"/{oid}/"
 
-        async with self._session as client:
-            resp = await client.get(endpoint)
-            if resp.status_code == 200:
-                rc = mod.model_validate(resp.content)
-                return rc
+        resp = await self._session.get(endpoint)
+        if resp.status_code == 200:
+            rc = mod.model_validate(resp.content)
+            return rc
 
-            return None
+        return None
 
 
 class Restful:
@@ -161,4 +130,4 @@ class Restful:
         return create_rs
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        pass
+        await self._session.aclose()
