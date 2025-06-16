@@ -58,6 +58,7 @@ class Inspector:
             model_name = model.__name__
 
             new_model = cls._model_from_schema(
+                model=model,
                 schema=post_schema,
                 model_name=model_name,
             )
@@ -68,14 +69,32 @@ class Inspector:
     @classmethod
     def _model_from_schema(
         cls,
+        model: typing.Type[RestfulModel],
         schema: typing.Dict[str, typing.Any],
         model_name: str,
     ) -> typing.Type[BaseModel]:
 
-        fields = {}
+        # Original fields take precedence over # generated fields
+        original_fields = model.model_fields
 
+        # Now merge the original fields with the generated fields
+        fields = {}
         for field_name, meta in schema.items():
 
+            # Check to see if it exists already
+            if field_name in original_fields:
+                f = original_fields[field_name]
+
+                fields[field_name] = (
+                    f.annotation,
+                    Field(
+                        default=f.default,
+                        description=meta.get("label", ""),
+                    ),
+                )
+                continue
+
+            # Create it
             field_type: typing.Any
             default: typing.Any = None
 
@@ -84,6 +103,9 @@ class Inspector:
             if field_type == "string":
                 field_type = str
 
+            elif field_type == "boolean":
+                field_type = bool
+
             elif field_type == "datetime":
                 field_type = datetime
 
@@ -91,6 +113,11 @@ class Inspector:
                 field_type = str
 
             else:
+
+                print(f"========= BEGIN: SCHEMA ============")
+                print(schema)
+                print(f"========= END: SCHEMA ==============")
+
                 print(
                     f"Warning: Unsupported field type '{field_type}' for field '{field_name}' in model '{model_name}'"
                 )
@@ -113,5 +140,5 @@ class Inspector:
                 ),
             )
 
-        model = create_model(model_name, **fields)
-        return model
+        m = create_model(model_name, **fields)
+        return m
