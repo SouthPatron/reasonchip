@@ -14,6 +14,7 @@ from .models import (
 )
 
 from .inspector import Inspector
+from .query import Query
 
 
 RRT = typing.TypeVar("RRT", bound=BaseModel)
@@ -38,31 +39,11 @@ class RestfulSession:
         self._model: typing.Type[RestfulModel] = model
         self._auth: typing.Optional[AuthHandler] = auth
 
-    async def _get_model(self) -> typing.Optional[typing.Type[RestfulModel]]:
-
-        # If it's a defined model, we don't need to inspect
-        if issubclass(self._model, DefinedModel):
-            return self._model
-
-        # Else it's a dynamic model and needs to be interpolated
-        mod = await Inspector.inspect(
-            session=self._session,
-            model=self._model,
-            auth=self._auth,
-        )
-
-        # Absorb fields into a new subclass of DynamicModel
-        AbsorbedModel = type(
-            f"Absorbed{self._model.__name__}", (DynamicModel, mod), {}
-        )
-        return AbsorbedModel
-
     # ---------------------------- LISTING -----------------------------------
 
-    async def get_page(
+    async def filter(
         self,
-        page_no: int = 1,
-        page_size: int = 20,
+        query: typing.Optional[Query] = None,
     ) -> typing.Optional[RestfulResult]:
 
         mod = self._model
@@ -72,37 +53,28 @@ class RestfulSession:
         if not bm:
             raise RuntimeError(f"Unable to get model information: {mod}")
 
-        # Authentication
         if self._auth:
             await self._auth.on_request(self._session)
 
-        # Handle parameters
-        params = {"page": page_no, "page_size": page_size}
+        params = query.to_params() if query else {}
 
-        # Perform request
         resp = await self._session.get(endpoint, params=params)
-        if resp.status_code != 200:
 
-            # Handle authentication errors
-            if resp.status_code == 401 and self._auth:
-                await self._auth.on_forbidden(self._session)
-                return await self.get_page(
-                    page_no,
-                    page_size,
-                )
+        if resp.status_code == 200:
+            rc = resp.json()
+            RestfulPageModel = RestfulResult[bm]
+            return RestfulPageModel.model_validate(rc)
 
-            # Probably page not found
-            if resp.status_code == 404:
-                return None
+        if resp.status_code == 401 and self._auth:
+            await self._auth.on_forbidden(self._session)
+            return await self.filter(query=query)
 
-            raise RuntimeError(
-                f"Unable to get page: {mod}: {resp.status_code} - {resp.text}"
-            )
+        if resp.status_code == 404:
+            return None
 
-        rc = resp.json()
-
-        RestfulPageModel = RestfulResult[bm]
-        return RestfulPageModel.model_validate(rc)
+        raise RuntimeError(
+            f"Unable to filter: {mod}: {resp.status_code} - {resp.text}"
+        )
 
     # ---------------------------- CRUD --------------------------------------
 
@@ -233,6 +205,27 @@ class RestfulSession:
         raise RuntimeError(
             f"Unable to delete object: {mod}: {oid} {resp.status_code} - {resp.text}"
         )
+
+    # ---------------------------- PRIVATES ----------------------------------
+
+    async def _get_model(self) -> typing.Optional[typing.Type[RestfulModel]]:
+
+        # If it's a defined model, we don't need to inspect
+        if issubclass(self._model, DefinedModel):
+            return self._model
+
+        # Else it's a dynamic model and needs to be interpolated
+        mod = await Inspector.inspect(
+            session=self._session,
+            model=self._model,
+            auth=self._auth,
+        )
+
+        # Absorb fields into a new subclass of DynamicModel
+        AbsorbedModel = type(
+            f"Absorbed{self._model.__name__}", (DynamicModel, mod), {}
+        )
+        return AbsorbedModel
 
 
 class Restful:

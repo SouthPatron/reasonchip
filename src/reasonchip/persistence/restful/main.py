@@ -41,7 +41,7 @@ async def main():
 
     async with restful as rf:
         rs = rf(PlayerModel)
-        page = await rs.get_page(page_no=1)
+        page = await rs.filter()
 
         print(f"PAGE ==== {page}")
 
