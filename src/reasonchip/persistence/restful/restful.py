@@ -57,6 +57,8 @@ class RestfulSession:
         )
         return AbsorbedModel
 
+    # ---------------------------- LISTING -----------------------------------
+
     async def get_page(
         self,
         page_no: int = 1,
@@ -102,13 +104,46 @@ class RestfulSession:
         RestfulPageModel = RestfulResult[bm]
         return RestfulPageModel.model_validate(rc)
 
+    # ---------------------------- CRUD --------------------------------------
+
+    async def create(
+        self,
+        data: typing.Union[RestfulModel, dict],
+    ) -> typing.Optional[RestfulModel]:
+
+        mod = self._model
+        endpoint = "/m/" + mod._endpoint.rstrip("/") + "/"
+
+        bm = await self._get_model()
+        if not bm:
+            raise RuntimeError(f"Unable to get model information: {mod}")
+
+        # Authentication
+        if self._auth:
+            await self._auth.on_request(self._session)
+
+        payload = data.model_dump() if isinstance(data, BaseModel) else data
+
+        resp = await self._session.post(endpoint, json=payload)
+
+        if resp.status_code == 201:
+            return bm.model_validate(resp.json())
+
+        if resp.status_code == 401 and self._auth:
+            await self._auth.on_forbidden(self._session)
+            return await self.create(data=data)
+
+        raise RuntimeError(
+            f"Unable to create object: {mod}: {resp.status_code} - {resp.text}"
+        )
+
     async def load(
         self,
         oid: uuid.UUID,
     ) -> typing.Optional[RestfulModel]:
 
         mod = self._model
-        endpoint = "/m/" + mod._endpoint + f"/{oid}/"
+        endpoint = "/m/" + mod._endpoint.rstrip("/") + f"/{oid}/"
 
         bm = await self._get_model()
         if not bm:
@@ -137,6 +172,66 @@ class RestfulSession:
 
         raise RuntimeError(
             f"Unable to get object: {mod}: {oid} {resp.status_code} - {resp.text}"
+        )
+
+    async def update(
+        self,
+        oid: uuid.UUID,
+        data: typing.Union[RestfulModel, dict],
+    ) -> typing.Optional[RestfulModel]:
+
+        mod = self._model
+        endpoint = "/m/" + mod._endpoint.rstrip("/") + f"/{oid}/"
+
+        bm = await self._get_model()
+        if not bm:
+            raise RuntimeError(f"Unable to get model information: {mod}")
+
+        # Authentication
+        if self._auth:
+            await self._auth.on_request(self._session)
+
+        payload = data.model_dump() if isinstance(data, BaseModel) else data
+
+        resp = await self._session.put(endpoint, json=payload)
+
+        if resp.status_code == 200:
+            return bm.model_validate(resp.json())
+
+        if resp.status_code == 401 and self._auth:
+            await self._auth.on_forbidden(self._session)
+            return await self.update(oid=oid, data=data)
+
+        raise RuntimeError(
+            f"Unable to update object: {mod}: {oid} {resp.status_code} - {resp.text}"
+        )
+
+    async def delete(
+        self,
+        oid: uuid.UUID,
+    ) -> bool:
+
+        mod = self._model
+        endpoint = "/m/" + mod._endpoint.rstrip("/") + f"/{oid}/"
+
+        # Authentication
+        if self._auth:
+            await self._auth.on_request(self._session)
+
+        resp = await self._session.delete(endpoint)
+
+        if resp.status_code == 204:
+            return True
+
+        if resp.status_code == 401 and self._auth:
+            await self._auth.on_forbidden(self._session)
+            return await self.delete(oid=oid)
+
+        if resp.status_code == 404:
+            return False
+
+        raise RuntimeError(
+            f"Unable to delete object: {mod}: {oid} {resp.status_code} - {resp.text}"
         )
 
 
