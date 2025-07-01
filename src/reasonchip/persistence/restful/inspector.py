@@ -14,26 +14,23 @@ from .models import RestfulModel
 
 class Inspector:
 
-    _lock: asyncio.Lock = asyncio.Lock()
-    _registry: typing.Dict[str, typing.Type[BaseModel]] = {}
+    def __init__(self):
+        self._lock: asyncio.Lock = asyncio.Lock()
+        self._registry: typing.Dict[str, typing.Type[BaseModel]] = {}
 
-    def __new__(cls, *args, **kwargs):
-        raise RuntimeError("Inspector is singleton.")
-
-    @classmethod
     async def inspect(
-        cls,
+        self,
         session: httpx.AsyncClient,
         model: typing.Type[RestfulModel],
         auth: typing.Optional[AuthHandler] = None,
     ):
 
-        async with cls._lock:
+        async with self._lock:
 
             # Check for local cache
             key_name = model.__name__
-            if key_name in cls._registry:
-                return Inspector._registry[key_name]
+            if key_name in self._registry:
+                return self._registry[key_name]
 
             # The remote needs to be inspected and a model generated.
             endpoint = "/m/" + model._endpoint.rstrip("/") + "/"
@@ -48,7 +45,7 @@ class Inspector:
 
                 if resp.status_code == 401 and auth:
                     await auth.on_forbidden(session)
-                    return await cls.inspect(session, model, auth)
+                    return await self.inspect(session, model, auth)
 
                 raise RuntimeError("Unable to fetch OPTIONS")
 
@@ -57,18 +54,17 @@ class Inspector:
             post_schema = rc["actions"]["POST"]
             model_name = model.__name__
 
-            new_model = cls._model_from_schema(
+            new_model = self._model_from_schema(
                 model=model,
                 schema=post_schema,
                 model_name=model_name,
             )
 
-            Inspector._registry[key_name] = new_model
+            self._registry[key_name] = new_model
             return new_model
 
-    @classmethod
     def _model_from_schema(
-        cls,
+        self,
         model: typing.Type[RestfulModel],
         schema: typing.Dict[str, typing.Any],
         model_name: str,

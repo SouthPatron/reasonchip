@@ -32,10 +32,12 @@ class RestfulSession:
     def __init__(
         self,
         session: httpx.AsyncClient,
+        inspector: Inspector,
         model: typing.Type[RestfulModel],
         auth: typing.Optional[AuthHandler] = None,
     ):
         self._session: httpx.AsyncClient = session
+        self._inspector: Inspector = inspector
         self._model: typing.Type[RestfulModel] = model
         self._auth: typing.Optional[AuthHandler] = auth
 
@@ -215,7 +217,7 @@ class RestfulSession:
             return self._model
 
         # Else it's a dynamic model and needs to be interpolated
-        mod = await Inspector.inspect(
+        mod = await self._inspector.inspect(
             session=self._session,
             model=self._model,
             auth=self._auth,
@@ -236,6 +238,7 @@ class Restful:
         auth: typing.Optional[AuthHandler] = None,
     ):
         self._auth: typing.Optional[AuthHandler] = auth
+        self._inspector: Inspector = Inspector()
 
         p = params or {}
 
@@ -248,6 +251,7 @@ class Restful:
         def create_rs(rm: typing.Type[RestfulModel]) -> RestfulSession:
             return RestfulSession(
                 session=self._session,
+                inspector=self._inspector,
                 model=rm,
                 auth=self._auth,
             )

@@ -16,82 +16,32 @@ from reasonchip.persistence.restful.models import (
 from auth.django_restful_token import DjangoRestfulTokenAuth
 
 
-class PlayerModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "player"
+# Models
+
+
+class CountryModel(DynamicModel):
+    _endpoint: typing.ClassVar[str] = "country"
 
     id: typing.Optional[uuid.UUID] = None
 
 
-class MessageModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "message"
-
-    id: typing.Optional[uuid.UUID] = None
-
-    player: Relationship[PlayerModel] = relationship(PlayerModel)
-
-
-class GameModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "game"
+class CountryShapeModel(DynamicModel):
+    _endpoint: typing.ClassVar[str] = "country_shape"
 
     id: typing.Optional[uuid.UUID] = None
 
 
-class GameThreadModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "game_thread"
+class CountryRelationshipModel(DynamicModel):
+    _endpoint: typing.ClassVar[str] = "country_relationship"
 
     id: typing.Optional[uuid.UUID] = None
 
 
-class LocationModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "location"
-
-    id: typing.Optional[uuid.UUID] = None
-
-
-class LocationThreadModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "location_thread"
-
-    id: typing.Optional[uuid.UUID] = None
-
-
-class LocationSnapshotModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "location_snapshot"
-
-    id: typing.Optional[uuid.UUID] = None
-
-
-class CharacterModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "character"
-
-    id: typing.Optional[uuid.UUID] = None
-
-
-class CharacterProfileModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "character_profile"
-
-    id: typing.Optional[uuid.UUID] = None
-
-
-class CharacterThreadModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "character_thread"
-
-    id: typing.Optional[uuid.UUID] = None
-
-
-class PlayerAssociationModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "player_association"
-
-    id: typing.Optional[uuid.UUID] = None
-
-
-class GameConditionModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "game_condition"
-
-    id: typing.Optional[uuid.UUID] = None
+# *************************** MAIN *******************************************
 
 
 async def main():
-    url = "http://127.0.0.1:8000/restful/"
+    url = "http://127.0.0.1:8000/api/restful/"
     url = url.rstrip("/")
 
     headers = {
@@ -113,18 +63,9 @@ async def main():
     )
 
     models = [
-        PlayerModel,
-        MessageModel,
-        GameModel,
-        GameThreadModel,
-        LocationModel,
-        LocationThreadModel,
-        LocationSnapshotModel,
-        CharacterModel,
-        CharacterProfileModel,
-        CharacterThreadModel,
-        PlayerAssociationModel,
-        GameConditionModel,
+        CountryModel,
+        CountryShapeModel,
+        CountryRelationshipModel,
     ]
 
     async with restful as rf:
