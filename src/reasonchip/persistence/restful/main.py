@@ -6,33 +6,32 @@ import uuid
 
 from reasonchip.persistence.restful.restful import Restful
 from reasonchip.persistence.restful.models import (
-    RestfulModel,
-    DefinedModel,
     DynamicModel,
-    Relationship,
-    relationship,
 )
 
 from auth.django_restful_token import DjangoRestfulTokenAuth
 
 
-# Models
+# *************************** MODELS *****************************************
 
 
 class CountryModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "country"
+    _endpoint: typing.ClassVar[str] = "m/country"
+    _field_name: typing.ClassVar[typing.Optional[str]] = "country"
 
     id: typing.Optional[uuid.UUID] = None
 
 
 class CountryShapeModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "country_shape"
+    _endpoint: typing.ClassVar[str] = "m/country_shape"
+    _field_name: typing.ClassVar[typing.Optional[str]] = "country_shape"
 
     id: typing.Optional[uuid.UUID] = None
 
 
 class CountryRelationshipModel(DynamicModel):
-    _endpoint: typing.ClassVar[str] = "country_relationship"
+    _endpoint: typing.ClassVar[str] = "m/country_relationship"
+    _field_name: typing.ClassVar[typing.Optional[str]] = "country_relationship"
 
     id: typing.Optional[uuid.UUID] = None
 
@@ -54,42 +53,22 @@ async def main():
         password="stupid password",
     )
 
-    restful = Restful(
-        params={
-            "base_url": url,
-            "headers": headers,
-        },
-        auth=auth,
-    )
-
     models = [
         CountryModel,
         CountryShapeModel,
         CountryRelationshipModel,
     ]
 
-    async with restful as rf:
+    restful = Restful(
+        params={
+            "base_url": url,
+            "headers": headers,
+        },
+        auth=auth,
+        models=models,
+    )
 
-        for m in models:
-
-            print(f"=========================== {m} =========================")
-
-            rs = rf(m)
-            page = await rs.filter()
-
-            print("====== PAGE =============")
-            print(page)
-            print("====== END OF PAGE ======")
-
-            if page:
-                for item in page.results:
-                    print("ITEM:")
-                    print(item)
-                    obj = await rs.load(item.id)
-
-                    if obj:
-                        print("OBJECT")
-                        print(obj)
+    await restful.init()
 
 
 if __name__ == "__main__":

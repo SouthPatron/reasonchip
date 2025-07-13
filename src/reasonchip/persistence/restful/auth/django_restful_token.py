@@ -1,4 +1,5 @@
 import typing
+import asyncio
 
 from httpx import AsyncClient, Response
 
@@ -18,6 +19,7 @@ class DjangoRestfulTokenAuth(AuthHandler):
         self._username = username
         self._password = password
         self._token: typing.Optional[str] = None
+        self._lock = asyncio.Lock()
 
     async def login(self, client: AsyncClient):
         try:
@@ -43,15 +45,15 @@ class DjangoRestfulTokenAuth(AuthHandler):
         self._token = None  # Clear the token before logout
 
     async def on_request(self, client: AsyncClient):
-        # If client doesn't already have the token, fetch it.
-        if not self._token:
-            await self.login(client)
+        async with self._lock:
+            # If client doesn't already have the token, fetch it.
+            if not self._token:
+                await self.login(client)
 
-        # Set the Authorization header with the token.
-        client.headers["Authorization"] = f"Token {self._token}"
+            # Set the Authorization header with the token.
+            client.headers["Authorization"] = f"Token {self._token}"
 
     async def on_forbidden(self, client: AsyncClient):
-        await self.login(client)
-
-        # Set the Authorization header with the token.
-        client.headers["Authorization"] = f"Token {self._token}"
+        async with self._lock:
+            await self.login(client)
+            client.headers["Authorization"] = f"Token {self._token}"

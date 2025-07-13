@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 class RestfulModel(BaseModel):
     _endpoint: typing.ClassVar[str]
+    _field_name: typing.ClassVar[typing.Optional[str]] = None
 
 
 class DefinedModel(RestfulModel):

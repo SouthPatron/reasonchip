@@ -1,244 +1,23 @@
-import uuid
 import typing
 import httpx
 
-from pydantic import (
-    BaseModel,
-    Field,
-)
-from auth.auth_handler import AuthHandler
-from .models import (
-    RestfulModel,
-    DefinedModel,
-    DynamicModel,
-)
+from .models import RestfulModel
+from .auth.auth_handler import AuthHandler
+from .resolver import Resolver
 
-from .inspector import Inspector
-from .query import Query
-
-
-RRT = typing.TypeVar("RRT", bound=BaseModel)
-
-
-class RestfulResult(BaseModel, typing.Generic[RRT]):
-    count: int
-    next: typing.Optional[str] = None
-    previous: typing.Optional[str] = None
-    results: typing.List[RRT] = Field(default_factory=list)
-
-
-class RestfulSession:
-
-    def __init__(
-        self,
-        session: httpx.AsyncClient,
-        inspector: Inspector,
-        model: typing.Type[RestfulModel],
-        auth: typing.Optional[AuthHandler] = None,
-    ):
-        self._session: httpx.AsyncClient = session
-        self._inspector: Inspector = inspector
-        self._model: typing.Type[RestfulModel] = model
-        self._auth: typing.Optional[AuthHandler] = auth
-
-    # ---------------------------- LISTING -----------------------------------
-
-    async def filter(
-        self,
-        query: typing.Optional[Query] = None,
-    ) -> typing.Optional[RestfulResult]:
-
-        mod = self._model
-        endpoint = "/m/" + mod._endpoint.rstrip("/") + "/"
-
-        bm = await self._get_model()
-        if not bm:
-            raise RuntimeError(f"Unable to get model information: {mod}")
-
-        if self._auth:
-            await self._auth.on_request(self._session)
-
-        params = query.to_params() if query else {}
-
-        resp = await self._session.get(endpoint, params=params)
-
-        if resp.status_code == 200:
-            rc = resp.json()
-            RestfulPageModel = RestfulResult[bm]
-            return RestfulPageModel.model_validate(rc)
-
-        if resp.status_code == 401 and self._auth:
-            await self._auth.on_forbidden(self._session)
-            return await self.filter(query=query)
-
-        if resp.status_code == 404:
-            return None
-
-        raise RuntimeError(
-            f"Unable to filter: {mod}: {resp.status_code} - {resp.text}"
-        )
-
-    # ---------------------------- CRUD --------------------------------------
-
-    async def create(
-        self,
-        data: typing.Union[RestfulModel, dict],
-    ) -> typing.Optional[RestfulModel]:
-
-        mod = self._model
-        endpoint = "/m/" + mod._endpoint.rstrip("/") + "/"
-
-        bm = await self._get_model()
-        if not bm:
-            raise RuntimeError(f"Unable to get model information: {mod}")
-
-        # Authentication
-        if self._auth:
-            await self._auth.on_request(self._session)
-
-        payload = data.model_dump() if isinstance(data, BaseModel) else data
-
-        resp = await self._session.post(endpoint, json=payload)
-
-        if resp.status_code == 201:
-            return bm.model_validate(resp.json())
-
-        if resp.status_code == 401 and self._auth:
-            await self._auth.on_forbidden(self._session)
-            return await self.create(data=data)
-
-        raise RuntimeError(
-            f"Unable to create object: {mod}: {resp.status_code} - {resp.text}"
-        )
-
-    async def load(
-        self,
-        oid: uuid.UUID,
-    ) -> typing.Optional[RestfulModel]:
-
-        mod = self._model
-        endpoint = "/m/" + mod._endpoint.rstrip("/") + f"/{oid}/"
-
-        bm = await self._get_model()
-        if not bm:
-            raise RuntimeError(f"Unable to get model information: {mod}")
-
-        # Authentication
-        if self._auth:
-            await self._auth.on_request(self._session)
-
-        # Get the object
-        resp = await self._session.get(endpoint)
-
-        # Successful retrieval
-        if resp.status_code == 200:
-            rc = bm.model_validate(resp.json())
-            return rc
-
-        # Handle authentication errors
-        if resp.status_code == 401 and self._auth:
-            await self._auth.on_forbidden(self._session)
-            return await self.load(oid=oid)
-
-        # Probably page not found
-        if resp.status_code == 404:
-            return None
-
-        raise RuntimeError(
-            f"Unable to get object: {mod}: {oid} {resp.status_code} - {resp.text}"
-        )
-
-    async def update(
-        self,
-        oid: uuid.UUID,
-        data: typing.Union[RestfulModel, dict],
-    ) -> typing.Optional[RestfulModel]:
-
-        mod = self._model
-        endpoint = "/m/" + mod._endpoint.rstrip("/") + f"/{oid}/"
-
-        bm = await self._get_model()
-        if not bm:
-            raise RuntimeError(f"Unable to get model information: {mod}")
-
-        # Authentication
-        if self._auth:
-            await self._auth.on_request(self._session)
-
-        payload = data.model_dump() if isinstance(data, BaseModel) else data
-
-        resp = await self._session.put(endpoint, json=payload)
-
-        if resp.status_code == 200:
-            return bm.model_validate(resp.json())
-
-        if resp.status_code == 401 and self._auth:
-            await self._auth.on_forbidden(self._session)
-            return await self.update(oid=oid, data=data)
-
-        raise RuntimeError(
-            f"Unable to update object: {mod}: {oid} {resp.status_code} - {resp.text}"
-        )
-
-    async def delete(
-        self,
-        oid: uuid.UUID,
-    ) -> bool:
-
-        mod = self._model
-        endpoint = "/m/" + mod._endpoint.rstrip("/") + f"/{oid}/"
-
-        # Authentication
-        if self._auth:
-            await self._auth.on_request(self._session)
-
-        resp = await self._session.delete(endpoint)
-
-        if resp.status_code == 204:
-            return True
-
-        if resp.status_code == 401 and self._auth:
-            await self._auth.on_forbidden(self._session)
-            return await self.delete(oid=oid)
-
-        if resp.status_code == 404:
-            return False
-
-        raise RuntimeError(
-            f"Unable to delete object: {mod}: {oid} {resp.status_code} - {resp.text}"
-        )
-
-    # ---------------------------- PRIVATES ----------------------------------
-
-    async def _get_model(self) -> typing.Optional[typing.Type[RestfulModel]]:
-
-        # If it's a defined model, we don't need to inspect
-        if issubclass(self._model, DefinedModel):
-            return self._model
-
-        # Else it's a dynamic model and needs to be interpolated
-        mod = await self._inspector.inspect(
-            session=self._session,
-            model=self._model,
-            auth=self._auth,
-        )
-
-        # Absorb fields into a new subclass of DynamicModel
-        AbsorbedModel = type(
-            f"Absorbed{self._model.__name__}", (DynamicModel, mod), {}
-        )
-        return AbsorbedModel
+from .restful_session import RestfulSession
 
 
 class Restful:
 
     def __init__(
         self,
+        models: typing.List[typing.Type[RestfulModel]],
         params: typing.Optional[typing.Dict[str, typing.Any]] = None,
         auth: typing.Optional[AuthHandler] = None,
     ):
         self._auth: typing.Optional[AuthHandler] = auth
-        self._inspector: Inspector = Inspector()
+        self._resolver: Resolver = Resolver(models)
 
         p = params or {}
 
@@ -248,15 +27,20 @@ class Restful:
         self._session = httpx.AsyncClient(**p)
 
     async def __aenter__(self):
-        def create_rs(rm: typing.Type[RestfulModel]) -> RestfulSession:
-            return RestfulSession(
-                session=self._session,
-                inspector=self._inspector,
-                model=rm,
-                auth=self._auth,
-            )
-
-        return create_rs
+        return RestfulSession(
+            session=self._session,
+            resolver=self._resolver,
+            auth=self._auth,
+        )
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         await self._session.aclose()
+
+    # ---------------------- METHODS -----------------------------------------
+
+    async def init(self) -> None:
+        # Initialize all the models by the resolver
+        await self._resolver.init(
+            session=self._session,
+            auth=self._auth,
+        )

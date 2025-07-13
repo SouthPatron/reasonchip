@@ -2,6 +2,8 @@ import typing
 import httpx
 import asyncio
 
+from dataclasses import dataclass
+
 from datetime import datetime
 from pydantic import (
     BaseModel,
@@ -9,31 +11,96 @@ from pydantic import (
     create_model,
 )
 from auth.auth_handler import AuthHandler
-from .models import RestfulModel
+from .models import (
+    RestfulModel,
+    DefinedModel,
+    DynamicModel,
+)
 
 
-class Inspector:
+@dataclass
+class ModelInfo:
+    model: typing.Type[RestfulModel]
+    inspected_model: typing.Optional[typing.Type[RestfulModel]] = None
 
-    def __init__(self):
+
+class Resolver:
+
+    def __init__(
+        self,
+        models: typing.List[typing.Type[RestfulModel]],
+    ):
         self._lock: asyncio.Lock = asyncio.Lock()
-        self._registry: typing.Dict[str, typing.Type[BaseModel]] = {}
+        self._registry: typing.Dict[str, ModelInfo] = {}
 
-    async def inspect(
+        for x in models:
+            field_name = x._field_name if x._field_name else x._endpoint
+            assert (
+                field_name not in self._registry
+            ), f"Model '{field_name}' already exists in registry."
+            self._registry[field_name] = ModelInfo(model=x)
+
+    @property
+    def models(self) -> typing.Dict[str, typing.Type[RestfulModel]]:
+        rc = {}
+
+        for k, v in self._registry.items():
+            assert v.inspected_model, "Init was not called before use."
+            rc[k] = v
+
+        return rc
+
+    # ----------------- INITIALIZATION --------------------------------------
+
+    async def init(
         self,
         session: httpx.AsyncClient,
-        model: typing.Type[RestfulModel],
+        auth: typing.Optional[AuthHandler] = None,
+    ):
+        for k, _ in self._registry.items():
+            await self._inspect(
+                session,
+                field_name=k,
+                auth=auth,
+            )
+
+    def get_model(self, field_name: str):
+        assert (
+            field_name in self._registry
+        ), f"Model '{field_name}' not found in registry."
+        return self.models[field_name]
+
+    # ----------------- INSPECTION ------------------------------------------
+
+    async def _inspect(
+        self,
+        session: httpx.AsyncClient,
+        field_name: str,
         auth: typing.Optional[AuthHandler] = None,
     ):
 
         async with self._lock:
 
             # Check for local cache
-            key_name = model.__name__
-            if key_name in self._registry:
-                return self._registry[key_name]
+            if field_name not in self._registry:
+                raise RuntimeError(
+                    f"Model '{field_name}' not found in registry."
+                )
+
+            # Check if already inspected
+            entry = self._registry[field_name]
+            if entry.inspected_model:
+                return entry.inspected_model
+
+            # If it's a DefinedModel, it is exactly what is says it is.
+            if isinstance(entry.model, DefinedModel):
+                entry.inspected_model = entry.model
+                return entry.inspected_model
 
             # The remote needs to be inspected and a model generated.
-            endpoint = "/m/" + model._endpoint.rstrip("/") + "/"
+            model = entry.model
+
+            endpoint = model._endpoint.strip("/") + "/"
 
             # Authentication
             if auth:
@@ -45,7 +112,7 @@ class Inspector:
 
                 if resp.status_code == 401 and auth:
                     await auth.on_forbidden(session)
-                    return await self.inspect(session, model, auth)
+                    return await self._inspect(session, field_name, auth)
 
                 raise RuntimeError("Unable to fetch OPTIONS")
 
@@ -60,8 +127,10 @@ class Inspector:
                 model_name=model_name,
             )
 
-            self._registry[key_name] = new_model
-            return new_model
+            self._registry[field_name] = ModelInfo(
+                model=model,
+                inspected_model=new_model,
+            )
 
     def _model_from_schema(
         self,
