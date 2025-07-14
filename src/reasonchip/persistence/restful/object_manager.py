@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 
 from .models import RestfulModel
 from .auth.auth_handler import AuthHandler
-from .resolver import Resolver
 from .query import Query
 
 
@@ -25,11 +24,11 @@ class ObjectManager:
     def __init__(
         self,
         session: httpx.AsyncClient,
-        resolver: Resolver,
+        model: typing.Type[RestfulModel],
         auth: typing.Optional[AuthHandler] = None,
     ):
         self._session: httpx.AsyncClient = session
-        self._resolver: Resolver = resolver
+        self._model: typing.Type[RestfulModel] = model
         self._auth: typing.Optional[AuthHandler] = auth
 
     # ---------------------------- LISTING -----------------------------------
@@ -40,11 +39,7 @@ class ObjectManager:
     ) -> typing.Optional[RestfulResult]:
 
         mod = self._model
-        endpoint = "/m/" + mod._endpoint.rstrip("/") + "/"
-
-        bm = await self._get_model()
-        if not bm:
-            raise RuntimeError(f"Unable to get model information: {mod}")
+        endpoint = mod._endpoint.strip("/") + "/"
 
         if self._auth:
             await self._auth.on_request(self._session)
@@ -55,7 +50,11 @@ class ObjectManager:
 
         if resp.status_code == 200:
             rc = resp.json()
-            RestfulPageModel = RestfulResult[bm]
+            from pprint import pprint
+
+            pprint(rc)
+
+            RestfulPageModel = RestfulResult[mod]
             return RestfulPageModel.model_validate(rc)
 
         if resp.status_code == 401 and self._auth:
@@ -77,11 +76,7 @@ class ObjectManager:
     ) -> typing.Optional[RestfulModel]:
 
         mod = self._model
-        endpoint = "/m/" + mod._endpoint.rstrip("/") + "/"
-
-        bm = await self._get_model()
-        if not bm:
-            raise RuntimeError(f"Unable to get model information: {mod}")
+        endpoint = mod._endpoint.strip("/") + "/"
 
         # Authentication
         if self._auth:
@@ -92,7 +87,7 @@ class ObjectManager:
         resp = await self._session.post(endpoint, json=payload)
 
         if resp.status_code == 201:
-            return bm.model_validate(resp.json())
+            return mod.model_validate(resp.json())
 
         if resp.status_code == 401 and self._auth:
             await self._auth.on_forbidden(self._session)
@@ -108,11 +103,7 @@ class ObjectManager:
     ) -> typing.Optional[RestfulModel]:
 
         mod = self._model
-        endpoint = "/m/" + mod._endpoint.rstrip("/") + f"/{oid}/"
-
-        bm = await self._get_model()
-        if not bm:
-            raise RuntimeError(f"Unable to get model information: {mod}")
+        endpoint = mod._endpoint.strip("/") + f"/{oid}/"
 
         # Authentication
         if self._auth:
@@ -123,7 +114,7 @@ class ObjectManager:
 
         # Successful retrieval
         if resp.status_code == 200:
-            rc = bm.model_validate(resp.json())
+            rc = mod.model_validate(resp.json())
             return rc
 
         # Handle authentication errors
@@ -146,11 +137,7 @@ class ObjectManager:
     ) -> typing.Optional[RestfulModel]:
 
         mod = self._model
-        endpoint = "/m/" + mod._endpoint.rstrip("/") + f"/{oid}/"
-
-        bm = await self._get_model()
-        if not bm:
-            raise RuntimeError(f"Unable to get model information: {mod}")
+        endpoint = mod._endpoint.strip("/") + f"/{oid}/"
 
         # Authentication
         if self._auth:
@@ -161,7 +148,7 @@ class ObjectManager:
         resp = await self._session.put(endpoint, json=payload)
 
         if resp.status_code == 200:
-            return bm.model_validate(resp.json())
+            return mod.model_validate(resp.json())
 
         if resp.status_code == 401 and self._auth:
             await self._auth.on_forbidden(self._session)
@@ -177,7 +164,7 @@ class ObjectManager:
     ) -> bool:
 
         mod = self._model
-        endpoint = "/m/" + mod._endpoint.rstrip("/") + f"/{oid}/"
+        endpoint = mod._endpoint.strip("/") + f"/{oid}/"
 
         # Authentication
         if self._auth:

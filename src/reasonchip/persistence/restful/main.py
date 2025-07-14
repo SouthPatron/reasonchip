@@ -7,6 +7,8 @@ import uuid
 from reasonchip.persistence.restful.restful import Restful
 from reasonchip.persistence.restful.models import (
     DynamicModel,
+    Relationship,
+    relationship,
 )
 
 from auth.django_restful_token import DjangoRestfulTokenAuth
@@ -27,6 +29,7 @@ class CountryShapeModel(DynamicModel):
     _field_name: typing.ClassVar[typing.Optional[str]] = "country_shape"
 
     id: typing.Optional[uuid.UUID] = None
+    country: typing.Optional[uuid.UUID] = None
 
 
 class CountryRelationshipModel(DynamicModel):
@@ -34,6 +37,8 @@ class CountryRelationshipModel(DynamicModel):
     _field_name: typing.ClassVar[typing.Optional[str]] = "country_relationship"
 
     id: typing.Optional[uuid.UUID] = None
+    country: typing.Optional[uuid.UUID] = None
+    foreign_country: typing.Optional[CountryModel] = relationship()
 
 
 # *************************** MAIN *******************************************
@@ -69,6 +74,37 @@ async def main():
     )
 
     await restful.init()
+
+    # -----------------------------------------------------------------------
+
+    async with restful as rf:
+
+        # Countries
+        countries = rf.objects.country
+        rc = await countries.filter()
+        if not rc:
+            print("No countries found...")
+        else:
+            for c in rc:
+                print(c)
+
+        # Country Shapes
+        shapes = rf.objects.country_shape
+        rc = await shapes.filter()
+        if not rc:
+            print("No country shapes found...")
+        else:
+            for c in rc:
+                print(c)
+
+        # Country Relationship
+        relationships = rf.objects.country_relationship
+        rc = await relationships.filter()
+        if not rc:
+            print("No country relationships found...")
+        else:
+            for c in rc:
+                print(c)
 
 
 if __name__ == "__main__":

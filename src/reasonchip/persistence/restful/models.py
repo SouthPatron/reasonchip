@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import typing
 
+from dataclasses import dataclass
+
 from pydantic import BaseModel
+
+# --------------------------- MODELS ----------------------------------------
 
 
 class RestfulModel(BaseModel):
@@ -18,20 +22,27 @@ class DynamicModel(RestfulModel):
     pass
 
 
-T = typing.TypeVar("T", bound="RestfulModel")
+# -------------------------- RELATIONSHIPS ----------------------------------
 
 
-class Relationship(typing.Generic[T]):
-    def __init__(
-        self,
-        model: typing.Type[T],
-    ):
-        self.model = model
+@dataclass
+class Relationship:
+    default: typing.Any = None
+    default_factory: typing.Optional[typing.Callable] = None
+    description: typing.Optional[str] = None
 
 
 def relationship(
-    model: typing.Type[T],
-) -> Relationship[T]:
-    return Relationship[T](
-        model=model,
+    default: typing.Any = None,
+    default_factory: typing.Optional[typing.Callable] = None,
+    description: typing.Optional[str] = None,
+) -> typing.Any:
+
+    if default and default_factory:
+        raise ValueError("Cannot specify both default and default_factory")
+
+    return Relationship(
+        default=default,
+        default_factory=default_factory,
+        description=description,
     )

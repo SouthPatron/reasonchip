@@ -15,13 +15,14 @@ from .models import (
     RestfulModel,
     DefinedModel,
     DynamicModel,
+    Relationship,
 )
 
 
 @dataclass
 class ModelInfo:
     model: typing.Type[RestfulModel]
-    inspected_model: typing.Optional[typing.Type[RestfulModel]] = None
+    inspected_model: typing.Optional[typing.Type[BaseModel]] = None
 
 
 class Resolver:
@@ -58,7 +59,7 @@ class Resolver:
         auth: typing.Optional[AuthHandler] = None,
     ):
         for k, _ in self._registry.items():
-            await self._inspect(
+            im: typing.Type[BaseModel] = await self._inspect(
                 session,
                 field_name=k,
                 auth=auth,
@@ -68,7 +69,12 @@ class Resolver:
         assert (
             field_name in self._registry
         ), f"Model '{field_name}' not found in registry."
-        return self.models[field_name]
+
+        mi = self._registry[field_name]
+        assert (
+            mi.inspected_model
+        ), f"Model '{field_name}' has not been inspected yet."
+        return mi.inspected_model
 
     # ----------------- INSPECTION ------------------------------------------
 
@@ -77,7 +83,7 @@ class Resolver:
         session: httpx.AsyncClient,
         field_name: str,
         auth: typing.Optional[AuthHandler] = None,
-    ):
+    ) -> typing.Type[BaseModel]:
 
         async with self._lock:
 
@@ -92,8 +98,8 @@ class Resolver:
             if entry.inspected_model:
                 return entry.inspected_model
 
-            # If it's a DefinedModel, it is exactly what is says it is.
-            if isinstance(entry.model, DefinedModel):
+            # If it's a DefinedModel class, it is exactly what is says it is.
+            if issubclass(entry.model, DefinedModel):
                 entry.inspected_model = entry.model
                 return entry.inspected_model
 
@@ -127,10 +133,17 @@ class Resolver:
                 model_name=model_name,
             )
 
+            # Copy accross the important model variables
+            setattr(new_model, "_endpoint", model._endpoint)
+            setattr(new_model, "_field_name", model._field_name)
+
+            # Registry
             self._registry[field_name] = ModelInfo(
                 model=model,
                 inspected_model=new_model,
             )
+
+        return new_model
 
     def _model_from_schema(
         self,
@@ -150,13 +163,36 @@ class Resolver:
             if field_name in original_fields:
                 f = original_fields[field_name]
 
-                fields[field_name] = (
-                    f.annotation,
-                    Field(
-                        default=f.default,
-                        description=meta.get("label", ""),
-                    ),
-                )
+                # This is not a relationship
+                if not isinstance(f.default, Relationship):
+                    fields[field_name] = (
+                        f.annotation,
+                        Field(
+                            default=f.default,
+                            description=meta.get("label", ""),
+                        ),
+                    )
+                    continue
+
+                # ------------------ Generate the field -----------------------
+                rel: Relationship = f.default
+
+                field_kwargs = {}
+
+                # Defaults
+                if rel.default_factory:
+                    field_kwargs["default_factory"] = rel.default_factory
+                else:
+                    field_kwargs["default"] = rel.default
+
+                # Simple field values
+                field_kwargs["description"] = rel.description
+
+                # Create the field now
+                field = Field(**field_kwargs)
+
+                # Deliver the field
+                fields[field_name] = (f.annotation, field)
                 continue
 
             # Create it
@@ -177,19 +213,25 @@ class Resolver:
             elif field_type == "choice":
                 field_type = str
 
-            else:
+            elif field_type == "field":
+                if field_name not in self._registry:
+                    print(f"========= BEGIN: SCHEMA ============")
+                    print(schema)
+                    print(f"========= END: SCHEMA ==============")
+                    assert (
+                        False
+                    ), f"Field type '{field_name}' not found in registry in model '{model_name}'"
 
+                mi = self._registry[field_name]
+                field_type = mi.model
+
+            else:
                 print(f"========= BEGIN: SCHEMA ============")
                 print(schema)
                 print(f"========= END: SCHEMA ==============")
-
-                print(
-                    f"Warning: Unsupported field type '{field_type}' for field '{field_name}' in model '{model_name}'"
-                )
                 assert (
                     False
                 ), f"Unsupported field type '{field_type}' for field '{field_name}' in model '{model_name}'"
-                # field_type = typing.Any
 
             # Optional if not required or read_only
             if not meta.get("required", False) or meta.get("read_only", False):
