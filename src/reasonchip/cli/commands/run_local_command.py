@@ -13,6 +13,8 @@ from reasonchip.core import exceptions as rex
 from reasonchip.core.engine.variables import Variables
 from reasonchip.utils.local_runner import LocalRunner
 
+from reasonchip.persistence.rox.rox import Rox, RoxConfiguration
+
 from .exit_code import ExitCode
 from .command import AsyncCommand
 
@@ -66,6 +68,7 @@ class RunLocalCommand(AsyncCommand):
         )
 
         cls.add_default_options(parser)
+        cls.add_db_options(parser)
 
     async def main(
         self,
@@ -78,6 +81,17 @@ class RunLocalCommand(AsyncCommand):
 
         if not args.collections:
             args.collections = ["."]
+
+        # Initialize Rox ORM
+        if args.db_url:
+            config: RoxConfiguration = RoxConfiguration(
+                url=args.db_url,
+                pool_size=args.db_pool_size,
+                max_overflow=args.db_max_overflow,
+                pool_recycle=args.db_pool_recycle,
+                pool_timeout=args.db_pool_timeout,
+            )
+            Rox(configuration=config)
 
         try:
             # Load variables
