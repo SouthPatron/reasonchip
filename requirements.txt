@@ -22,7 +22,9 @@ SQLAlchemy>=2.0.40
 asyncpg>=0.30.0
 aiosqlite>=0.21.0
 diff-match-patch>=20241021
-httpx>=0.28.1				# RESTful
+
+# RESTful
+httpx>=0.28.1
 
 # Chip specific
 openai>=1.61.1
