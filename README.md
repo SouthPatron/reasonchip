@@ -6,7 +6,7 @@
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/reasonchip.svg)
 ![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)
 
-Open source reasoning workflow support
+Reasoning workflow support
 
 ## Quick links
 
