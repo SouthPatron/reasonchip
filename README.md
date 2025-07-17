@@ -1,12 +1,12 @@
 # ReasonChip
 
 ![License: GPL v3+](https://img.shields.io/badge/license-GPLv3%2B-blue.svg)
-![Python](https://img.shields.io/badge/python-3.12+-blue)
+![Python](https://img.shields.io/badge/python-3.13+-blue)
 [![PyPI version](https://img.shields.io/pypi/v/reasonchip.svg)](https://pypi.org/project/reasonchip/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/reasonchip.svg)
 ![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)
 
-Open source agentic workflow automation software
+Open source reasoning workflow support
 
 ## Quick links
 
@@ -18,9 +18,9 @@ Open source agentic workflow automation software
 
 | Location | Description |
 | ------------------------- | ----------------------------------------------- |
-| [examples](./examples/) | Example workflows |
-| [src](./src/reasonchip/) | Package |
-| [website](./website/reasonchip/) | Website |
+| [examples](https://github.com/SouthPatron/reasonchip/tree/main/examples/) | Example workflows |
+| [src](https://github.com/SouthPatron/reasonchip/tree/main/src/reasonchip/) | Package |
+| [website](https://github.com/SouthPatron/reasonchip/tree/main/website/reasonchip/) | Website |
 
 ## Installation
 

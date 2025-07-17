@@ -20,7 +20,7 @@ def main() -> ExitCode:
     # Build the argument tree
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="Open source agentic workflow automation software",
+        description="Reasoning workflow support",
         add_help=False,
     )
 
