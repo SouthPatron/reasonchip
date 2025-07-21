@@ -6,6 +6,9 @@
 import typing
 
 
+# --------- Base Exception --------------------------------------------------
+
+
 class ReasonChipException(Exception):
     """Base class for exceptions in this module."""
 

@@ -10,6 +10,7 @@ import types
 import importlib
 import importlib.util
 import asyncio
+import sys
 
 from pathlib import Path
 
@@ -176,14 +177,23 @@ class WorkflowLoader:
         :return: A Workflow object containing the loaded workflow.
         """
         try:
+            # Make sure the module_name is a valid Python identifier
+            if not module_name.isidentifier():
+                raise ValueError(f"Invalid module name: {module_name}")
+
             # Load the spec from the path
             p = Path(path)
+            if p.is_dir():
+                p = p / "__init__.py"
+
             spec = importlib.util.spec_from_file_location(module_name, p)
             if spec is None or spec.loader is None:
                 raise ImportError(f"Could not load module from {path}")
 
             # Get the module from the spec
             module = importlib.util.module_from_spec(spec)
+
+            sys.modules[module_name] = module
 
             # Execute the module
             spec.loader.exec_module(module)

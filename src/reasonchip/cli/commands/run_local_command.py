@@ -9,11 +9,15 @@ import re
 import json
 import traceback
 
-from reasonchip.core import exceptions as rex
-from reasonchip.core.engine.variables import Variables
-from reasonchip.utils.local_runner import LocalRunner
+from pathlib import Path
 
-from reasonchip.persistence.rox.rox import Rox, RoxConfiguration
+from reasonchip.core import exceptions as rex
+from reasonchip.core.engine.workflows import WorkflowLoader
+from reasonchip.core.engine.engine import (
+    Engine,
+    EngineContext,
+    WorkflowSet,
+)
 
 from .exit_code import ExitCode
 from .command import AsyncCommand
@@ -27,48 +31,31 @@ class RunLocalCommand(AsyncCommand):
 
     @classmethod
     def help(cls) -> str:
-        return "Run a pipeline locally"
+        return "Run a workflow locally"
 
     @classmethod
     def description(cls) -> str:
-        return "Run a pipeline locally"
+        return "Run a workflow locally"
 
     @classmethod
     def build_parser(cls, parser: argparse.ArgumentParser):
         parser.add_argument(
-            "pipeline",
+            "workflow",
             metavar="<name>",
             type=str,
-            help="Name of the pipeline to run",
+            help="Name of the workflow to run",
         )
         parser.add_argument(
             "--collection",
             dest="collections",
             action="append",
             default=[],
-            metavar="<collection root>",
+            metavar="name=<root>",
             type=str,
-            help="Root of a pipeline collection",
-        )
-        parser.add_argument(
-            "--set",
-            action="append",
-            default=[],
-            metavar="key=value",
-            type=str,
-            help="Set or override a configuration key-value pair.",
-        )
-        parser.add_argument(
-            "--vars",
-            action="append",
-            default=[],
-            metavar="<variable file>",
-            type=str,
-            help="Variable file to load",
+            help="Root of a workflow collection",
         )
 
         cls.add_default_options(parser)
-        cls.add_db_options(parser)
 
     async def main(
         self,
@@ -82,59 +69,47 @@ class RunLocalCommand(AsyncCommand):
         if not args.collections:
             args.collections = ["."]
 
-        # Initialize Rox ORM
-        if args.db_url:
-            config: RoxConfiguration = RoxConfiguration(
-                url=args.db_url,
-                pool_size=args.db_pool_size,
-                max_overflow=args.db_max_overflow,
-                pool_recycle=args.db_pool_recycle,
-                pool_timeout=args.db_pool_timeout,
-            )
-            Rox(configuration=config)
+        workflow_loader = WorkflowLoader()
+
+        workflow_set = WorkflowSet()
 
         try:
-            # Load variables
-            variables = Variables()
-            for x in args.vars:
-                variables.load_file(x)
-
-            for x in args.set:
+            # Create the WorkflowSet
+            for x in args.collections:
                 m = re.match(r"^(.*?)=(.*)$", x)
                 if not m:
                     raise ValueError(f"Invalid key value pair: {x}")
 
                 key, value = m[1], m[2]
-                variables.set(key, value)
 
-            # Create the local runner
-            runner = LocalRunner(
-                collections=args.collections,
-                default_variables=variables.vmap,
+                abs_path = str(Path(value).resolve())
+
+                workflow = workflow_loader.load_from_path(
+                    module_name=key,
+                    path=abs_path,
+                )
+
+                workflow_set.add(workflow)
+
+            # Create the Engine and EngineContext
+            context = EngineContext(workflow_set=workflow_set)
+            engine = Engine(workflow_set=workflow_set)
+
+            # Run the engine and the run
+            rc = await engine.run(
+                context=context,
+                entry=args.workflow,
             )
-
-            # Run the engine
-            rc = await runner.run(args.pipeline)
             if rc:
                 print(json.dumps(rc))
 
             # Shutdown the engine
-            runner.shutdown()
             return ExitCode.OK
 
-        except rex.ProcessorException as ex:
-            print(f"************** PROCESSOR EXCEPTION **************")
+        except rex.EngineException as ex:
+            print(f"************** ENGINE EXCEPTION *****************")
 
-            if ex.stack:
-                stack = ex.stack
-                if stack:
-                    stack.print()
-
-            exc_type = ex.__class__.__name__
-
-            print("\n")
-            print(f"{exc_type}: {str(ex)}")
-            print("\n")
+            traceback.print_exc()
 
             return ExitCode.ERROR
 
