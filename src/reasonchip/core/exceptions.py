@@ -5,8 +5,6 @@
 
 import typing
 
-from .stack import Stack
-
 
 class ReasonChipException(Exception):
     """Base class for exceptions in this module."""
@@ -21,68 +19,37 @@ class ConfigurationException(ReasonChipException):
     pass
 
 
-# --------- Parsing Exceptions ----------------------------------------------
+# --------- Workflow Exceptions ---------------------------------------------
 
 
-class ParsingException(ReasonChipException):
-    """Raised when a parsing error occurs."""
+class WorkflowException(ReasonChipException):
+    """Raised when a Workflow exception occurs."""
 
-    def __init__(self, source: typing.Optional[str] = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.source = source
-
-    def __str__(self):
-        resp = f"""PARSING EXCEPTION
-
-There was a problem parsing a pipeline or task.
-The location of the error is:
-
-LOCATION: {self.source}
-"""
-        return resp
+    pass
 
 
-class TaskParseException(ParsingException):
-    """Raised when a task cannot be parsed."""
+class WorkflowLoadException(WorkflowException):
+    """Raised when a Workflow can't be loaded."""
 
-    def __init__(
-        self,
-        message: str,
-        task_no: int,
-        errors: typing.Optional[typing.List] = None,
-        *args,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.message = message
-        self.task_no = task_no
-        self.errors = errors
-
-    def __str__(self):
-        resp = f"""Task#: {self.task_no + 1}
-Message: {self.message}
-"""
-        if self.errors:
-            for m in self.errors:
-                loc = m.get("loc", None)
-                msg = m.get("msg", None)
-
-                resp += f"\nLocation: {loc}"
-                resp += f"\nReason: {msg}\n"
-
-        return resp
+    pass
 
 
-class PipelineFormatException(ParsingException):
-    """The PipelineFile contains an error."""
+class WorkflowAlreadyExistsException(WorkflowException):
+    """Raised when a Workflow already exists and cannot be overwritten."""
 
-    def __init__(self, message: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.message = message
+    pass
 
-    def __str__(self):
-        resp = f"Message: {self.message}.\n"
-        return resp
+
+class WorkflowNotFoundException(WorkflowException):
+    """Raised when a Workflow cannot be found."""
+
+    pass
+
+
+class WorkflowStepMalformedException(WorkflowException):
+    """Raised when a Workflow step is malformed."""
+
+    pass
 
 
 # --------- Registry Exceptions ----------------------------------------------
@@ -131,150 +98,34 @@ class MalformedChipException(RegistryException):
         return resp
 
 
-# --------- Validation Exceptions --------------------------------------------
+# --------- Engine Exceptions ------------------------------------------------
 
 
-class ValidationException(ReasonChipException):
-    """An exception raised during validation of the pipelines."""
-
-    def __init__(self, source: typing.Optional[str] = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.source = source
-
-    def __str__(self) -> str:
-        resp = f"""VALIDATION EXCEPTION
-
-There was a problem validating the pipelines and tasks prior to execution.
-
-The source was: {self.source}
-"""
-        return resp
-
-
-class NoSuchPipelineDuringValidationException(ValidationException):
-    """Raised when a pipeline is not found during validation."""
-
-    def __init__(self, task_no: int, pipeline: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.task_no = task_no
-        self.pipeline = pipeline
-
-    def __str__(self) -> str:
-        resp = f"""In task #{self.task_no + 1}, the specified pipeline does not exist.
-
-Pipeline: {self.pipeline}
-"""
-        return resp
-
-
-class NoSuchChipDuringValidationException(ValidationException):
-    """Raised when a chip is not found during validation."""
-
-    def __init__(self, task_no: int, chip: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.task_no = task_no
-        self.chip = chip
-
-    def __str__(self) -> str:
-        resp = f"""In task #{self.task_no + 1}, the specified chip does not exist.
-
-Chip: {self.chip}
-"""
-        return resp
-
-
-class NestedValidationException(ValidationException):
-    """Raised when a validation exception is nested."""
-
-    def __init__(self, task_no: int, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.task_no = task_no
-
-    def __str__(self) -> str:
-        resp = f"Nested path task#: {self.task_no + 1}"
-        return resp
-
-
-# --------- Processor Exceptions ---------------------------------------------
-
-
-class ProcessorException(ReasonChipException):
-    """An exception raised from the processor."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.stack: typing.Optional[Stack] = None
-
-
-class NoSuchPipelineException(ProcessorException):
-    """Raised when a pipeline is not found."""
+class EngineException(ReasonChipException):
+    """Base class for exceptions in the Engine module."""
 
     pass
 
 
-class NoSuchChipException(ProcessorException):
-    """Raised when a chip is not found."""
-
-    pass
-
-
-class InvalidChipParametersException(ProcessorException):
-    """Raised when the parameters for a chip call don't validate."""
+class TerminateEngineException(EngineException):
+    """Raised when the Engine needs to be terminated."""
 
     def __init__(
         self,
-        chip: str,
-        errors: typing.Optional[typing.List] = None,
+        rc: typing.Any,
+    ):
+        self.rc = rc
+
+
+class RestartEngineException(EngineException):
+    """Raised when the Engine needs to be restarted."""
+
+    def __init__(
+        self,
+        name: str,
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self.chip = chip
-        self.errors = errors
-
-    def __str__(self):
-        resp = f"""Chip: {self.chip}"""
-        if self.errors:
-            for m in self.errors:
-                loc = m.get("loc", None)
-                msg = m.get("msg", None)
-
-                resp += f"\nLocation: {loc}"
-                resp += f"\nReason: {msg}\n"
-
-        return resp
-
-
-class ChipException(ProcessorException):
-    """Raised when a chip call fails."""
-
-    pass
-
-
-class VariableNotFoundException(ProcessorException):
-    """Raised when a variable is not found."""
-
-    pass
-
-
-class CodeExecutionException(ProcessorException):
-    """Raised when code execution fails."""
-
-    pass
-
-
-class EvaluationException(ProcessorException):
-    """Raised when an evaluation fails."""
-
-    pass
-
-
-class LoopVariableNotIterableException(ProcessorException):
-    """Raised when a loop variable is not iterable."""
-
-    pass
-
-
-class AssertException(ProcessorException):
-    "" "Raised when an assert fails." ""
-    pass
+        self.name = name
+        self.args = args
+        self.kwargs = kwargs

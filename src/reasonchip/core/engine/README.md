@@ -12,14 +12,10 @@ loading, and the main processor that runs the tasks accordingly.
 
 | Location                 | Description                                   |
 |--------------------------|-----------------------------------------------|
-| [pipelines.py](./pipelines.py)        | Defines the pipeline and task models, task parsing, and pipeline loading from YAML files.
 | [engine.py](./engine.py)              | Core Engine managing lifecycle, pipeline loading, initialization, and validation.
-| [processor.py](./processor.py)        | Processor runs the flow of tasks with variable scoping and looping support.
 | [variables.py](./variables.py)        | Variables class manages variable storage, interpolation, safe evaluation.
-| [flow_control.py](./flow_control.py)  | FlowControl class manages the task queue and progression.
 | [registry.py](./registry.py)          | Registry manages chip function registration and dynamic module loading.
 | [parsers.py](./parsers.py)            | Safe evaluation and escaping helpers for expressions.
-| [facilities.py](./facilities.py)      | Singleton facility class placeholder.
 
 ## Onboarding Approach
 

@@ -9,7 +9,6 @@ import typing
 import inspect
 import os
 import importlib
-import importlib.util
 
 from pydantic import BaseModel
 
