@@ -102,7 +102,8 @@ It's an incredibly intolerant process by design. It will die if anything strange
         """
 
         if not args.collections:
-            args.collections = ["."]
+            print("No collections specified")
+            return ExitCode.ERROR
 
         # SSL Context
         ssl_options = SSLClientOptions.from_args(args)

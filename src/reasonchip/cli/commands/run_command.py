@@ -29,13 +29,13 @@ class RunCommand(AsyncCommand):
 
     @classmethod
     def help(cls) -> str:
-        return "Run a pipeline"
+        return "Run a workflow"
 
     @classmethod
     def description(cls) -> str:
         return """
 This command connects to a remote ReasonChip broker and runs a single
-pipeline. You may specify variables on the command line.
+workflow. You may specify variables on the command line.
 """
 
     @classmethod
@@ -133,7 +133,7 @@ pipeline. You may specify variables on the command line.
         try:
             resp = await api.run_workflow(
                 workflow=args.workflow,
-                variables=json.dumps(variables),
+                variables=json.dumps(variables) if variables else None,
                 detached=args.detach,
                 cookie=args.cookie,
             )

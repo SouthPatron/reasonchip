@@ -45,7 +45,7 @@ Run a broker for mediation between engines and the clients.
 
 Engines connect to the broker and register for work.
 Clients connect to a broker and submit work to be done.
-The work in this case is the running of pipelines.
+The work in this case is the running of workflows.
 
 Make sure to spawn multiple engines to connect to the broker. If you don't
 have engines, nothing can happen.

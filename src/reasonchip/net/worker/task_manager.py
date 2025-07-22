@@ -339,10 +339,7 @@ class TaskManager:
             v = json.loads(variables) if variables else {}
 
             # Run the engine
-            rc = await self._engine.run(
-                entry=workflow,
-                **v,
-            )
+            rc = await self._engine.run(entry=workflow, **v)
 
             # Serialize the results
             rc_str = json.dumps(rc) if rc else None
