@@ -8,17 +8,23 @@ import argparse
 import signal
 import asyncio
 import traceback
+import re
 
-from reasonchip.core.engine.engine import Engine
+from pathlib import Path
 
-from reasonchip.persistence.rox.rox import Rox, RoxConfiguration
+from reasonchip.core import exceptions as rex
+from reasonchip.core.engine.workflows import WorkflowLoader
+from reasonchip.core.engine.engine import (
+    Engine,
+    EngineContext,
+    WorkflowSet,
+)
 
 from reasonchip.net.worker import TaskManager
 
 from reasonchip.net.protocol import DEFAULT_LISTENERS
 from reasonchip.net.transports import worker_to_broker
 from reasonchip.net.transports import SSLClientOptions
-
 
 from .exit_code import ExitCode
 from .command import AsyncCommand
@@ -69,9 +75,9 @@ It's an incredibly intolerant process by design. It will die if anything strange
             dest="collections",
             action="append",
             default=[],
-            metavar="<directory>",
+            metavar="name=<directory>",
             type=str,
-            help="Root path of a pipeline collection. Default serves ./ only",
+            help="Root path of a workflow collection. Default serves ./ only",
         )
         parser.add_argument(
             "--broker",
@@ -89,7 +95,6 @@ It's an incredibly intolerant process by design. It will die if anything strange
         )
 
         cls.add_default_options(parser)
-        cls.add_db_options(parser)
         cls.add_ssl_client_options(parser)
 
     async def main(
@@ -104,17 +109,6 @@ It's an incredibly intolerant process by design. It will die if anything strange
         if not args.collections:
             args.collections = ["."]
 
-        # Initialize Rox ORM
-        if args.db_url:
-            config: RoxConfiguration = RoxConfiguration(
-                url=args.db_url,
-                pool_size=args.db_pool_size,
-                max_overflow=args.db_max_overflow,
-                pool_recycle=args.db_pool_recycle,
-                pool_timeout=args.db_pool_timeout,
-            )
-            Rox(configuration=config)
-
         # SSL Context
         ssl_options = SSLClientOptions.from_args(args)
         ssl_context = ssl_options.create_ssl_context() if ssl_options else None
@@ -128,10 +122,30 @@ It's an incredibly intolerant process by design. It will die if anything strange
 
         await self.setup_signal_handlers()
 
+        workflow_loader = WorkflowLoader()
+        workflow_set = WorkflowSet()
+
         try:
-            # Let us create the engine.
-            engine: Engine = Engine()
-            engine.initialize(pipelines=args.collections)
+            # Create the WorkflowSet.
+            for x in args.collections:
+                m = re.match(r"^(.*?)=(.*)$", x)
+                if not m:
+                    raise ValueError(f"Invalid key value pair: {x}")
+
+                key, value = m[1], m[2]
+
+                abs_path = str(Path(value).resolve())
+
+                workflow = workflow_loader.load_from_path(
+                    module_name=key,
+                    path=abs_path,
+                )
+
+                workflow_set.add(workflow)
+
+            # Create the Engine and EngineContext
+            context = EngineContext(workflow_set=workflow_set)
+            engine = Engine(workflow_set=workflow_set)
 
             # Now we start the loop to receive requests and process them.
             tm = TaskManager(
@@ -167,13 +181,11 @@ It's an incredibly intolerant process by design. It will die if anything strange
                     if task_wait in wl:
                         self._die.set()
 
-            # Shutdown the engine
-            engine.shutdown()
+            # Exit
             return ExitCode.OK
 
         except Exception as ex:
             print(f"************** UNHANDLED EXCEPTION **************")
-            print(f"\n\n{ex}\n\n")
             traceback.print_exc()
             return ExitCode.ERROR
 

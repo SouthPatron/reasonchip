@@ -21,6 +21,11 @@ from .. import exceptions as rex
 
 
 class WorkflowContext:
+    """
+    A placeholder for the workflow context. This will be overriden by
+    users of workflows.
+    """
+
     pass
 
 
@@ -112,6 +117,9 @@ class Workflow:
 
 
 class WorkflowSet:
+    """
+    A collection of workflows
+    """
 
     def __init__(self):
         """
@@ -119,7 +127,7 @@ class WorkflowSet:
         """
         self._workflows: typing.Dict[str, Workflow] = {}
 
-    def add(self, workflow: Workflow):
+    def add(self, workflow: Workflow) -> WorkflowSet:
         """
         Add a workflow to the set.
 
@@ -129,6 +137,7 @@ class WorkflowSet:
             raise rex.WorkflowAlreadyExistsException(workflow.name)
 
         self._workflows[workflow.name] = workflow
+        return self
 
     async def resolve(self, fqn: str) -> WorkflowStep:
         """

@@ -14,8 +14,7 @@ import time
 from dataclasses import dataclass
 
 from reasonchip.core import exceptions as rex
-from reasonchip.core.engine.engine import Engine
-from reasonchip.core.engine.variables import Variables
+from reasonchip.core.engine.engine import Engine, EngineContext
 
 from ..transports import ClientTransport
 
@@ -41,6 +40,7 @@ class TaskManager:
     def __init__(
         self,
         engine: Engine,
+        context: EngineContext,
         transport: ClientTransport,
         max_capacity: int = 4,
     ):
@@ -50,6 +50,7 @@ class TaskManager:
 
         # General state
         self._engine: Engine = engine
+        self._context: EngineContext = context
         self._transport: ClientTransport = transport
         self._max_capacity: int = max_capacity
 

@@ -50,7 +50,7 @@ class RunLocalCommand(AsyncCommand):
             dest="collections",
             action="append",
             default=[],
-            metavar="name=<root>",
+            metavar="name=<directory>",
             type=str,
             help="Root of a workflow collection",
         )
@@ -70,7 +70,6 @@ class RunLocalCommand(AsyncCommand):
             args.collections = ["."]
 
         workflow_loader = WorkflowLoader()
-
         workflow_set = WorkflowSet()
 
         try:
