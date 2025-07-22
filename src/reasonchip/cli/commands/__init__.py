@@ -9,7 +9,8 @@ from .command import Command, AsyncCommand
 from .exit_code import ExitCode
 
 # Commands
-# from .broker_command import BrokerCommand
+from .broker_command import BrokerCommand
+
 # from .run_command import RunCommand
 from .run_local_command import RunLocalCommand
 
@@ -23,7 +24,7 @@ def get_commands() -> (
         x.command(): x
         for x in [
             # Socket commands
-            # BrokerCommand,
+            BrokerCommand,
             # RunCommand,
             RunLocalCommand,
             WorkerCommand,

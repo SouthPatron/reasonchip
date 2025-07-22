@@ -18,7 +18,7 @@ from ..protocol import (
     ResultCode,
 )
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("reasonchip.net.broker.switchboard")
 
 
 @dataclass
@@ -251,8 +251,8 @@ class Switchboard:
         if not pkt.cookie:
             return await self._bad_packet(payload, "Missing cookie")
 
-        if not pkt.pipeline:
-            return await self._bad_packet(payload, "Missing pipeline")
+        if not pkt.workflow:
+            return await self._bad_packet(payload, "Missing workflow")
 
         # Get some information
         cookie = pkt.cookie
@@ -289,7 +289,7 @@ class Switchboard:
 
             # Log what happened
             log.info(
-                f"CLIENT RUN: cookie=[{cookie}] pipeline=[{pkt.pipeline}] client=[{payload.connection_id}] connection=[{conn}]"
+                f"CLIENT RUN: cookie=[{cookie}] pipeline=[{pkt.workflow}] client=[{payload.connection_id}] connection=[{conn}]"
             )
 
             # Send through to the worker

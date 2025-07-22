@@ -13,7 +13,7 @@ from ..transports import ServerTransport
 
 from .switchboard import Switchboard
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("reasonchip.net.broker.broker")
 
 
 class Broker:
