@@ -9,8 +9,6 @@ import re
 import json
 import uuid
 
-from reasonchip.core.engine.variables import Variables
-
 from reasonchip.net.client import (
     Multiplexor,
     Api,
@@ -43,10 +41,10 @@ pipeline. You may specify variables on the command line.
     @classmethod
     def build_parser(cls, parser: argparse.ArgumentParser):
         parser.add_argument(
-            "pipeline",
+            "workflow",
             metavar="<name>",
             type=str,
-            help="Name of the pipeline to run",
+            help="Name of the workflow to run",
         )
         parser.add_argument(
             "--broker",
@@ -65,8 +63,7 @@ pipeline. You may specify variables on the command line.
         )
         parser.add_argument(
             "--vars",
-            action="append",
-            default=[],
+            action="store",
             metavar="<variable file>",
             type=str,
             help="Variable file to load",
@@ -98,11 +95,12 @@ pipeline. You may specify variables on the command line.
         Main entry point for the application.
         """
         # Populate the default variables to be sent through
-        variables = Variables()
+        variables: typing.Dict[str, typing.Any] = {}
 
         # Load variables
-        for x in args.vars:
-            variables.load_file(x)
+        if args.vars:
+            with open(args.vars, "r") as f:
+                variables = json.loads(f.read())
 
         for x in args.set:
             m = re.match(r"^(.*?)=(.*)$", x)
@@ -110,7 +108,7 @@ pipeline. You may specify variables on the command line.
                 raise ValueError(f"Invalid key value pair: {x}")
 
             key, value = m[1], m[2]
-            variables.set(key, value)
+            variables[key] = value
 
         # Create the connection
         ssl_options = SSLClientOptions.from_args(args)
@@ -133,9 +131,9 @@ pipeline. You may specify variables on the command line.
         api = Api(multiplexor)
 
         try:
-            resp = await api.run_pipeline(
-                pipeline=args.pipeline,
-                variables=variables.vmap,
+            resp = await api.run_workflow(
+                workflow=args.workflow,
+                variables=json.dumps(variables),
                 detached=args.detach,
                 cookie=args.cookie,
             )

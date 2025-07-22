@@ -25,9 +25,9 @@ class Api:
     def __init__(self, multiplexor: Multiplexor) -> None:
         self._multiplexor = multiplexor
 
-    async def run_pipeline(
+    async def run_workflow(
         self,
-        pipeline: str,
+        workflow: str,
         variables: typing.Any = None,
         cookie: typing.Optional[uuid.UUID] = None,
         detached: bool = False,
@@ -39,14 +39,14 @@ class Api:
         ) as client:
 
             logging.debug(
-                f"Request to run pipeline: [{client.get_cookie()}] {pipeline}"
+                f"Request to run pipeline: [{client.get_cookie()}] {workflow}"
             )
 
             json_variables = json.dumps(variables) if variables else None
 
             req = SocketPacket(
                 packet_type=PacketType.RUN,
-                pipeline=pipeline,
+                workflow=workflow,
                 variables=json_variables,
                 detach=detached,
             )
