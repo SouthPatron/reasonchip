@@ -80,7 +80,7 @@ class SocketPacket(BaseModel):
     capacity: typing.Optional[int] = None
 
     # Run variables
-    pipeline: typing.Optional[str] = None
+    workflow: typing.Optional[str] = None
     variables: typing.Optional[str] = None
     detach: typing.Optional[bool] = None
 

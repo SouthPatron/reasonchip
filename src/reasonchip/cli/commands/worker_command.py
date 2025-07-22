@@ -12,13 +12,8 @@ import re
 
 from pathlib import Path
 
-from reasonchip.core import exceptions as rex
 from reasonchip.core.engine.workflows import WorkflowLoader
-from reasonchip.core.engine.engine import (
-    Engine,
-    EngineContext,
-    WorkflowSet,
-)
+from reasonchip.core.engine.engine import Engine, WorkflowSet
 
 from reasonchip.net.worker import TaskManager
 
@@ -144,7 +139,6 @@ It's an incredibly intolerant process by design. It will die if anything strange
                 workflow_set.add(workflow)
 
             # Create the Engine and EngineContext
-            context = EngineContext(workflow_set=workflow_set)
             engine = Engine(workflow_set=workflow_set)
 
             # Now we start the loop to receive requests and process them.
@@ -184,7 +178,7 @@ It's an incredibly intolerant process by design. It will die if anything strange
             # Exit
             return ExitCode.OK
 
-        except Exception as ex:
+        except Exception:
             print(f"************** UNHANDLED EXCEPTION **************")
             traceback.print_exc()
             return ExitCode.ERROR

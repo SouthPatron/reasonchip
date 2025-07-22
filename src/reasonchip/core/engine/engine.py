@@ -167,7 +167,6 @@ class Engine:
 
     async def run(
         self,
-        context: EngineContext,
         entry: str,
         *args,
         **kwargs,
@@ -175,7 +174,6 @@ class Engine:
         """
         Runs a workflow step with the given context and parameters.
 
-        :param context: The context to use for the workflow step.
         :param entry: The name of the workflow step to run.
         :param args: Positional arguments to pass to the step.
         :param kwargs: Keyword arguments to pass to the step.
@@ -186,6 +184,8 @@ class Engine:
         t_entry = entry
         t_args = args
         t_kwargs = kwargs
+
+        context: EngineContext = EngineContext(self._workflow_set)
 
         while True:
 

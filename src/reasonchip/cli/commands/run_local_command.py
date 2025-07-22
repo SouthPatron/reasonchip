@@ -13,11 +13,7 @@ from pathlib import Path
 
 from reasonchip.core import exceptions as rex
 from reasonchip.core.engine.workflows import WorkflowLoader
-from reasonchip.core.engine.engine import (
-    Engine,
-    EngineContext,
-    WorkflowSet,
-)
+from reasonchip.core.engine.engine import Engine, WorkflowSet
 
 from .exit_code import ExitCode
 from .command import AsyncCommand
@@ -91,14 +87,10 @@ class RunLocalCommand(AsyncCommand):
                 workflow_set.add(workflow)
 
             # Create the Engine and EngineContext
-            context = EngineContext(workflow_set=workflow_set)
             engine = Engine(workflow_set=workflow_set)
 
             # Run the engine and the run
-            rc = await engine.run(
-                context=context,
-                entry=args.workflow,
-            )
+            rc = await engine.run(entry=args.workflow)
             if rc:
                 print(json.dumps(rc))
 

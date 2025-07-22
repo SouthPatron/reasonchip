@@ -13,7 +13,7 @@ from .exit_code import ExitCode
 # from .run_command import RunCommand
 from .run_local_command import RunLocalCommand
 
-# from .worker_command import WorkerCommand
+from .worker_command import WorkerCommand
 
 
 def get_commands() -> (
@@ -26,7 +26,7 @@ def get_commands() -> (
             # BrokerCommand,
             # RunCommand,
             RunLocalCommand,
-            # WorkerCommand,
+            WorkerCommand,
         ]
     }
 
