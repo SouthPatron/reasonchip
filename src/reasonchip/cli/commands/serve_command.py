@@ -8,6 +8,7 @@ import argparse
 import signal
 import asyncio
 import traceback
+import logging
 import re
 
 from pathlib import Path
@@ -18,6 +19,8 @@ from reasonchip.net.amqp_consumer import AmqpConsumer, AMQPCallbackResp
 
 from .exit_code import ExitCode
 from .command import AsyncCommand
+
+log = logging.getLogger("reasonchip.cli.commands.serve")
 
 
 class ServeCommand(AsyncCommand):
@@ -82,14 +85,14 @@ The AMQP url should be specified like these examples:
             "--amqp-exchange",
             metavar="<name>",
             type=str,
-            default="",
+            default="reasonchip",
             help="Exchange name",
         )
         parser.add_argument(
             "--amqp-routing-key",
             metavar="<key>",
             type=str,
-            default="",
+            default="reasonchip",
             help="Routing key",
         )
         parser.add_argument(
@@ -122,6 +125,7 @@ The AMQP url should be specified like these examples:
 
         try:
             # Create the WorkflowSet.
+            log.info(f"Attempting to load {len(args.collections)} collections")
             for x in args.collections:
                 m = re.match(r"^(.*?)=(.*)$", x)
                 if not m:
@@ -138,6 +142,8 @@ The AMQP url should be specified like these examples:
 
                 workflow_set.add(workflow)
 
+                log.info(f"\tLoaded workflow '{key}' from {abs_path}")
+
             # Create the Engine and EngineContext
             engine = Engine(workflow_set=workflow_set)
 
@@ -145,6 +151,8 @@ The AMQP url should be specified like these examples:
             async def amqp_callback(packet: bytes) -> AMQPCallbackResp:
                 print(f"Received packet: {packet}")
                 return AMQPCallbackResp.ACK
+
+            log.info("Starting AMQP consumer")
 
             amqp = AmqpConsumer(callback=amqp_callback)
             rc = amqp.initialize(
@@ -160,7 +168,11 @@ The AMQP url should be specified like these examples:
                     f"routing key: {args.amqp_routing_key}"
                 )
 
+            log.info("AMQP consumer initialized successfully")
+
             await amqp.start()
+
+            log.info("AMQP consumer started successfully")
 
             # Wait for signals or the client to stop
             task_wait = asyncio.create_task(self._die.wait())
@@ -169,12 +181,16 @@ The AMQP url should be specified like these examples:
             wl = [task_wait, task_consumer]
 
             while wl:
+                log.info(
+                    f"Waiting for tasks to complete: {len(wl)} tasks remaining"
+                )
                 done, _ = await asyncio.wait(
                     wl,
                     return_when=asyncio.FIRST_COMPLETED,
                 )
 
                 if task_wait in done:
+                    log.info(f"Received shutdown signal, stopping tasks...")
                     wl.remove(task_wait)
                     task_wait = None
 
@@ -182,6 +198,14 @@ The AMQP url should be specified like these examples:
                         await amqp.stop()
 
                 if task_consumer in done:
+                    log.info(f"AMQP consumer task completed")
+                    if amqp.failed:
+                        ex = amqp.exception
+                        if ex:
+                            log.error(
+                                f"AMQP consumer task raised an exception: {ex}"
+                            )
+
                     wl.remove(task_consumer)
                     task_consumer = None
 
@@ -189,9 +213,11 @@ The AMQP url should be specified like these examples:
                         self._die.set()
 
             # Shutdown
+            log.info("Shutting down AMQP consumer")
             amqp.shutdown()
 
             # Exit
+            log.info("ServeCommand completed successfully")
             return ExitCode.OK
 
         except Exception:

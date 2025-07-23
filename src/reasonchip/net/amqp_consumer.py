@@ -185,6 +185,7 @@ class AmqpConsumer:
 
         except Exception:
             log.exception("Unexpected error in AMQP Consumer")
+            raise
 
         finally:
             if channel:
