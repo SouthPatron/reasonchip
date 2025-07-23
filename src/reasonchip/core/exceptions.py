@@ -55,52 +55,6 @@ class WorkflowStepMalformedException(WorkflowException):
     pass
 
 
-# --------- Registry Exceptions ----------------------------------------------
-
-
-class RegistryException(ReasonChipException):
-    """The Registry experienced an error."""
-
-    def __init__(
-        self,
-        module_name: typing.Optional[str] = None,
-        function_name: typing.Optional[str] = None,
-        *args,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.module_name = module_name
-        self.function_name = function_name
-
-    def __str__(self):
-        resp = "REGISTRY EXCEPTION\n"
-        if self.module_name is not None:
-            resp += f"\nModule: {self.module_name}"
-
-        if self.function_name is not None:
-            resp += f"\nFunction: {self.function_name}"
-
-        return resp
-
-
-class MalformedChipException(RegistryException):
-    """Raised when a chip is malformed."""
-
-    def __init__(
-        self,
-        reason: typing.Optional[str] = None,
-        *args,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.reason = reason
-
-    def __str__(self):
-        resp = "The chip is malformed.\n"
-        resp += f"\n{self.reason}\n"
-        return resp
-
-
 # --------- Engine Exceptions ------------------------------------------------
 
 

@@ -14,18 +14,13 @@ from pathlib import Path
 
 from reasonchip.core.engine.workflows import WorkflowLoader
 from reasonchip.core.engine.engine import Engine, WorkflowSet
-
-from reasonchip.net.worker import TaskManager
-
-from reasonchip.net.protocol import DEFAULT_LISTENERS
-from reasonchip.net.transports import worker_to_broker
-from reasonchip.net.transports import SSLClientOptions
+from reasonchip.net.amqp_consumer import AmqpConsumer, AMQPCallbackResp
 
 from .exit_code import ExitCode
 from .command import AsyncCommand
 
 
-class WorkerCommand(AsyncCommand):
+class ServeCommand(AsyncCommand):
 
     def __init__(self):
         super().__init__()
@@ -33,34 +28,29 @@ class WorkerCommand(AsyncCommand):
 
     @classmethod
     def command(cls) -> str:
-        return "worker"
+        return "serve"
 
     @classmethod
     def help(cls) -> str:
-        return "Launch an engine process to perform work for a broker"
+        return "Serve requests on a queue"
 
     @classmethod
     def description(cls) -> str:
         return """
-This is an engine process which provides workers to a broker. This process isn't meant to be used directly. It registers the number of tasks available with the broker and the broker dispatches tasks to this engine up to that capacity.
+This is an engine process which serves requests received from a queue.
 
 You may specify how many parallel tasks may be executed at any one time.
 
-The broker address should be specified like these examples:
+The AMQP url should be specified like these examples:
 
-  socket:///tmp/reasonchip.serve
-  tcp://0.0.0.0/
-  tcp://127.0.0.1:51501/
-  tcp://[::1]:51501/
-  tcp://[::]/
+    amqp://localhost
+    amqp://user:pass@localhost
+    amqp://user:pass@localhost/vhost_name
+    amqp://user:pass@rabbit.example.com:5672/vhost_name
+    amqps://user:pass@rabbit.example.com:5671/vhost_name
+    amqps://user:pass@rabbit.example.com:5671/vhost_name?heartbeat=30&connection_timeout=60
+    amqp://user%40example.com:pa%3Ass@rabbit.example.com:5672/%2F
 
-The default connection port is 51501.
-
-Unless specified, the default broker is:
-
-  socket:///tmp/reasonchip-broker-engine.sock
-
-It's an incredibly intolerant process by design. It will die if anything strange happens between it and the broker. The broker should know what it's doing.
 """
 
     @classmethod
@@ -72,14 +62,35 @@ It's an incredibly intolerant process by design. It will die if anything strange
             default=[],
             metavar="name=<directory>",
             type=str,
-            help="Root path of a workflow collection. Default serves ./ only",
+            help="List of named collections.",
         )
         parser.add_argument(
-            "--broker",
-            metavar="<address>",
+            "--amqp-url",
+            metavar="<url>",
             type=str,
-            default=DEFAULT_LISTENERS[0],
-            help="Address of the broker. Socket or IP4/6",
+            default="amqp://localhost",
+            help="AMQP URL",
+        )
+        parser.add_argument(
+            "--amqp-queue",
+            metavar="<name>",
+            type=str,
+            required=True,
+            help="Queue name",
+        )
+        parser.add_argument(
+            "--amqp-exchange",
+            metavar="<name>",
+            type=str,
+            default="",
+            help="Exchange name",
+        )
+        parser.add_argument(
+            "--amqp-routing-key",
+            metavar="<key>",
+            type=str,
+            default="",
+            help="Routing key",
         )
         parser.add_argument(
             "--tasks",
@@ -90,7 +101,6 @@ It's an incredibly intolerant process by design. It will die if anything strange
         )
 
         cls.add_default_options(parser)
-        cls.add_ssl_client_options(parser)
 
     async def main(
         self,
@@ -104,17 +114,6 @@ It's an incredibly intolerant process by design. It will die if anything strange
         if not args.collections:
             print("No collections specified")
             return ExitCode.ERROR
-
-        # SSL Context
-        ssl_options = SSLClientOptions.from_args(args)
-        ssl_context = ssl_options.create_ssl_context() if ssl_options else None
-
-        # Let's create the SSL context right up front.
-        transport = worker_to_broker(
-            args.broker,
-            ssl_client_options=ssl_options,
-            ssl_context=ssl_context,
-        )
 
         await self.setup_signal_handlers()
 
@@ -142,19 +141,32 @@ It's an incredibly intolerant process by design. It will die if anything strange
             # Create the Engine and EngineContext
             engine = Engine(workflow_set=workflow_set)
 
-            # Now we start the loop to receive requests and process them.
-            tm = TaskManager(
-                engine=engine,
-                transport=transport,
-                max_capacity=args.tasks,
+            # Now we create a consumer
+            async def amqp_callback(packet: bytes) -> AMQPCallbackResp:
+                print(f"Received packet: {packet}")
+                return AMQPCallbackResp.ACK
+
+            amqp = AmqpConsumer(callback=amqp_callback)
+            rc = amqp.initialize(
+                amqp_url=args.amqp_url,
+                queue_name=args.amqp_queue,
+                exchange_name=args.amqp_exchange,
+                routing_key=args.amqp_routing_key,
             )
-            await tm.start()
+            if rc == False:
+                raise ValueError(
+                    f"Failed to initialize AMQP consumer with URL: {args.amqp_url}, "
+                    f"queue: {args.amqp_queue}, exchange: {args.amqp_exchange}, "
+                    f"routing key: {args.amqp_routing_key}"
+                )
+
+            await amqp.start()
 
             # Wait for signals or the client to stop
             task_wait = asyncio.create_task(self._die.wait())
-            task_manager = asyncio.create_task(tm.wait())
+            task_consumer = amqp.task()
 
-            wl = [task_wait, task_manager]
+            wl = [task_wait, task_consumer]
 
             while wl:
                 done, _ = await asyncio.wait(
@@ -166,15 +178,18 @@ It's an incredibly intolerant process by design. It will die if anything strange
                     wl.remove(task_wait)
                     task_wait = None
 
-                    if task_manager in wl:
-                        await tm.stop()
+                    if task_consumer in wl:
+                        await amqp.stop()
 
-                if task_manager in done:
-                    wl.remove(task_manager)
-                    task_manager = None
+                if task_consumer in done:
+                    wl.remove(task_consumer)
+                    task_consumer = None
 
                     if task_wait in wl:
                         self._die.set()
+
+            # Shutdown
+            amqp.shutdown()
 
             # Exit
             return ExitCode.OK

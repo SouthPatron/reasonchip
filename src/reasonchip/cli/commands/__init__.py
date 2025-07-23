@@ -9,10 +9,9 @@ from .command import Command, AsyncCommand
 from .exit_code import ExitCode
 
 # Commands
-from .broker_command import BrokerCommand
-from .run_command import RunCommand
-from .run_local_command import RunLocalCommand
-from .worker_command import WorkerCommand
+# from .run_command import RunCommand
+# from .run_local_command import RunLocalCommand
+from .serve_command import ServeCommand
 
 
 def get_commands() -> (
@@ -22,10 +21,9 @@ def get_commands() -> (
         x.command(): x
         for x in [
             # Socket commands
-            BrokerCommand,
-            RunCommand,
-            RunLocalCommand,
-            WorkerCommand,
+            # RunCommand,
+            # RunLocalCommand,
+            ServeCommand,
         ]
     }
 
