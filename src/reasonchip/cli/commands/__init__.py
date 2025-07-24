@@ -11,6 +11,7 @@ from .exit_code import ExitCode
 # Commands
 # from .run_command import RunCommand
 # from .run_local_command import RunLocalCommand
+from .dispatch_command import DispatchCommand
 from .serve_command import ServeCommand
 
 
@@ -23,6 +24,7 @@ def get_commands() -> (
             # Socket commands
             # RunCommand,
             # RunLocalCommand,
+            DispatchCommand,
             ServeCommand,
         ]
     }

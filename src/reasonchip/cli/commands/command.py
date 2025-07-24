@@ -198,6 +198,41 @@ class BaseCommand(ABC):
             help="TLS version to use: 1.2, 1.3, etc.",
         )
 
+    @classmethod
+    def add_amqp_options(
+        cls,
+        parser: argparse.ArgumentParser,
+    ):
+        group = parser.add_argument_group("AMQP Options")
+        group.add_argument(
+            "--amqp-url",
+            metavar="<url>",
+            type=str,
+            default="amqp://localhost",
+            help="AMQP URL",
+        )
+        group.add_argument(
+            "--amqp-queue",
+            metavar="<name>",
+            type=str,
+            required=True,
+            help="Queue name",
+        )
+        group.add_argument(
+            "--amqp-exchange",
+            metavar="<name>",
+            type=str,
+            default="reasonchip",
+            help="Exchange name",
+        )
+        group.add_argument(
+            "--amqp-routing-key",
+            metavar="<key>",
+            type=str,
+            default="reasonchip",
+            help="Routing key",
+        )
+
 
 class Command(BaseCommand):
 

@@ -18,7 +18,7 @@ from reasonchip.core.engine.workflows import WorkflowLoader
 from reasonchip.core.engine.engine import Engine, WorkflowSet
 from reasonchip.net.amqp_consumer import AmqpConsumer, AMQPCallbackResp
 from reasonchip.net.task_manager import TaskManager
-from reasonchip.net.protocol import SocketPacket, PacketType, ResultCode
+from reasonchip.net.protocol import SocketPacket, PacketType
 
 from .exit_code import ExitCode
 from .command import AsyncCommand
@@ -71,34 +71,6 @@ The AMQP url should be specified like these examples:
             help="List of named collections.",
         )
         parser.add_argument(
-            "--amqp-url",
-            metavar="<url>",
-            type=str,
-            default="amqp://localhost",
-            help="AMQP URL",
-        )
-        parser.add_argument(
-            "--amqp-queue",
-            metavar="<name>",
-            type=str,
-            required=True,
-            help="Queue name",
-        )
-        parser.add_argument(
-            "--amqp-exchange",
-            metavar="<name>",
-            type=str,
-            default="reasonchip",
-            help="Exchange name",
-        )
-        parser.add_argument(
-            "--amqp-routing-key",
-            metavar="<key>",
-            type=str,
-            default="reasonchip",
-            help="Routing key",
-        )
-        parser.add_argument(
             "--tasks",
             metavar="<number>",
             type=int,
@@ -107,6 +79,7 @@ The AMQP url should be specified like these examples:
         )
 
         cls.add_default_options(parser)
+        cls.add_amqp_options(parser)
 
     async def main(
         self,
@@ -243,6 +216,7 @@ The AMQP url should be specified like these examples:
             # ------------- THE DEATH PROCESS ---------------------------------
             if t_dying not in done:
                 t_dying.cancel()
+                await asyncio.gather(t_dying, return_exceptions=True)
 
             if t_consumer not in done:
                 await amqp.stop()
