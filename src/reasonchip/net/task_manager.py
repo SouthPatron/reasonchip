@@ -27,8 +27,7 @@ class TaskInfo:
 
 class TaskManager:
     """
-    TaskManager manages multiple engine tasks across a transport connection
-    to a server.
+    TaskManager manages multiple engine tasks up to a capacity.
     """
 
     def __init__(
@@ -122,6 +121,10 @@ class TaskManager:
         timeout: typing.Optional[float] = None,
     ) -> bool:
 
+        log.debug(
+            f"Queueing task: [{cookie}] [{workflow}] [{params}] with timeout={timeout}"
+        )
+
         # We will wait for the timeout, semaphore, or the task to die.
         t_dying = asyncio.create_task(self._dying.wait())
         t_queue = asyncio.create_task(self._sem.acquire())
@@ -135,19 +138,26 @@ class TaskManager:
 
         # Timeout occurred
         if not done:
+            log.debug("Queueing task timed out")
             t_dying.cancel()
             t_queue.cancel()
+            await asyncio.gather(t_dying, t_queue, return_exceptions=True)
             return False
 
         # We are actually dying
         if t_dying in done:
+            log.debug("Queueing task was cancelled because we are dying")
             t_queue.cancel()
+            await asyncio.gather(t_queue, return_exceptions=True)
             return False
 
         # We acquired the semaphore
         assert t_queue in done and t_queue.done()
 
+        log.debug("Semaphore acquired, proceeding with queueing")
+
         t_dying.cancel()
+        await asyncio.gather(t_dying, return_exceptions=True)
 
         # Queue the request
         await self._incoming_queue.put(

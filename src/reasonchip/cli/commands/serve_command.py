@@ -10,6 +10,7 @@ import asyncio
 import traceback
 import logging
 import re
+import uuid
 
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from reasonchip.core.engine.workflows import WorkflowLoader
 from reasonchip.core.engine.engine import Engine, WorkflowSet
 from reasonchip.net.amqp_consumer import AmqpConsumer, AMQPCallbackResp
 from reasonchip.net.task_manager import TaskManager
+from reasonchip.net.protocol import SocketPacket, PacketType, ResultCode
 
 from .exit_code import ExitCode
 from .command import AsyncCommand
@@ -154,8 +156,54 @@ The AMQP url should be specified like these examples:
 
             # ------------- AMQP CHANNEL --------------------------------------
             async def amqp_callback(packet: bytes) -> AMQPCallbackResp:
-                print(f"Received packet: {packet}")
-                return AMQPCallbackResp.ACK
+                # Now we get SocketPacket (Pydantic2) to process packet.
+                try:
+                    log.debug(
+                        f"Received packet from AMQP: {packet.decode('utf-8')}"
+                    )
+
+                    # Process and approve the packet.
+                    sp = SocketPacket.model_validate_json(
+                        packet.decode("utf-8")
+                    )
+
+                    if sp.packet_type != PacketType.RUN:
+                        log.error(
+                            f"Received unexpected packet type: {sp.packet_type}"
+                        )
+                        return AMQPCallbackResp.REJECT
+
+                    if not sp.workflow:
+                        raise ValueError(
+                            "Workflow is not specified in the packet"
+                        )
+
+                    # Extract information
+                    cookie = sp.cookie or uuid.uuid4()
+                    workflow = sp.workflow
+                    variables = sp.variables or None
+
+                    # Queue
+                    queued = await taskman.queue(
+                        cookie=cookie,
+                        workflow=workflow,
+                        params=variables,
+                    )
+
+                    if queued:
+                        log.info(
+                            f"Queued task with cookie: {cookie}, workflow: {workflow}"
+                        )
+                    else:
+                        log.error(
+                            f"Failed to queue task with cookie: {cookie}, workflow: {workflow}"
+                        )
+
+                    return AMQPCallbackResp.ACK
+
+                except Exception as e:
+                    log.error(f"Failed to process packet: {e}")
+                    return AMQPCallbackResp.REJECT
 
             log.info("Starting AMQP consumer")
 
