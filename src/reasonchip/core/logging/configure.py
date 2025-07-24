@@ -74,27 +74,43 @@ def configure_logging(
     for name in logging.root.manager.loggerDict:
         logger = logging.getLogger(name)
 
-        if name in levels:
-            level = levels[name]
-            logger.setLevel(level)
-            logger.propagate = False
-            for h in logger.handlers:
-                logger.removeHandler(h)
-            logger.addHandler(syslog_handler)
+        # Configure as requested or as the root logger
+        tmp_name = name if name in levels else "root"
+        level = levels[tmp_name]
+        logger.setLevel(level)
+        logger.propagate = False
+        logger.disabled = False
+        for h in logger.handlers:
+            logger.removeHandler(h)
+        logger.addHandler(syslog_handler)
+        setattr(logger, "_crafty", True)
 
     # Hooking into the call
     original_get_logger = logging.getLogger
 
     def crafty_get_logger(name=None):
+        """
+        For each specific logger requested, set the level and handler.
+
+        If the logger isn't specifically configured, use the settings
+        for the
+        root logger.
+
+        This seems sane at the moment.
+        """
+
         logger = original_get_logger(name)
 
-        if name and name in levels and not getattr(logger, "_crafty", False):
-            logger.setLevel(levels[name])
-            logger.propagate = False
-            for h in logger.handlers:
-                logger.removeHandler(h)
-            logger.addHandler(syslog_handler)
-            setattr(logger, "_crafty", True)
+        if name:
+            if not getattr(logger, "_crafty", False):
+                tmp_name = name if name in levels else "root"
+                logger.setLevel(levels[tmp_name])
+                logger.propagate = False
+                logger.disabled = False
+                for h in logger.handlers:
+                    logger.removeHandler(h)
+                logger.addHandler(syslog_handler)
+                setattr(logger, "_crafty", True)
 
         return logger
 

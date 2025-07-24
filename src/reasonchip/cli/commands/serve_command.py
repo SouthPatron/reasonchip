@@ -16,6 +16,7 @@ from pathlib import Path
 from reasonchip.core.engine.workflows import WorkflowLoader
 from reasonchip.core.engine.engine import Engine, WorkflowSet
 from reasonchip.net.amqp_consumer import AmqpConsumer, AMQPCallbackResp
+from reasonchip.net.task_manager import TaskManager
 
 from .exit_code import ExitCode
 from .command import AsyncCommand
@@ -147,7 +148,11 @@ The AMQP url should be specified like these examples:
             # Create the Engine and EngineContext
             engine = Engine(workflow_set=workflow_set)
 
-            # Now we create a consumer
+            # ------------- TASK MANAGER --------------------------------------
+            taskman = TaskManager(engine=engine, max_capacity=args.tasks)
+            await taskman.start()
+
+            # ------------- AMQP CHANNEL --------------------------------------
             async def amqp_callback(packet: bytes) -> AMQPCallbackResp:
                 print(f"Received packet: {packet}")
                 return AMQPCallbackResp.ACK
@@ -174,43 +179,28 @@ The AMQP url should be specified like these examples:
 
             log.info("AMQP consumer started successfully")
 
-            # Wait for signals or the client to stop
-            task_wait = asyncio.create_task(self._die.wait())
-            task_consumer = amqp.task()
+            # ------------- MAIN LOOP -----------------------------------------
+            t_dying = asyncio.create_task(self._die.wait())
+            t_consumer = amqp.task()
+            t_manager = taskman.task()
 
-            wl = [task_wait, task_consumer]
+            wl = [t_dying, t_consumer, t_manager]
 
-            while wl:
-                log.info(
-                    f"Waiting for tasks to complete: {len(wl)} tasks remaining"
-                )
-                done, _ = await asyncio.wait(
-                    wl,
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
+            log.info("Waiting for termination or failure")
+            done, _ = await asyncio.wait(
+                wl,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
 
-                if task_wait in done:
-                    log.info(f"Received shutdown signal, stopping tasks...")
-                    wl.remove(task_wait)
-                    task_wait = None
+            # ------------- THE DEATH PROCESS ---------------------------------
+            if t_dying not in done:
+                t_dying.cancel()
 
-                    if task_consumer in wl:
-                        await amqp.stop()
+            if t_consumer not in done:
+                await amqp.stop()
 
-                if task_consumer in done:
-                    log.info(f"AMQP consumer task completed")
-                    if amqp.failed:
-                        ex = amqp.exception
-                        if ex:
-                            log.error(
-                                f"AMQP consumer task raised an exception: {ex}"
-                            )
-
-                    wl.remove(task_consumer)
-                    task_consumer = None
-
-                    if task_wait in wl:
-                        self._die.set()
+            if t_manager not in done:
+                await taskman.stop()
 
             # Shutdown
             log.info("Shutting down AMQP consumer")

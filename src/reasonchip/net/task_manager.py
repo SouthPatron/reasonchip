@@ -6,7 +6,6 @@
 import typing
 import uuid
 import asyncio
-import traceback
 import json
 import logging
 import time
@@ -15,18 +14,14 @@ from dataclasses import dataclass
 
 from reasonchip.core.engine.engine import Engine
 
-from .protocol import (
-    SocketPacket,
-    PacketType,
-    ResultCode,
-)
-
 log = logging.getLogger("reasonchip.net.task_manager")
 
 
 @dataclass
 class TaskInfo:
     cookie: uuid.UUID
+    workflow: str
+    params: typing.Optional[str] = None
     task: typing.Optional[asyncio.Task] = None
 
 
@@ -51,7 +46,9 @@ class TaskManager:
         self._lock: asyncio.Lock = asyncio.Lock()
 
         # Streams
-        self._incoming_queue: asyncio.Queue = asyncio.Queue()
+        self._incoming_queue: asyncio.Queue[TaskInfo] = asyncio.Queue[
+            TaskInfo
+        ]()
         self._sem: asyncio.Semaphore = asyncio.Semaphore()
 
         # Multiplexing
@@ -60,6 +57,12 @@ class TaskManager:
         self._tasks: typing.Dict[uuid.UUID, TaskInfo] = {}
 
         log.debug(f"TaskManager created")
+
+    # ------------------------- PROPERTIES -----------------------------------
+
+    def task(self) -> asyncio.Task:
+        assert self._handler is not None
+        return self._handler
 
     # ------------------------- LIFECYCLE ------------------------------------
 
@@ -113,7 +116,9 @@ class TaskManager:
 
     async def queue(
         self,
-        packet: SocketPacket,
+        cookie: uuid.UUID,
+        workflow: str,
+        params: typing.Optional[str] = None,
         timeout: typing.Optional[float] = None,
     ) -> bool:
 
@@ -139,32 +144,22 @@ class TaskManager:
             t_queue.cancel()
             return False
 
+        # We acquired the semaphore
+        assert t_queue in done and t_queue.done()
+
         t_dying.cancel()
 
-        # We acquired the semaphore. We can queue.
-        await self._incoming_queue.put(packet)
+        # Queue the request
+        await self._incoming_queue.put(
+            TaskInfo(
+                cookie=cookie,
+                workflow=workflow,
+                params=params,
+            )
+        )
         return True
 
     # ------------------------- PLEXORS --------------------------------------
-
-    async def _wait_for_engine(
-        self,
-        task: asyncio.Task,
-        cookie: uuid.UUID,
-    ) -> uuid.UUID:
-
-        log.debug(f"Waiting for engine run to complete: {cookie}")
-
-        # Wait for an engine run to complete
-        done, _ = await asyncio.wait(
-            [task],
-            return_when=asyncio.ALL_COMPLETED,
-        )
-        assert done
-
-        ex = task.exception()
-        assert ex is None
-        return cookie
 
     async def _multiplexing(self):
 
@@ -188,10 +183,12 @@ class TaskManager:
             )
             assert done
 
-            # Handle tasks
+            # Handle an engine completion
             for t in done:
                 if t in (t_dying, t_incoming):
                     continue
+
+                assert t and t.done()
 
                 wl.remove(t)
 
@@ -219,161 +216,60 @@ class TaskManager:
 
             # Receiving a packet
             if t_incoming in done:
-                assert t_incoming and t_incoming.done()
-
-                log.debug("Received packet on incoming queue")
+                assert t_incoming
 
                 wl.remove(t_incoming)
+
+                if t_incoming.cancelled():
+                    # Handle cancelled tasks
+                    log.debug("Incoming task was cancelled")
+                    t_incoming = None
+                    continue
+
+                assert t_incoming.done()
+
+                log.debug("Received packet on incoming queue")
 
                 rc = t_incoming.result()
 
                 t_incoming = None
 
-                assert rc is None or isinstance(rc, SocketPacket)
+                # Create and record the task
+                rc.task = asyncio.create_task(self._run_engine(rc))
+                self._tasks[rc.cookie] = rc
+                wl.append(rc.task)
 
-                restart = await self._process_server_packet(rc)
-
-                # Restart the task if advised and we're not dying
-                if restart and not self._dying.is_set():
+                # Restart the task if we're not dying
+                if not self._dying.is_set():
                     log.debug("Restarting the incoming queue task")
                     t_incoming = asyncio.create_task(self._incoming_queue.get())
-
                     wl.append(t_incoming)
-
-                else:
-                    if not self._dying.is_set():
-                        self._dying.set()
-                    log.debug("Not restarting the incoming queue task")
-
-            # Rebuild the waiting list, adding any running engines
-            wl = [x for x in (t_dying, t_incoming) if x is not None]
-
-            for t in self._tasks.values():
-                assert t.task is not None
-                wl.append(
-                    asyncio.create_task(self._wait_for_engine(t.task, t.cookie))
-                )
 
         log.debug(f"Exiting multiplexing loop")
 
-    # ------------------------- HANDLERS -------------------------------------
-
-    async def _process_server_packet(
-        self,
-        packet: SocketPacket,
-    ) -> typing.Optional[TaskInfo]:
-
-        log.debug(
-            f"Processing server packet: [{packet.packet_type}] [{packet.cookie}]"
-        )
-
-        handlers = {
-            PacketType.SHUTDOWN: self._srv_shutdown,
-            PacketType.RUN: self._srv_run,
-            PacketType.CANCEL: self._srv_cancel,
-        }
-
-        handler = handlers.get(
-            packet.packet_type, self._srv_unsupported_packet_type
-        )
-        return await handler(packet)
-
-    async def _srv_run(self, packet: SocketPacket) -> typing.Optional[TaskInfo]:
-        # Make sure we have capacity
-        if len(self._tasks) >= self._max_capacity:
-            log.fatal(
-                "Capacity reached on worker. We should never have been asked."
-            )
-            return None
-
-        # Check if the packet is fine
-        if not packet.cookie or not packet.workflow:
-            log.fatal(
-                "Missing cookie or pipeline in packet. Should have been checked beforehand."
-            )
-            return None
-
-        # Check for collisions
-        if packet.cookie in self._tasks:
-            log.fatal(
-                "Cookie collision has occurred. Should never have been allowed."
-            )
-            return None
-
-        # Create a new task
-        task_info = TaskInfo(cookie=packet.cookie)
-        self._tasks[packet.cookie] = task_info
-
-        task_info.task = asyncio.create_task(
-            self._run_engine(
-                task_info,
-                workflow=packet.workflow,
-                variables=packet.variables,
-            )
-        )
-
-        return task_info
-
-    async def _srv_cancel(
-        self, packet: SocketPacket
-    ) -> typing.Optional[TaskInfo]:
-        # Check if the packet is fine
-        if not packet.cookie:
-            log.fatal("Missing cookie. Should have been checked beforehand.")
-            return None
-
-        # Check for the task
-        if packet.cookie not in self._tasks:
-            log.warning(
-                f"Cookie not found trying to cancel. Could be a race condition: [{packet.cookie}]"
-            )
-            return None
-
-        log.info(f"Cancelling task: [{packet.cookie}]")
-
-        task_info = self._tasks[packet.cookie]
-        assert task_info.task is not None
-        task_info.task.cancel()
-        return None
-
-    async def _srv_shutdown(
-        self, packet: SocketPacket
-    ) -> typing.Optional[TaskInfo]:
-        log.info(f"Shutdown request received from server")
-        return None
-
-    async def _srv_unsupported_packet_type(
-        self, packet: SocketPacket
-    ) -> typing.Optional[TaskInfo]:
-        log.fatal(f"Unsupported packet type: [{packet.packet_type}]")
-        return None
-
     # ------------------------- ENGINE RUNNER --------------------------------
 
-    async def _run_engine(
-        self,
-        task_info: TaskInfo,
-        workflow: str,
-        variables: typing.Optional[str] = None,
-    ):
+    async def _run_engine(self, task_info: TaskInfo):
         start_time = time.perf_counter()
 
         try:
-            log.info(f"Running engine: [{task_info.cookie}] [{workflow}]")
+            log.info(
+                f"Running engine: [{task_info.cookie}] [{task_info.workflow}]"
+            )
 
             # Process the variables
-            v = json.loads(variables) if variables else {}
+            v = json.loads(task_info.params) if task_info.params else {}
 
             # Run the engine
-            rc = await self._engine.run(entry=workflow, **v)
+            rc = await self._engine.run(entry=task_info.workflow, **v)
 
             log.debug(
-                f"Engine run completed: [{task_info.cookie}] [{workflow}] [{rc}]"
+                f"Engine run completed: [{task_info.cookie}] [{task_info.workflow}] [{rc}]"
             )
 
         except Exception:
             log.exception(
-                f"Exception occurred during engine run: [{task_info.cookie}] [{workflow}]"
+                f"Exception occurred during engine run: [{task_info.cookie}] [{task_info.workflow}]"
             )
 
         end_time = time.perf_counter()
@@ -384,5 +280,7 @@ class TaskManager:
         time_s = time_ms / 1_000
 
         log.info(
-            f"Engine task completed: [{task_info.cookie}] [{workflow}] [{elapsed:.2f}us] [{time_ms:.2f}ms] [{time_s:.2f}s]"
+            f"Engine task completed: [{task_info.cookie}] [{task_info.workflow}] [{elapsed:.2f}us] [{time_ms:.2f}ms] [{time_s:.2f}s]"
         )
+
+        return task_info.cookie
