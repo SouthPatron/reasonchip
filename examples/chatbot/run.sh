@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
 
-
-reasonchip run chatbot.app.entry
+reasonchip run								\
+	--log-level DEBUG						\
+	--collection chatbot=./workflows		\
+	chatbot.app.entry
