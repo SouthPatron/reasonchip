@@ -46,6 +46,10 @@ async def entry(
 
         history.append({"role": "assistant", "content": reply})
 
+        history = history[-20:]  # Keep only the last 20 messages
+
+        print(f"Reply to user '{user_id}': {reply}")
+
     except Exception as e:
         log.exception("OpenAI request failed")
         return f"[error]: {e}"

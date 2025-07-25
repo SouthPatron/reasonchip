@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
 
+while true; do
+	read -rp "You: " message
 
-#	--log-level reasonchip.cli.commands.serve=DEBUG			\
-#	--variables ./variables.json			\
-#	--set "a.b.e=6"							\
+	if [[ "$message" == "quit" ]]; then
+		echo "Exiting chatbot..."
+		break
+	fi
 
-reasonchip dispatch							\
-	--log-level DEBUG						\
-	--amqp-url ${AMQP_URL}					\
-	--amqp-topic reasonchip					\
-	chatbot.app.entry
+	reasonchip dispatch							\
+		--log-level DEBUG						\
+		--amqp-url ${AMQP_URL}					\
+		--amqp-topic reasonchip					\
+		--variables ./variables.json			\
+		chatbot.app.entry						\
+		--set "message=$message"
 
+done
