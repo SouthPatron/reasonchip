@@ -11,10 +11,8 @@ import uuid
 import logging
 import traceback
 
-
 from .exit_code import ExitCode
 from .command import AsyncCommand
-
 
 log = logging.getLogger("reasonchip.cli.commands.dispatch")
 
