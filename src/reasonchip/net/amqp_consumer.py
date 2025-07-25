@@ -13,7 +13,7 @@ from aio_pika.abc import (
     AbstractRobustQueue,
 )
 
-log = logging.getLogger("reasonchip.core.net.amqp_consumer")
+log = logging.getLogger("reasonchip.net.amqp_consumer")
 
 
 class AMQPCallbackResp(enum.Enum):

@@ -11,6 +11,9 @@ import uuid
 import logging
 import traceback
 
+from reasonchip.net.amqp_client import AmqpClient
+from reasonchip.net.protocol import SocketPacket, PacketType
+
 from .exit_code import ExitCode
 from .command import AsyncCommand
 
@@ -67,7 +70,7 @@ This dispatches a workflow with variables to the AMQP broker.
         )
 
         cls.add_default_options(parser)
-        cls.add_amqp_options(parser)
+        cls.add_amqp_client_options(parser)
 
     async def main(
         self,
@@ -96,15 +99,48 @@ This dispatches a workflow with variables to the AMQP broker.
 
         # Create the connection
         try:
-            from pprint import pprint
 
-            pprint(variables)
+            # ------------- AMQP CHANNEL --------------------------------------
+            amqp = AmqpClient()
+            rc = await amqp.connect(
+                amqp_url=args.amqp_url,
+                exchange_name=args.amqp_exchange,
+            )
+            if rc == False:
+                raise ValueError(
+                    f"Failed to connect to AMQP broker at {args.amqp_url},"
+                    f" exchange {args.amqp_exchange}"
+                )
+
+            log.info("Connected to AMQP broker successfully")
+
+            # ------------- SEND PACKET ---------------------------------------
+
+            packet = SocketPacket(
+                packet_type=PacketType.RUN,
+                cookie=uuid.uuid4(),
+                workflow=args.workflow,
+                variables=json.dumps(variables) if variables else None,
+            )
+
+            success = await amqp.send_message(
+                topic=args.amqp_topic,
+                message=packet.model_dump_json().encode("utf-8"),
+            )
+
+            # ------------- CLEANUP AND SHUTDOWN ------------------------------
+
+            await amqp.disconnect()
+
+            if not success:
+                return ExitCode.ERROR
+
+            return ExitCode.OK
 
         except Exception as ex:
             print("************** EXCEPTION ************************")
             traceback.print_exc()
-
-        return ExitCode.OK
+            return ExitCode.ERROR
 
     # -------------------------- VARIABLES -----------------------------------
 

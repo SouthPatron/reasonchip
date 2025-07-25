@@ -79,7 +79,7 @@ The AMQP url should be specified like these examples:
         )
 
         cls.add_default_options(parser)
-        cls.add_amqp_options(parser)
+        cls.add_amqp_listener_options(parser)
 
     async def main(
         self,

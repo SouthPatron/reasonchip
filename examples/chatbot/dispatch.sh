@@ -6,8 +6,8 @@
 reasonchip dispatch							\
 	--log-level DEBUG						\
 	--amqp-url ${AMQP_URL}					\
-	--amqp-queue reasonchip					\
+	--amqp-topic reasonchip					\
 	--variables ./variables.json			\
 	--set "a.b.e=6"							\
-	hello_world
+	chatbot.app.entry
 

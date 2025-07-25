@@ -199,11 +199,39 @@ class BaseCommand(ABC):
         )
 
     @classmethod
-    def add_amqp_options(
+    def add_amqp_client_options(
         cls,
         parser: argparse.ArgumentParser,
     ):
-        group = parser.add_argument_group("AMQP Options")
+        group = parser.add_argument_group("AMQP Client Options")
+        group.add_argument(
+            "--amqp-url",
+            metavar="<url>",
+            type=str,
+            default="amqp://localhost",
+            help="AMQP URL",
+        )
+        group.add_argument(
+            "--amqp-exchange",
+            metavar="<name>",
+            type=str,
+            default="reasonchip",
+            help="Exchange name",
+        )
+        group.add_argument(
+            "--amqp-topic",
+            metavar="<topic>",
+            type=str,
+            default="reasonchip",
+            help="Topic",
+        )
+
+    @classmethod
+    def add_amqp_listener_options(
+        cls,
+        parser: argparse.ArgumentParser,
+    ):
+        group = parser.add_argument_group("AMQP Listener Options")
         group.add_argument(
             "--amqp-url",
             metavar="<url>",
