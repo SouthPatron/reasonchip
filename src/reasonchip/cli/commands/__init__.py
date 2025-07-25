@@ -9,8 +9,8 @@ from .command import Command, AsyncCommand
 from .exit_code import ExitCode
 
 # Commands
-from .run_command import RunCommand
 from .dispatch_command import DispatchCommand
+from .run_command import RunCommand
 from .serve_command import ServeCommand
 
 
@@ -21,8 +21,8 @@ def get_commands() -> (
         x.command(): x
         for x in [
             # Socket commands
-            RunCommand,
             DispatchCommand,
+            RunCommand,
             ServeCommand,
         ]
     }
