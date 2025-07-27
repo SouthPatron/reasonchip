@@ -8,6 +8,7 @@ from __future__ import annotations
 import typing
 import logging
 import asyncio
+import importlib
 
 from .. import exceptions as rex
 
@@ -129,27 +130,26 @@ class EngineContext:
         if not self._stack:
             return name
 
-        # Count the relative dots (e.g., "..foo.bar" -> ["", "", "foo", "bar"])
-        parts = name.split(".")
-        num_dots = 0
-        for part in parts:
-            if part != "":
-                num_dots += 1
-            else:
-                break
+        # Handle relative imports
+        new_parts = name.split(".")
+        old_parts = self._stack[-1].split(".")
 
-        # If it's already fully qualified, return it as is.
-        if num_dots == 0:
+        # Nothing is relative
+        if new_parts[0] != "":
             return name
 
-        # Resolve any relative paths
-        current = self._stack[-1].split(".")
-        if num_dots > len(current):
-            raise rex.WorkflowNotFoundException(name)
+        # Handle relative paths
+        while new_parts[0] == "":
+            # We can't go up if there's nothing to go up from.
+            if not old_parts:
+                raise rex.WorkflowNotFoundException(name)
 
-        base = current[: len(current) - num_dots]
-        tail = parts[num_dots:]
-        return ".".join(base + tail)
+            old_parts.pop()
+            new_parts = new_parts[1:]
+
+        # Join the old parts and new parts to form the fully qualified name.
+        new_name = ".".join(old_parts + new_parts)
+        return new_name
 
     async def _fetch_callable(self, fqn: str) -> WorkflowStep:
 
@@ -165,8 +165,26 @@ class EngineContext:
                     raise rex.WorkflowNotFoundException(fqn)
 
                 # Try to import the module and get the function.
+                log.debug(
+                    f"Importing '{func_name}' from module '{module_path}'"
+                )
                 mod = __import__(module_path, fromlist=[func_name])
-                func = getattr(mod, func_name)
+                log.debug(f"Successfully imported '{module_path}'")
+                func = getattr(mod, func_name, None)
+
+                # Check that func is a module
+                if isinstance(func, type(mod)):
+                    # Look for 'entry' within the module
+                    log.debug(f"'{func_name}' is a module. Looking for entry.")
+                    mod = __import__(fqn, fromlist=["entry"])
+                    func = getattr(mod, "entry", None)
+
+                    log.debug(f"Found module '{fqn}' with entry '{func_name}'")
+
+                    if not func:
+                        log.debug(
+                            f"Function 'entry' not found in module '{fqn}'"
+                        )
 
                 # Make sure it's a WorkflowStep callable
                 if not isinstance(func, WorkflowStep):

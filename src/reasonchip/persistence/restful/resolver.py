@@ -10,7 +10,7 @@ from pydantic import (
     Field,
     create_model,
 )
-from auth.auth_handler import AuthHandler
+from .auth.auth_handler import AuthHandler
 from .models import (
     RestfulModel,
     DefinedModel,
