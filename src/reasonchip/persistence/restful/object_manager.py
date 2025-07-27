@@ -82,7 +82,11 @@ class ObjectManager:
         if self._auth:
             await self._auth.on_request(self._session)
 
-        payload = data.model_dump() if isinstance(data, BaseModel) else data
+        payload = (
+            data.model_dump(mode="json")
+            if isinstance(data, BaseModel)
+            else data
+        )
 
         resp = await self._session.post(endpoint, json=payload)
 
@@ -143,7 +147,11 @@ class ObjectManager:
         if self._auth:
             await self._auth.on_request(self._session)
 
-        payload = data.model_dump() if isinstance(data, BaseModel) else data
+        payload = (
+            data.model_dump(mode="json")
+            if isinstance(data, BaseModel)
+            else data
+        )
 
         resp = await self._session.put(endpoint, json=payload)
 
