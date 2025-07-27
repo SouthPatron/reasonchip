@@ -7,35 +7,47 @@ from __future__ import annotations
 
 import typing
 import logging
+import asyncio
 
 from .. import exceptions as rex
 
-from .workflows import (
-    WorkflowContext,
-    WorkflowSet,
-)
 
 log = logging.getLogger("reasonchip.core.engine.engine")
 
+# -------------------------- TYPES ------------------------------------------
 
-class EngineContext(WorkflowContext):
+
+@typing.runtime_checkable
+class WorkflowStep(typing.Protocol):
+    """
+    Protocol for a workflow step.
+    """
+
+    def __call__(
+        self,
+        context: EngineContext,
+        *args: typing.Any,
+        **kwargs: typing.Any,
+    ) -> typing.Awaitable[typing.Any]: ...
+
+
+# -------------------------- SUPPORT CLASSES --------------------------------
+
+
+class EngineContext:
     """
     A context for the workflow engine which is passed to each step in the
     workflow.
     """
 
-    def __init__(
-        self,
-        workflow_set: WorkflowSet,
-    ):
+    def __init__(self):
         """
         Constructor.
-
-        :param workflow_set: The workflow set to use.
         """
-        self._workflow_set: WorkflowSet = workflow_set
+        self._lock: asyncio.Lock = asyncio.Lock()
         self._stack: typing.List[str] = []
         self._state: typing.Dict[str, typing.Any] = {}
+        self._cache: typing.Dict[str, WorkflowStep] = {}
 
     @property
     def state(self) -> typing.Dict[str, typing.Any]:
@@ -72,7 +84,7 @@ class EngineContext(WorkflowContext):
         log.debug(f"Resolved workflow step '{name}' to '{fqn}'")
 
         # Resolve the workflow step.
-        step = await self._workflow_set.resolve(fqn)
+        step = await self._fetch_callable(fqn)
 
         # Turn the step into a callable.
         self._stack.append(fqn)
@@ -139,31 +151,44 @@ class EngineContext(WorkflowContext):
         tail = parts[num_dots:]
         return ".".join(base + tail)
 
+    async def _fetch_callable(self, fqn: str) -> WorkflowStep:
+
+        try:
+            # Check if we already have this step cached.
+            async with self._lock:
+                if fqn in self._cache:
+                    return self._cache[fqn]
+
+                # Discover the module and function name from the FQN.
+                module_path, _, func_name = fqn.rpartition(".")
+                if not module_path or not func_name:
+                    raise rex.WorkflowNotFoundException(fqn)
+
+                # Try to import the module and get the function.
+                mod = __import__(module_path, fromlist=[func_name])
+                func = getattr(mod, func_name)
+
+                # Make sure it's a WorkflowStep callable
+                if not isinstance(func, WorkflowStep):
+                    raise RuntimeError(
+                        f"Workflow step '{fqn}' is not a valid callable."
+                    )
+
+                self._cache[fqn] = func
+                return func
+
+        except Exception as e:
+            log.error(f"Failed to import workflow step '{fqn}': {e}")
+            raise rex.WorkflowNotFoundException(fqn) from e
+
+
+# -------------------------- ENGINE ITSELF ----------------------------------
+
 
 class Engine:
     """
     A class with a big name and a little job.
     """
-
-    def __init__(
-        self,
-        workflow_set: WorkflowSet,
-    ):
-        """
-        Constructor.
-
-        :param workflow_set: The workflow set to use.
-        """
-        self._workflow_set: WorkflowSet = workflow_set
-
-    @property
-    def workflow_set(self) -> WorkflowSet:
-        """
-        Return the workflow set associated with this engine.
-
-        :return: The workflow set.
-        """
-        return self._workflow_set
 
     async def run(
         self,
@@ -185,7 +210,7 @@ class Engine:
         t_args = args
         t_kwargs = kwargs
 
-        context: EngineContext = EngineContext(self._workflow_set)
+        context: EngineContext = EngineContext()
 
         while True:
 

@@ -10,10 +10,7 @@ import json
 import logging
 import traceback
 
-from pathlib import Path
-
-from reasonchip.core.engine.workflows import WorkflowLoader
-from reasonchip.core.engine.engine import Engine, WorkflowSet
+from reasonchip import Engine
 
 from .exit_code import ExitCode
 from .command import AsyncCommand
@@ -43,15 +40,6 @@ class RunCommand(AsyncCommand):
             metavar="<name>",
             type=str,
             help="Name of the workflow to run",
-        )
-        parser.add_argument(
-            "--collection",
-            dest="collections",
-            action="append",
-            default=[],
-            metavar="name=<directory>",
-            type=str,
-            help="Root of a workflow collection",
         )
         parser.add_argument(
             "--variables",
@@ -97,32 +85,9 @@ class RunCommand(AsyncCommand):
             key, value = m[1], m[2]
             variables = self._deep_update(variables, key, value)
 
-        workflow_loader = WorkflowLoader()
-        workflow_set = WorkflowSet()
-
         try:
-            # Create the WorkflowSet.
-            log.info(f"Attempting to load {len(args.collections)} collections")
-            for x in args.collections:
-                m = re.match(r"^(.*?)=(.*)$", x)
-                if not m:
-                    raise ValueError(f"Invalid key value pair: {x}")
-
-                key, value = m[1], m[2]
-
-                abs_path = str(Path(value).resolve())
-
-                workflow = workflow_loader.load_from_path(
-                    module_name=key,
-                    path=abs_path,
-                )
-
-                workflow_set.add(workflow)
-
-                log.info(f"\tLoaded workflow '{key}' from {abs_path}")
-
-            # Create the Engine and EngineContext
-            engine = Engine(workflow_set=workflow_set)
+            # Create the Engine
+            engine = Engine()
 
             # Run the engine and the run
             rc = await engine.run(entry=args.workflow, **variables)

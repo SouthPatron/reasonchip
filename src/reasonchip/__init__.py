@@ -3,8 +3,9 @@
 # This file is part of ReasonChip and licensed under the GPLv3+.
 # See <https://www.gnu.org/licenses/> for details.
 
-from .core.engine.engine import EngineContext
+from .core.engine.engine import EngineContext, Engine
 
 __all__ = [
     "EngineContext",
+    "Engine",
 ]

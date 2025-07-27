@@ -14,8 +14,7 @@ import uuid
 
 from pathlib import Path
 
-from reasonchip.core.engine.workflows import WorkflowLoader
-from reasonchip.core.engine.engine import Engine, WorkflowSet
+from reasonchip.core.engine.engine import Engine
 from reasonchip.net.amqp_consumer import AmqpConsumer, AMQPCallbackResp
 from reasonchip.net.task_manager import TaskManager
 from reasonchip.net.protocol import SocketPacket, PacketType
@@ -62,15 +61,6 @@ The AMQP url should be specified like these examples:
     @classmethod
     def build_parser(cls, parser: argparse.ArgumentParser):
         parser.add_argument(
-            "--collection",
-            dest="collections",
-            action="append",
-            default=[],
-            metavar="name=<directory>",
-            type=str,
-            help="List of named collections.",
-        )
-        parser.add_argument(
             "--tasks",
             metavar="<number>",
             type=int,
@@ -90,38 +80,11 @@ The AMQP url should be specified like these examples:
         Main entry point for the application.
         """
 
-        if not args.collections:
-            print("No collections specified")
-            return ExitCode.ERROR
-
         await self.setup_signal_handlers()
 
-        workflow_loader = WorkflowLoader()
-        workflow_set = WorkflowSet()
-
         try:
-            # Create the WorkflowSet.
-            log.info(f"Attempting to load {len(args.collections)} collections")
-            for x in args.collections:
-                m = re.match(r"^(.*?)=(.*)$", x)
-                if not m:
-                    raise ValueError(f"Invalid key value pair: {x}")
-
-                key, value = m[1], m[2]
-
-                abs_path = str(Path(value).resolve())
-
-                workflow = workflow_loader.load_from_path(
-                    module_name=key,
-                    path=abs_path,
-                )
-
-                workflow_set.add(workflow)
-
-                log.info(f"\tLoaded workflow '{key}' from {abs_path}")
-
-            # Create the Engine and EngineContext
-            engine = Engine(workflow_set=workflow_set)
+            # Create the Engine
+            engine = Engine()
 
             # ------------- TASK MANAGER --------------------------------------
             taskman = TaskManager(engine=engine, max_capacity=args.tasks)
