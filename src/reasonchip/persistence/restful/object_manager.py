@@ -50,9 +50,6 @@ class ObjectManager:
 
         if resp.status_code == 200:
             rc = resp.json()
-            from pprint import pprint
-
-            pprint(rc)
 
             RestfulPageModel = RestfulResult[mod]
             return RestfulPageModel.model_validate(rc)

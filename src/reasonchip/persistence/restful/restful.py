@@ -34,7 +34,7 @@ class Restful:
         )
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        await self._session.aclose()
+        pass
 
     # ---------------------- METHODS -----------------------------------------
 
