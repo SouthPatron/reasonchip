@@ -21,9 +21,6 @@ class Restful:
 
         p = params or {}
 
-        if "follow_redirects" not in p:
-            p["follow_redirects"] = True
-
         self._session = httpx.AsyncClient(**p)
 
     async def __aenter__(self):
