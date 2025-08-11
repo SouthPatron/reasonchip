@@ -190,3 +190,46 @@ class ObjectManager:
         raise RuntimeError(
             f"Unable to delete object: {mod}: {oid} {resp.status_code} - {resp.text}"
         )
+
+    # ---------------------------- CONVENIENCES ------------------------------
+
+    async def one_or_none(
+        self,
+        query: typing.Optional[Query] = None,
+    ) -> typing.Optional[RestfulModel]:
+
+        mod = self._model
+        endpoint = mod._endpoint.strip("/") + "/"
+
+        if self._auth:
+            await self._auth.on_request(self._session)
+
+        params = query.to_params() if query else {}
+
+        resp = await self._session.get(endpoint, params=params)
+
+        if resp.status_code == 200:
+            rc = resp.json()
+
+            RestfulPageModel = RestfulResult[mod]
+            obj = RestfulPageModel.model_validate(rc)
+            if obj.count == 0:
+                return None
+
+            if obj.count == 1:
+                return obj.results[0]
+
+            raise RuntimeError(
+                f"Expected one object, but found {obj.count} for query: {query}"
+            )
+
+        if resp.status_code == 401 and self._auth:
+            await self._auth.on_forbidden(self._session)
+            return await self.one_or_none(query=query)
+
+        if resp.status_code == 404:
+            return None
+
+        raise RuntimeError(
+            f"Unable to filter: {mod}: {resp.status_code} - {resp.text}"
+        )
