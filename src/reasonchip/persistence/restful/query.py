@@ -1,3 +1,4 @@
+from __future__ import annotations
 import typing
 
 
@@ -12,17 +13,25 @@ class Query:
         self._limit: typing.Optional[int] = None
         self._offset: typing.Optional[int] = None
 
-    def filter(self, **kwargs):
+    def search(self, term: str) -> Query:
+        self._filters["search"] = term
+        return self
+
+    def filter(self, **kwargs) -> Query:
         self._filters.update(kwargs)
+        return self
 
-    def order_by(self, ordering: str):
+    def order_by(self, ordering: str) -> Query:
         self._ordering = ordering
+        return self
 
-    def limit(self, limit: int):
+    def limit(self, limit: int) -> Query:
         self._limit = limit
+        return self
 
-    def offset(self, offset: int = 0):
+    def offset(self, offset: int = 0) -> Query:
         self._offset = offset
+        return self
 
     def to_params(self) -> dict:
         params = self._filters.copy()

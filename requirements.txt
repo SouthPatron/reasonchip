@@ -6,16 +6,10 @@ black>=25.1.0
 pre-commit>=4.2.0
 
 # Engine
-ruamel.yaml>=0.18.6
-munch>=4.0.0
 pydantic>=2
 
 # Servers
-fastapi>=0.115.6
-hypercorn[h3]>=0.17.3
-grpcio>=1.68.1
-grpcio-reflection>=1.68.1
-grpcio-tools>=1.68.1
+aio-pika>=9.5.5
 
 # Persistence
 SQLAlchemy>=2.0.40
@@ -25,9 +19,4 @@ diff-match-patch>=20241021
 
 # RESTful
 httpx>=0.28.1
-
-# Chip specific
-openai>=1.61.1
-redis[hiredis]>=5.2.1
-python-telegram-bot>=21.10
 

@@ -3,22 +3,203 @@
 # This file is part of ReasonChip and licensed under the GPLv3+.
 # See <https://www.gnu.org/licenses/> for details.
 
-import typing
+from __future__ import annotations
 
-from .pipelines import (
-    PipelineLoader,
-    Pipeline,
-    Task,
-    TaskSet,
-    DispatchTask,
-    BranchTask,
-    ChipTask,
-)
-from .processor import Processor
-from .variables import Variables
-from .registry import Registry
+import typing
+import logging
+import asyncio
 
 from .. import exceptions as rex
+
+
+log = logging.getLogger("reasonchip.core.engine.engine")
+
+# -------------------------- TYPES ------------------------------------------
+
+
+@typing.runtime_checkable
+class WorkflowStep(typing.Protocol):
+    """
+    Protocol for a workflow step.
+    """
+
+    def __call__(
+        self,
+        context: EngineContext,
+        *args: typing.Any,
+        **kwargs: typing.Any,
+    ) -> typing.Awaitable[typing.Any]: ...
+
+
+# -------------------------- SUPPORT CLASSES --------------------------------
+
+
+class EngineContext:
+    """
+    A context for the workflow engine which is passed to each step in the
+    workflow.
+    """
+
+    def __init__(self):
+        """
+        Constructor.
+        """
+        self._lock: asyncio.Lock = asyncio.Lock()
+        self._stack: typing.List[str] = []
+        self._state: typing.Dict[str, typing.Any] = {}
+        self._cache: typing.Dict[str, WorkflowStep] = {}
+
+    @property
+    def state(self) -> typing.Dict[str, typing.Any]:
+        """
+        Return the state object of the context.
+
+        :return: The state object.
+        """
+        return self._state
+
+    async def branch(
+        self,
+        name: str,
+        *args,
+        **kwargs,
+    ) -> typing.Any:
+        """
+        Call a workflow step by its name with parameters.
+
+        :param name: The name of the workflow step to call.
+        :param args: Positional arguments to pass to the step.
+        :param kwargs: Keyword arguments to pass to the step.
+
+        :return: The return value of the step.
+        """
+
+        log.debug(
+            f"Calling workflow step '{name}' with args: {args} and kwargs: {kwargs}"
+        )
+
+        # Turn the name into a fully qualified name.
+        fqn: str = self._resolve(name)
+
+        log.debug(f"Resolved workflow step '{name}' to '{fqn}'")
+
+        # Resolve the workflow step.
+        step = await self._fetch_callable(fqn)
+
+        # Turn the step into a callable.
+        self._stack.append(fqn)
+
+        try:
+            log.debug(f"Executing workflow step: '{fqn}'")
+
+            # Call the step with the provided arguments.
+            rc = await step(self, *args, **kwargs)
+
+            log.debug(f"Workflow step '{fqn}' returned: {rc}")
+
+            return rc
+
+        except rex.RestartEngineException as e:
+            # Make sure we resolve at the current stack level
+            log.debug(
+                f"Workflow step '{fqn}' raised RestartEngineException: {e}"
+            )
+
+            e.name = self._resolve(e.name)
+            raise
+
+        finally:
+            log.debug(f"Finished executing workflow step: '{fqn}'")
+
+            # Pop the current step from the stack, regardless
+            self._stack.pop()
+
+    def _resolve(self, name: str) -> str:
+        """
+        Resolve a workflow step name to a fully qualified name.
+
+        NOTE: This supports dot notation for relative paths. Same as Python.
+
+        :param name: The name of the workflow step to resolve.
+
+        :return: The fully qualified name of the workflow step.
+        """
+
+        # Nothing to do here.
+        if not self._stack:
+            return name
+
+        # Handle relative imports
+        new_parts = name.split(".")
+        old_parts = self._stack[-1].split(".")
+
+        # Nothing is relative
+        if new_parts[0] != "":
+            return name
+
+        # Handle relative paths
+        while new_parts[0] == "":
+            # We can't go up if there's nothing to go up from.
+            if not old_parts:
+                raise rex.WorkflowNotFoundException(name)
+
+            old_parts.pop()
+            new_parts = new_parts[1:]
+
+        # Join the old parts and new parts to form the fully qualified name.
+        new_name = ".".join(old_parts + new_parts)
+        return new_name
+
+    async def _fetch_callable(self, fqn: str) -> WorkflowStep:
+
+        try:
+            # Check if we already have this step cached.
+            async with self._lock:
+                if fqn in self._cache:
+                    return self._cache[fqn]
+
+                # Discover the module and function name from the FQN.
+                module_path, _, func_name = fqn.rpartition(".")
+                if not module_path or not func_name:
+                    raise rex.WorkflowNotFoundException(fqn)
+
+                # Try to import the module and get the function.
+                log.debug(
+                    f"Importing '{func_name}' from module '{module_path}'"
+                )
+                mod = __import__(module_path, fromlist=[func_name])
+                log.debug(f"Successfully imported '{module_path}'")
+                func = getattr(mod, func_name, None)
+
+                # Check that func is a module
+                if isinstance(func, type(mod)):
+                    # Look for 'entry' within the module
+                    log.debug(f"'{func_name}' is a module. Looking for entry.")
+                    mod = __import__(fqn, fromlist=["entry"])
+                    func = getattr(mod, "entry", None)
+
+                    log.debug(f"Found module '{fqn}' with entry '{func_name}'")
+
+                    if not func:
+                        log.debug(
+                            f"Function 'entry' not found in module '{fqn}'"
+                        )
+
+                # Make sure it's a WorkflowStep callable
+                if not isinstance(func, WorkflowStep):
+                    raise RuntimeError(
+                        f"Workflow step '{fqn}' is not a valid callable."
+                    )
+
+                self._cache[fqn] = func
+                return func
+
+        except Exception as e:
+            log.error(f"Failed to import workflow step '{fqn}': {e}")
+            raise rex.WorkflowNotFoundException(fqn) from e
+
+
+# -------------------------- ENGINE ITSELF ----------------------------------
 
 
 class Engine:
@@ -26,100 +207,51 @@ class Engine:
     A class with a big name and a little job.
     """
 
-    def __init__(self):
-        """
-        Constructor.
-        """
-        self._pipelines: typing.Dict[str, Pipeline] = {}
-
-    @property
-    def pipelines(self) -> typing.Dict[str, Pipeline]:
-        return self._pipelines
-
-    def initialize(
-        self,
-        pipelines: typing.List[str],
-    ):
-        """
-        Load all pipelines and chips.
-
-        :param pipelines: List of paths to the pipeline collection roots.
-        """
-        # Load all the collections
-        loader = PipelineLoader()
-        for r in pipelines:
-            col = loader.load_from_tree(r)
-            self._pipelines.update(col)
-
-        self._validate()
-
-    def shutdown(self):
-        pass
-
     async def run(
         self,
         entry: str,
-        variables: Variables,
+        *args,
+        **kwargs,
     ) -> typing.Any:
+        """
+        Runs a workflow step with the given context and parameters.
 
-        async def get_pipeline(name: str) -> typing.Optional[Pipeline]:
-            return self._pipelines.get(name, None)
+        :param entry: The name of the workflow step to run.
+        :param args: Positional arguments to pass to the step.
+        :param kwargs: Keyword arguments to pass to the step.
 
-        processor = Processor(resolver=get_pipeline)
-        return await processor.run(
-            variables=variables,
-            entry=entry,
-        )
+        :return: The return value of the workflow step.
+        """
 
-    # -------------- VALIDATION --------------------------------------------
+        t_entry = entry
+        t_args = args
+        t_kwargs = kwargs
 
-    def _validate(self):
-        """Validates the pipeline collections, as much as possible."""
+        context: EngineContext = EngineContext()
 
-        for name, pipeline in self._pipelines.items():
-
-            def check_tasks(tasks: typing.List[Task]):
-                for i, t in enumerate(tasks):
-                    if isinstance(t, BranchTask):
-                        # Check for the pipeline existence
-                        pipeline_name = t.branch
-                        if pipeline_name not in self._pipelines:
-                            raise rex.NoSuchPipelineDuringValidationException(
-                                task_no=i,
-                                pipeline=pipeline_name,
-                            )
-
-                    if isinstance(t, DispatchTask):
-                        # Check for the pipeline existence
-                        pipeline_name = t.dispatch
-                        if pipeline_name not in self._pipelines:
-                            raise rex.NoSuchPipelineDuringValidationException(
-                                task_no=i,
-                                pipeline=pipeline_name,
-                            )
-
-                    elif isinstance(t, ChipTask):
-                        # Check for the chip existence
-                        chip = Registry.get_chip(t.chip)
-                        if chip is None:
-                            raise rex.NoSuchChipDuringValidationException(
-                                task_no=i,
-                                chip=t.chip,
-                            )
-
-                    elif isinstance(t, TaskSet):
-                        # We need to deep-dive a TaskSet
-                        try:
-                            check_tasks(t.tasks)
-                        except rex.ValidationException as ex:
-                            raise rex.NestedValidationException(
-                                task_no=i,
-                            ) from ex
-
-                    else:
-                        continue
+        while True:
 
             try:
-                check_tasks(pipeline.tasks)
-            except rex.ValidationException as ex:
-                raise rex.ValidationException(source=name) from ex
+                rc = await context.branch(
+                    t_entry,
+                    *t_args,
+                    **t_kwargs,
+                )
+                return rc
+
+            except rex.RestartEngineException as e:
+                t_entry = e.name
+                t_args = e.args
+                t_kwargs = e.kwargs
+
+                log.debug(
+                    f"Top-level restarting workflow step '{t_entry}' with args: {t_args} and kwargs: {t_kwargs}"
+                )
+
+                continue
+
+            except rex.TerminateEngineException as e:
+                log.debug(
+                    f"Top-level terminating workflow step '{t_entry}' with return code: {e.rc}"
+                )
+                return e.rc

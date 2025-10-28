@@ -55,7 +55,7 @@ jobs:
       - name: Install reasonchip
         run: |
           cd ${{ github.workspace }}/
-          pip install -e .          
+          pip install -e .
 
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v3

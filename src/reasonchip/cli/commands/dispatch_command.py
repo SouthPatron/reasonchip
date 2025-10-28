@@ -7,31 +7,34 @@ import typing
 import argparse
 import re
 import json
+import uuid
 import logging
 import traceback
 
-from reasonchip import Engine
+from reasonchip.net.amqp_client import AmqpClient
+from reasonchip.net.protocol import SocketPacket, PacketType
 
 from .exit_code import ExitCode
 from .command import AsyncCommand
 
+log = logging.getLogger("reasonchip.cli.commands.dispatch")
 
-log = logging.getLogger("reasonchip.cli.commands.run")
 
-
-class RunCommand(AsyncCommand):
+class DispatchCommand(AsyncCommand):
 
     @classmethod
     def command(cls) -> str:
-        return "run"
+        return "dispatch"
 
     @classmethod
     def help(cls) -> str:
-        return "Run a workflow locally"
+        return "Dispatch a workflow"
 
     @classmethod
     def description(cls) -> str:
-        return "Run a workflow locally"
+        return """
+This dispatches a workflow with variables to the AMQP broker.
+"""
 
     @classmethod
     def build_parser(cls, parser: argparse.ArgumentParser):
@@ -57,8 +60,17 @@ class RunCommand(AsyncCommand):
             type=str,
             help="Set or override a configuration key-value pair.",
         )
+        parser.add_argument(
+            "--cookie",
+            action="store",
+            metavar="<UUID>",
+            default=None,
+            type=uuid.UUID,
+            help="Cookie to use (defaults to a random UUID)",
+        )
 
         cls.add_default_options(parser)
+        cls.add_amqp_client_options(parser)
 
     async def main(
         self,
@@ -85,23 +97,49 @@ class RunCommand(AsyncCommand):
             key, value = m[1], m[2]
             variables = self._deep_update(variables, key, value)
 
+        # Create the connection
         try:
-            # Create the Engine
-            engine = Engine()
 
-            # Run the engine and the run
-            rc = await engine.run(entry=args.workflow, **variables)
-            if rc:
-                print(json.dumps(rc))
+            # ------------- AMQP CHANNEL --------------------------------------
+            amqp = AmqpClient()
+            rc = await amqp.connect(
+                amqp_url=args.amqp_url,
+                exchange_name=args.amqp_exchange,
+            )
+            if rc == False:
+                raise ValueError(
+                    f"Failed to connect to AMQP broker at {args.amqp_url},"
+                    f" exchange {args.amqp_exchange}"
+                )
 
-            # Shutdown the engine
+            log.info("Connected to AMQP broker successfully")
+
+            # ------------- SEND PACKET ---------------------------------------
+
+            packet = SocketPacket(
+                packet_type=PacketType.RUN,
+                cookie=uuid.uuid4(),
+                workflow=args.workflow,
+                variables=json.dumps(variables) if variables else None,
+            )
+
+            success = await amqp.send_message(
+                topic=args.amqp_topic,
+                message=packet.model_dump_json().encode("utf-8"),
+            )
+
+            # ------------- CLEANUP AND SHUTDOWN ------------------------------
+
+            await amqp.disconnect()
+
+            if not success:
+                return ExitCode.ERROR
+
             return ExitCode.OK
 
-        except Exception:
-            print(f"************** UNHANDLED EXCEPTION **************")
-
+        except Exception as ex:
+            print("************** EXCEPTION ************************")
             traceback.print_exc()
-
             return ExitCode.ERROR
 
     # -------------------------- VARIABLES -----------------------------------
