@@ -8,7 +8,6 @@ from __future__ import annotations
 import typing
 import logging
 import asyncio
-import importlib
 
 from .. import exceptions as rex
 

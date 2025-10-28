@@ -12,7 +12,7 @@ import time
 
 from dataclasses import dataclass
 
-from reasonchip.core.engine.engine import Engine
+from .engine.engine import Engine
 
 log = logging.getLogger("reasonchip.net.task_manager")
 

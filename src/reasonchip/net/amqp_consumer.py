@@ -3,8 +3,6 @@ import logging
 import asyncio
 import enum
 
-from .simple_task import SimpleTask
-
 from aio_pika import connect_robust, ExchangeType
 from aio_pika.abc import (
     AbstractIncomingMessage,
@@ -12,6 +10,8 @@ from aio_pika.abc import (
     AbstractRobustConnection,
     AbstractRobustQueue,
 )
+
+from ..core.simple_task import SimpleTask
 
 log = logging.getLogger("reasonchip.net.amqp_consumer")
 

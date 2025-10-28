@@ -9,14 +9,11 @@ import signal
 import asyncio
 import traceback
 import logging
-import re
 import uuid
 
-from pathlib import Path
-
 from reasonchip.core.engine.engine import Engine
+from reasonchip.core.task_manager import TaskManager
 from reasonchip.net.amqp_consumer import AmqpConsumer, AMQPCallbackResp
-from reasonchip.net.task_manager import TaskManager
 from reasonchip.net.protocol import SocketPacket, PacketType
 
 from .exit_code import ExitCode
