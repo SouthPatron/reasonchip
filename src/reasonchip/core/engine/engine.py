@@ -8,6 +8,7 @@ from __future__ import annotations
 import typing
 import logging
 import asyncio
+import inspect
 
 from .. import exceptions as rex
 
@@ -28,7 +29,7 @@ class WorkflowStep(typing.Protocol):
         context: EngineContext,
         *args: typing.Any,
         **kwargs: typing.Any,
-    ) -> typing.Awaitable[typing.Any]: ...
+    ) -> typing.Any: ...
 
 
 # -------------------------- SUPPORT CLASSES --------------------------------
@@ -93,10 +94,11 @@ class EngineContext:
             log.debug(f"Executing workflow step: '{fqn}'")
 
             # Call the step with the provided arguments.
-            rc = await step(self, *args, **kwargs)
+            rc = step(self, *args, **kwargs)
+            if inspect.iscoroutine(rc):
+                rc = await rc
 
             log.debug(f"Workflow step '{fqn}' returned: {rc}")
-
             return rc
 
         except rex.RestartEngineException as e:
@@ -113,6 +115,42 @@ class EngineContext:
 
             # Pop the current step from the stack, regardless
             self._stack.pop()
+
+    def restart(
+        self,
+        name: str,
+        *args,
+        **kwargs,
+    ) -> typing.NoReturn:
+        """
+        Restart the workflow engine at a given step with parameters.
+
+        :param name: The name of the workflow step to restart at.
+        :param args: Positional arguments to pass to the step.
+        :param kwargs: Keyword arguments to pass to the step.
+
+        :raise RestartEngineException: Always raised to signal a restart.
+        """
+        log.debug(
+            f"Requesting restart of workflow step '{name}' with args: {args} and kwargs: {kwargs}"
+        )
+        raise rex.RestartEngineException(name, args, kwargs)
+
+    def terminate(
+        self,
+        rc: typing.Any = 0,
+    ) -> typing.NoReturn:
+        """
+        Terminate the workflow engine with a return code.
+
+        :param rc: The return value of the engine.
+
+        :raise TerminateEngineException: Always raised to signal a termination.
+        """
+        log.debug(f"Requesting termination of engine with rc: {rc}")
+        raise rex.TerminateEngineException(rc)
+
+    # -------------------------- PRIVATE METHODS -----------------------------
 
     def _resolve(self, name: str) -> str:
         """
@@ -151,48 +189,47 @@ class EngineContext:
         return new_name
 
     async def _fetch_callable(self, fqn: str) -> WorkflowStep:
+        async with self._lock:
+            if fqn in self._cache:
+                return self._cache[fqn]
 
+            func = self._load_callable(fqn)
+
+            self._cache[fqn] = func
+            return func
+
+    def _load_callable(self, fqn: str) -> WorkflowStep:
         try:
-            # Check if we already have this step cached.
-            async with self._lock:
-                if fqn in self._cache:
-                    return self._cache[fqn]
+            # Discover the module and function name from the FQN.
+            module_path, _, func_name = fqn.rpartition(".")
+            if not module_path or not func_name:
+                raise rex.WorkflowNotFoundException(fqn)
 
-                # Discover the module and function name from the FQN.
-                module_path, _, func_name = fqn.rpartition(".")
-                if not module_path or not func_name:
-                    raise rex.WorkflowNotFoundException(fqn)
+            # Try to import the module and get the function.
+            log.debug(f"Importing '{func_name}' from module '{module_path}'")
+            mod = __import__(module_path, fromlist=[func_name])
+            log.debug(f"Successfully imported '{module_path}'")
+            func = getattr(mod, func_name, None)
 
-                # Try to import the module and get the function.
-                log.debug(
-                    f"Importing '{func_name}' from module '{module_path}'"
+            # Check that func is a module
+            if isinstance(func, type(mod)):
+                # Look for 'entry' within the module
+                log.debug(f"'{func_name}' is a module. Looking for entry.")
+                mod = __import__(fqn, fromlist=["entry"])
+                func = getattr(mod, "entry", None)
+
+                log.debug(f"Found module '{fqn}' with entry '{func_name}'")
+
+                if not func:
+                    log.debug(f"Function 'entry' not found in module '{fqn}'")
+
+            # Make sure it's a WorkflowStep callable
+            if not isinstance(func, WorkflowStep):
+                raise RuntimeError(
+                    f"Workflow step '{fqn}' is not a valid callable."
                 )
-                mod = __import__(module_path, fromlist=[func_name])
-                log.debug(f"Successfully imported '{module_path}'")
-                func = getattr(mod, func_name, None)
 
-                # Check that func is a module
-                if isinstance(func, type(mod)):
-                    # Look for 'entry' within the module
-                    log.debug(f"'{func_name}' is a module. Looking for entry.")
-                    mod = __import__(fqn, fromlist=["entry"])
-                    func = getattr(mod, "entry", None)
-
-                    log.debug(f"Found module '{fqn}' with entry '{func_name}'")
-
-                    if not func:
-                        log.debug(
-                            f"Function 'entry' not found in module '{fqn}'"
-                        )
-
-                # Make sure it's a WorkflowStep callable
-                if not isinstance(func, WorkflowStep):
-                    raise RuntimeError(
-                        f"Workflow step '{fqn}' is not a valid callable."
-                    )
-
-                self._cache[fqn] = func
-                return func
+            return func
 
         except Exception as e:
             log.error(f"Failed to import workflow step '{fqn}': {e}")
@@ -230,16 +267,16 @@ class Engine:
         context: EngineContext = EngineContext()
 
         while True:
-
             try:
-                rc = await context.branch(
+                return await context.branch(
                     t_entry,
                     *t_args,
                     **t_kwargs,
                 )
-                return rc
 
             except rex.RestartEngineException as e:
+                assert not context._stack
+
                 t_entry = e.name
                 t_args = e.args
                 t_kwargs = e.kwargs
@@ -251,6 +288,8 @@ class Engine:
                 continue
 
             except rex.TerminateEngineException as e:
+                assert not context._stack
+
                 log.debug(
                     f"Top-level terminating workflow step '{t_entry}' with return code: {e.rc}"
                 )

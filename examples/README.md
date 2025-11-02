@@ -2,9 +2,7 @@
 
 ## Workflows
 
+Nothing to see here... move along.
 
-| Location | Description |
-| -------- | ----------- |
-| [Document a Python code base](./document_code_base/) | Document, comment, and add logging into a Python code base |
 
 
