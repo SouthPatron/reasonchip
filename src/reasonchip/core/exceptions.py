@@ -31,26 +31,8 @@ class WorkflowException(ReasonChipException):
     pass
 
 
-class WorkflowLoadException(WorkflowException):
-    """Raised when a Workflow can't be loaded."""
-
-    pass
-
-
-class WorkflowAlreadyExistsException(WorkflowException):
-    """Raised when a Workflow already exists and cannot be overwritten."""
-
-    pass
-
-
 class WorkflowNotFoundException(WorkflowException):
     """Raised when a Workflow cannot be found."""
-
-    pass
-
-
-class WorkflowStepMalformedException(WorkflowException):
-    """Raised when a Workflow step is malformed."""
 
     pass
 

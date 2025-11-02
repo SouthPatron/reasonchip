@@ -32,6 +32,51 @@ class WorkflowStep(typing.Protocol):
     ) -> typing.Any: ...
 
 
+class EngineCallbacks(typing.Protocol):
+    """
+    Protocol for engine hooks (callbacks).
+
+    Implement any subset of these methods to observe engine activity.
+    """
+
+    async def on_step_start(
+        self,
+        context: EngineContext,
+        fqn: str,
+        args: typing.Tuple,
+        kwargs: typing.Dict,
+    ) -> None: ...
+
+    async def on_step_end(
+        self,
+        context: EngineContext,
+        fqn: str,
+        result: typing.Any,
+    ) -> None: ...
+
+    async def on_restart(
+        self,
+        context: EngineContext,
+        fqn: str,
+        args: typing.Tuple,
+        kwargs: typing.Dict,
+    ) -> None: ...
+
+    async def on_terminate(
+        self,
+        context: EngineContext,
+        fqn: str,
+        rc: typing.Any,
+    ) -> None: ...
+
+    async def on_error(
+        self,
+        context: EngineContext,
+        fqn: str,
+        exc: Exception,
+    ) -> None: ...
+
+
 # -------------------------- SUPPORT CLASSES --------------------------------
 
 
@@ -41,7 +86,10 @@ class EngineContext:
     workflow.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        callbacks: typing.List[EngineCallbacks] = [],
+    ):
         """
         Constructor.
         """
@@ -49,6 +97,7 @@ class EngineContext:
         self._stack: typing.List[str] = []
         self._state: typing.Dict[str, typing.Any] = {}
         self._cache: typing.Dict[str, WorkflowStep] = {}
+        self._callbacks: typing.List[EngineCallbacks] = callbacks
 
     @property
     def state(self) -> typing.Dict[str, typing.Any]:
@@ -58,6 +107,12 @@ class EngineContext:
         :return: The state object.
         """
         return self._state
+
+    def add_callbacks(self, callbacks: EngineCallbacks) -> None:
+        self._callbacks.append(callbacks)
+
+    def remove_callbacks(self, callbacks: EngineCallbacks) -> None:
+        self._callbacks.remove(callbacks)
 
     async def branch(
         self,
@@ -93,10 +148,16 @@ class EngineContext:
         try:
             log.debug(f"Executing workflow step: '{fqn}'")
 
+            # Notify callbacks about step start
+            await self._notify("on_step_start", fqn, args, kwargs)
+
             # Call the step with the provided arguments.
             rc = step(self, *args, **kwargs)
             if inspect.iscoroutine(rc):
                 rc = await rc
+
+            # Notify callbacks about step end
+            await self._notify("on_step_end", fqn, rc)
 
             log.debug(f"Workflow step '{fqn}' returned: {rc}")
             return rc
@@ -107,7 +168,20 @@ class EngineContext:
                 f"Workflow step '{fqn}' raised RestartEngineException: {e}"
             )
 
+            await self._notify("on_restart", fqn, e.args, e.kwargs)
             e.name = self._resolve(e.name)
+            raise
+
+        except rex.TerminateEngineException as e:
+            log.debug(
+                f"Workflow step '{fqn}' raised TerminateEngineException: {e}"
+            )
+            await self._notify("on_terminate", fqn, e.rc)
+            raise
+
+        except Exception as e:
+            log.exception(f"Workflow step '{fqn}' raised an exception: {e}")
+            await self._notify("on_error", fqn, e)
             raise
 
         finally:
@@ -235,6 +309,15 @@ class EngineContext:
             log.error(f"Failed to import workflow step '{fqn}': {e}")
             raise rex.WorkflowNotFoundException(fqn) from e
 
+    async def _notify(self, event: str, *args, **kwargs):
+        """
+        Call callbacks methods if implemented.
+        """
+        for callback in self._callbacks:
+            fn = getattr(callback, event, None)
+            if fn is not None:
+                await fn(self, *args, **kwargs)
+
 
 # -------------------------- ENGINE ITSELF ----------------------------------
 
@@ -243,6 +326,14 @@ class Engine:
     """
     A class with a big name and a little job.
     """
+
+    def __init__(
+        self, callbacks: typing.Optional[typing.List[EngineCallbacks]] = None
+    ):
+        """
+        Constructor.
+        """
+        self._callbacks = callbacks or []
 
     async def run(
         self,
@@ -264,7 +355,7 @@ class Engine:
         t_args = args
         t_kwargs = kwargs
 
-        context: EngineContext = EngineContext()
+        context: EngineContext = EngineContext(callbacks=self._callbacks)
 
         while True:
             try:
