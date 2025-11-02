@@ -7,16 +7,3 @@ pre-commit>=4.2.0
 
 # Engine
 pydantic>=2
-
-# Servers
-aio-pika>=9.5.5
-
-# Persistence
-SQLAlchemy>=2.0.40
-asyncpg>=0.30.0
-aiosqlite>=0.21.0
-diff-match-patch>=20241021
-
-# RESTful
-httpx>=0.28.1
-

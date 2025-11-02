@@ -3,6 +3,8 @@
 # This file is part of ReasonChip and licensed under the GPLv3+.
 # See <https://www.gnu.org/licenses/> for details.
 
+import sys
+import os
 import typing
 import argparse
 import re
@@ -86,6 +88,8 @@ class RunCommand(AsyncCommand):
             variables = self._deep_update(variables, key, value)
 
         try:
+            sys.path.insert(0, os.getcwd())
+
             # Create the Engine
             engine = Engine()
 
