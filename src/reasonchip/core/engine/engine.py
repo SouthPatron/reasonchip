@@ -88,7 +88,7 @@ class EngineContext:
 
     def __init__(
         self,
-        callbacks: typing.List[EngineCallbacks] = [],
+        callbacks: typing.Optional[typing.List[EngineCallbacks]] = None,
     ):
         """
         Constructor.
@@ -97,7 +97,7 @@ class EngineContext:
         self._stack: typing.List[str] = []
         self._state: typing.Dict[str, typing.Any] = {}
         self._cache: typing.Dict[str, WorkflowStep] = {}
-        self._callbacks: typing.List[EngineCallbacks] = callbacks
+        self._callbacks: typing.List[EngineCallbacks] = callbacks or []
 
     @property
     def state(self) -> typing.Dict[str, typing.Any]:
